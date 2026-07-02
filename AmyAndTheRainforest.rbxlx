@@ -1,0 +1,2044 @@
+<roblox xmlns:xmime="http://schemas.microsoft.com/appx/2006/xmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
+<External>null</External>
+<External>nil</External>
+<Item class="Workspace" referent="RBX00000009">
+<Properties>
+<string name="Name">Workspace</string>
+</Properties>
+</Item>
+<Item class="Lighting" referent="RBX00000010">
+<Properties>
+<string name="Name">Lighting</string>
+</Properties>
+</Item>
+<Item class="ReplicatedStorage" referent="RBX00000002">
+<Properties>
+<string name="Name">ReplicatedStorage</string>
+</Properties>
+<Item class="ModuleScript" referent="RBX00000001">
+<Properties>
+<string name="Name">StoryData</string>
+<ProtectedString name="Source"><![CDATA[--[[
+	StoryData
+	=========
+	Every word of the story lives in this one module: chapter titles,
+	dialogue, objectives, and where things are placed in the world.
+
+	NOTE FOR THE AUTHOR:
+	This is a first-draft narrative written to match the game's title,
+	"Amy and the Rainforest". The original story at clara.jasonduffett.net
+	could not be reached from the build environment, so treat every line
+	below as a placeholder you can rewrite. Edit the text freely -- the
+	game engine only cares about the structure (ids, types, counts).
+
+	Quest types understood by the engine (StoryServer):
+	  "talk"    -> walk up to an NPC and press E (ProximityPrompt)
+	  "collect" -> touch `count` glowing pickups spawned at `spawnPoints`
+	  "reach"   -> walk into an invisible zone named in `zone`
+]]
+
+local StoryData = {}
+
+StoryData.GameTitle = "Amy and the Rainforest"
+
+----------------------------------------------------------------
+-- World layout constants (shared by WorldBuilder + StoryServer)
+----------------------------------------------------------------
+StoryData.Map = {
+	GroundY = 0,
+	SpawnPosition = Vector3.new(0, 4, -30),
+
+	-- The river cuts across the map at these Z coordinates
+	RiverNearZ = 235,
+	RiverFarZ = 265,
+
+	-- The Great Kapok Tree
+	TreePosition = Vector3.new(0, 0, 400),
+	TreeHeight = 110,
+	TreeRadius = 10,
+	ClimbRadius = 19, -- distance of the spiral platforms from tree centre
+	TopPlatformY = 112,
+}
+
+----------------------------------------------------------------
+-- Characters
+----------------------------------------------------------------
+-- kind: "monkey" | "sloth" | "toucan" | "flower" (how StoryServer draws them)
+StoryData.NPCs = {
+	{
+		id = "Milo",
+		display = "Milo the Monkey",
+		kind = "monkey",
+		position = Vector3.new(6, 0, 25),
+		faceZ = -1, -- looks back toward the spawn
+	},
+	{
+		id = "GrandmaSloth",
+		display = "Grandma Sloth",
+		kind = "sloth",
+		position = Vector3.new(8, 0, 168),
+		faceZ = -1,
+	},
+	{
+		id = "Tiki",
+		display = "Tiki the Toucan",
+		kind = "toucan",
+		position = Vector3.new(10, 0, 226),
+		faceZ = -1,
+	},
+	{
+		id = "RainFlower",
+		display = "The Rain Flower",
+		kind = "flower",
+		-- placed on the tree-top platform by StoryServer using Map values
+		position = Vector3.new(0, 113, 400),
+		faceZ = -1,
+	},
+}
+
+----------------------------------------------------------------
+-- Trigger zones (invisible boxes the player can walk into)
+----------------------------------------------------------------
+StoryData.Zones = {
+	{ name = "VillageGate", position = Vector3.new(0, 6, 120), size = Vector3.new(70, 12, 8) },
+	{ name = "FarBank", position = Vector3.new(0, 6, 278), size = Vector3.new(70, 12, 8) },
+	{ name = "TreeTop", position = Vector3.new(0, 116, 400), size = Vector3.new(30, 8, 30) },
+}
+
+----------------------------------------------------------------
+-- The story, chapter by chapter
+----------------------------------------------------------------
+StoryData.Chapters = {
+
+	----------------------------------------------------------------
+	{
+		id = "chapter1",
+		title = "Chapter One",
+		subtitle = "The Edge of the Rainforest",
+		quests = {
+			{
+				id = "meet_milo",
+				type = "talk",
+				npc = "Milo",
+				objective = "Say hello to the little monkey on the path",
+				intro = {
+					{ speaker = "Narrator", text = "Amy stepped off the riverboat and into a world of green. The rainforest hummed and whistled and buzzed all around her." },
+					{ speaker = "Amy", text = "Wow... it's even bigger than in my books!" },
+				},
+				dialogue = {
+					{ speaker = "Milo the Monkey", text = "Ooh-ooh! A visitor! We never get visitors anymore. I'm Milo!" },
+					{ speaker = "Amy", text = "Hi Milo! I'm Amy. Why don't you get visitors anymore?" },
+					{ speaker = "Milo the Monkey", text = "Because of the Great Dry, of course. It hasn't rained in the forest for a whole month. A MONTH!" },
+					{ speaker = "Milo the Monkey", text = "Grandma Sloth will explain everything. Follow the path to our village -- I'll race you there!" },
+				},
+			},
+			{
+				id = "walk_to_village",
+				type = "reach",
+				zone = "VillageGate",
+				objective = "Follow the jungle path to the animal village",
+				intro = {
+					{ speaker = "Narrator", text = "Milo scampered ahead, swinging from vine to vine. Amy hurried after him along the winding path." },
+				},
+			},
+		},
+	},
+
+	----------------------------------------------------------------
+	{
+		id = "chapter2",
+		title = "Chapter Two",
+		subtitle = "The Village With No Rain",
+		quests = {
+			{
+				id = "meet_grandma",
+				type = "talk",
+				npc = "GrandmaSloth",
+				objective = "Talk to Grandma Sloth in the village",
+				intro = {
+					{ speaker = "Narrator", text = "The village was quiet. The flowers drooped, the stream had shrunk to a trickle, and everyone looked terribly thirsty." },
+				},
+				dialogue = {
+					{ speaker = "Grandma Sloth", text = "Welcome, child. I am... Grandma... Sloth. Forgive me... I talk... slowly... even for a sloth. It is... too dry... to hurry." },
+					{ speaker = "Amy", text = "Milo told me it hasn't rained in a month. What happened?" },
+					{ speaker = "Grandma Sloth", text = "At the top of the Great Kapok Tree grows the Rain Flower. When its petals glow, the clouds come to drink, and then they water the whole forest." },
+					{ speaker = "Grandma Sloth", text = "But a wild wind blew three of its petals away... and without them, the flower sleeps, and the sky has forgotten us." },
+					{ speaker = "Amy", text = "Then I'll find the petals and carry them back up the tree!" },
+					{ speaker = "Grandma Sloth", text = "You have... a brave heart, Amy. The petals still glow -- look for their pink light in the shadows of the forest." },
+				},
+			},
+			{
+				id = "find_petals",
+				type = "collect",
+				item = "Rain Flower Petal",
+				pickupStyle = "petal",
+				count = 3,
+				objective = "Find the 3 glowing petals near the village",
+				spawnPoints = {
+					Vector3.new(-42, 0, 142),
+					Vector3.new(38, 0, 192),
+					Vector3.new(-28, 0, 212),
+				},
+				intro = {
+					{ speaker = "Milo the Monkey", text = "I saw pink sparkles near the big rocks and under the old trees! Ooh-ooh, let's look everywhere!" },
+				},
+				onComplete = {
+					{ speaker = "Amy", text = "That's all three petals! They're so warm... like little pieces of sunshine." },
+					{ speaker = "Milo the Monkey", text = "Now we just have to cross the river. Umm. About that. You'd better come see the bridge." },
+				},
+			},
+		},
+	},
+
+	----------------------------------------------------------------
+	{
+		id = "chapter3",
+		title = "Chapter Three",
+		subtitle = "The Broken Bridge",
+		quests = {
+			{
+				id = "meet_tiki",
+				type = "talk",
+				npc = "Tiki",
+				objective = "Talk to the toucan by the river",
+				dialogue = {
+					{ speaker = "Tiki the Toucan", text = "Halt! Who crosses the... oh. Nobody crosses anything. The wild wind smashed our bridge to bits." },
+					{ speaker = "Amy", text = "But I have to get to the Great Kapok Tree! I'm carrying the Rain Flower's petals." },
+					{ speaker = "Tiki the Toucan", text = "The PETALS?! Why didn't you say so! The wind scattered the bridge planks along the riverbank. Bring me three good ones and I'll lash them down with the strongest vines in the forest." },
+				},
+			},
+			{
+				id = "find_planks",
+				type = "collect",
+				item = "Bridge Plank",
+				pickupStyle = "plank",
+				count = 3,
+				objective = "Gather 3 planks scattered along the riverbank",
+				spawnPoints = {
+					Vector3.new(-45, 0, 222),
+					Vector3.new(48, 0, 230),
+					Vector3.new(24, 0, 204),
+				},
+				onComplete = {
+					{ speaker = "Tiki the Toucan", text = "Perfect planks! Stand back -- toucan at work!" },
+					{ speaker = "Narrator", text = "Tiki tugged and knotted and tightened the vines, and in no time at all the bridge stood proud across the river again." },
+					{ speaker = "Tiki the Toucan", text = "Off you go, Amy. And tell that old tree Tiki says hello!" },
+				},
+			},
+			{
+				id = "cross_river",
+				type = "reach",
+				zone = "FarBank",
+				objective = "Cross the bridge to the far side of the river",
+			},
+		},
+	},
+
+	----------------------------------------------------------------
+	{
+		id = "chapter4",
+		title = "Chapter Four",
+		subtitle = "The Great Kapok Tree",
+		quests = {
+			{
+				id = "climb_tree",
+				type = "reach",
+				zone = "TreeTop",
+				objective = "Climb the winding branches to the top of the Great Kapok Tree",
+				intro = {
+					{ speaker = "Narrator", text = "And there it was: the Great Kapok Tree, taller than a hundred houses, its branches spiralling up into the clouds." },
+					{ speaker = "Amy", text = "Okay, Amy. One branch at a time. Don't look down. Well... maybe look down a little, the view is amazing." },
+				},
+			},
+		},
+	},
+
+	----------------------------------------------------------------
+	{
+		id = "chapter5",
+		title = "Chapter Five",
+		subtitle = "The Rain Flower",
+		quests = {
+			{
+				id = "wake_flower",
+				type = "talk",
+				npc = "RainFlower",
+				promptText = "Return the petals",
+				objective = "Return the petals to the Rain Flower",
+				dialogue = {
+					{ speaker = "Narrator", text = "At the very top of the tree, in a nest of silver leaves, the Rain Flower slept. Amy knelt and gently pressed the three petals back into place." },
+					{ speaker = "Amy", text = "There you go. All better now. Please wake up -- the whole forest is waiting for you." },
+					{ speaker = "Narrator", text = "One by one, the petals began to glow. Pink, then gold, then every colour at once..." },
+				},
+			},
+		},
+	},
+}
+
+----------------------------------------------------------------
+-- Ending
+----------------------------------------------------------------
+StoryData.Ending = {
+	lines = {
+		{ speaker = "Narrator", text = "The Rain Flower opened wide and sang a single, shimmering note. Far away, the clouds heard it -- and they came racing across the sky." },
+		{ speaker = "Narrator", text = "Rain! Soft, warm, wonderful rain fell on every leaf and flower and thirsty little stream." },
+		{ speaker = "Milo the Monkey", text = "Ooh-ooh! Amy did it! AMY DID IT!" },
+		{ speaker = "Grandma Sloth", text = "Thank you... brave... Amy. The forest... will remember you... forever." },
+		{ speaker = "Amy", text = "I'll come back and visit. I promise. Somebody has to teach Milo how to play tag properly!" },
+	},
+	title = "The End",
+	subtitle = "Amy and the Rainforest",
+}
+
+return StoryData
+]]></ProtectedString>
+</Properties>
+</Item>
+</Item>
+<Item class="ServerScriptService" referent="RBX00000005">
+<Properties>
+<string name="Name">ServerScriptService</string>
+</Properties>
+<Item class="Script" referent="RBX00000003">
+<Properties>
+<string name="Name">WorldBuilder</string>
+<ProtectedString name="Source"><![CDATA[--[[
+	WorldBuilder
+	============
+	Builds the whole rainforest out of parts when the server starts:
+	spawn clearing, jungle path, animal village, river with a broken
+	bridge, and the Great Kapok Tree with its spiral climb.
+
+	Everything is procedural (no uploaded assets needed), and all the
+	key coordinates come from StoryData.Map so the story scripts and
+	the map always agree about where things are.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
+
+local StoryData = require(ReplicatedStorage:WaitForChild("StoryData"))
+local Map = StoryData.Map
+
+local rng = Random.new(20260702) -- deterministic layout
+
+local mapFolder = Instance.new("Folder")
+mapFolder.Name = "RainforestMap"
+
+----------------------------------------------------------------
+-- Helpers
+----------------------------------------------------------------
+local function makePart(props, parent)
+	local part = Instance.new("Part")
+	part.Anchored = true
+	part.TopSurface = Enum.SurfaceType.Smooth
+	part.BottomSurface = Enum.SurfaceType.Smooth
+	for key, value in pairs(props) do
+		part[key] = value
+	end
+	part.Parent = parent or mapFolder
+	return part
+end
+
+local GREENS = {
+	Color3.fromRGB(58, 125, 68),
+	Color3.fromRGB(44, 110, 58),
+	Color3.fromRGB(76, 145, 65),
+	Color3.fromRGB(38, 96, 72),
+}
+
+local function pickGreen()
+	return GREENS[rng:NextInteger(1, #GREENS)]
+end
+
+-- A simple jungle tree: cylinder trunk + a cluster of leaf balls
+local function makeTree(x, z, scale)
+	local trunkHeight = 14 * scale
+	local trunk = makePart({
+		Name = "TreeTrunk",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(trunkHeight, 2.2 * scale, 2.2 * scale),
+		CFrame = CFrame.new(x, Map.GroundY + trunkHeight / 2, z) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Color3.fromRGB(92, 62, 42),
+		Material = Enum.Material.Wood,
+	})
+	local leafCount = rng:NextInteger(2, 4)
+	for i = 1, leafCount do
+		local offset = Vector3.new(
+			rng:NextNumber(-3, 3) * scale,
+			rng:NextNumber(-1, 3) * scale,
+			rng:NextNumber(-3, 3) * scale
+		)
+		makePart({
+			Name = "TreeLeaves",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(1, 1, 1) * rng:NextNumber(7, 11) * scale,
+			CFrame = CFrame.new(Vector3.new(x, Map.GroundY + trunkHeight, z) + offset),
+			Color = pickGreen(),
+			Material = Enum.Material.Grass,
+			CanCollide = false,
+		})
+	end
+	return trunk
+end
+
+local function makeGlowMushroom(x, z)
+	local stemHeight = rng:NextNumber(1.5, 3)
+	makePart({
+		Name = "MushroomStem",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(stemHeight, 0.8, 0.8),
+		CFrame = CFrame.new(x, Map.GroundY + stemHeight / 2, z) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Color3.fromRGB(235, 225, 200),
+		CanCollide = false,
+	})
+	makePart({
+		Name = "MushroomCap",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(2.4, 1.4, 2.4),
+		CFrame = CFrame.new(x, Map.GroundY + stemHeight + 0.4, z),
+		Color = Color3.fromRGB(120, 220, 255),
+		Material = Enum.Material.Neon,
+		CanCollide = false,
+	})
+end
+
+local function makeFireflies(position)
+	local holder = makePart({
+		Name = "FireflyHolder",
+		Size = Vector3.new(1, 1, 1),
+		CFrame = CFrame.new(position),
+		Transparency = 1,
+		CanCollide = false,
+	})
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	emitter.Color = ColorSequence.new(Color3.fromRGB(255, 240, 150))
+	emitter.LightEmission = 1
+	emitter.Size = NumberSequence.new(0.35)
+	emitter.Lifetime = NumberRange.new(2, 4)
+	emitter.Rate = 3
+	emitter.Speed = NumberRange.new(0.5, 1.5)
+	emitter.SpreadAngle = Vector2.new(180, 180)
+	emitter.Parent = holder
+end
+
+----------------------------------------------------------------
+-- Lighting / atmosphere
+----------------------------------------------------------------
+Lighting.ClockTime = 14.5
+Lighting.Brightness = 2.4
+Lighting.Ambient = Color3.fromRGB(90, 110, 90)
+Lighting.OutdoorAmbient = Color3.fromRGB(120, 140, 115)
+Lighting.FogColor = Color3.fromRGB(170, 205, 170)
+Lighting.FogEnd = 550
+
+local atmosphere = Instance.new("Atmosphere")
+atmosphere.Density = 0.35
+atmosphere.Color = Color3.fromRGB(199, 220, 199)
+atmosphere.Haze = 1.4
+atmosphere.Parent = Lighting
+
+----------------------------------------------------------------
+-- Ground: near bank, river, far bank
+----------------------------------------------------------------
+local MAP_WIDTH = 190
+local NEAR_START_Z = -70
+local FAR_END_Z = 480
+
+-- Near bank (spawn, village)
+local nearLength = Map.RiverNearZ - NEAR_START_Z
+makePart({
+	Name = "GroundNear",
+	Size = Vector3.new(MAP_WIDTH, 4, nearLength),
+	CFrame = CFrame.new(0, Map.GroundY - 2, NEAR_START_Z + nearLength / 2),
+	Color = Color3.fromRGB(80, 128, 66),
+	Material = Enum.Material.Grass,
+})
+
+-- Far bank (deep jungle, Great Tree)
+local farLength = FAR_END_Z - Map.RiverFarZ
+makePart({
+	Name = "GroundFar",
+	Size = Vector3.new(MAP_WIDTH, 4, farLength),
+	CFrame = CFrame.new(0, Map.GroundY - 2, Map.RiverFarZ + farLength / 2),
+	Color = Color3.fromRGB(72, 120, 62),
+	Material = Enum.Material.Grass,
+})
+
+-- Riverbed + water
+local riverLength = Map.RiverFarZ - Map.RiverNearZ
+local riverMidZ = (Map.RiverNearZ + Map.RiverFarZ) / 2
+makePart({
+	Name = "Riverbed",
+	Size = Vector3.new(MAP_WIDTH, 4, riverLength),
+	CFrame = CFrame.new(0, Map.GroundY - 7, riverMidZ),
+	Color = Color3.fromRGB(196, 178, 128),
+	Material = Enum.Material.Sand,
+})
+makePart({
+	Name = "RiverWater",
+	Size = Vector3.new(MAP_WIDTH, 3.5, riverLength),
+	CFrame = CFrame.new(0, Map.GroundY - 3, riverMidZ),
+	Color = Color3.fromRGB(70, 140, 180),
+	Material = Enum.Material.Glass,
+	Transparency = 0.45,
+	CanCollide = false,
+})
+
+-- Gentle ramps so anyone who falls in the river can walk back out (near side)
+makePart({
+	Name = "RiverRampNear",
+	Size = Vector3.new(24, 1, 14),
+	CFrame = CFrame.new(-30, Map.GroundY - 3, Map.RiverNearZ - 1) * CFrame.Angles(math.rad(-35), 0, 0),
+	Color = Color3.fromRGB(196, 178, 128),
+	Material = Enum.Material.Sand,
+})
+makePart({
+	Name = "RiverRampFar",
+	Size = Vector3.new(24, 1, 14),
+	CFrame = CFrame.new(30, Map.GroundY - 3, Map.RiverFarZ + 1) * CFrame.Angles(math.rad(35), 0, 0),
+	Color = Color3.fromRGB(196, 178, 128),
+	Material = Enum.Material.Sand,
+})
+
+-- Invisible barrier over the river until the bridge is repaired.
+-- StoryServer removes this when chapter 3 is complete.
+makePart({
+	Name = "RiverBarrier",
+	Size = Vector3.new(MAP_WIDTH, 60, 4),
+	CFrame = CFrame.new(0, Map.GroundY + 20, riverMidZ),
+	Transparency = 1,
+})
+
+-- Invisible walls around the whole map so nobody falls off the edge
+local function makeWall(cframe, size)
+	makePart({ Name = "BoundaryWall", Size = size, CFrame = cframe, Transparency = 1 })
+end
+local midZ = (NEAR_START_Z + FAR_END_Z) / 2
+local totalLength = FAR_END_Z - NEAR_START_Z
+makeWall(CFrame.new(-MAP_WIDTH / 2, 30, midZ), Vector3.new(4, 80, totalLength))
+makeWall(CFrame.new(MAP_WIDTH / 2, 30, midZ), Vector3.new(4, 80, totalLength))
+makeWall(CFrame.new(0, 30, NEAR_START_Z), Vector3.new(MAP_WIDTH, 80, 4))
+makeWall(CFrame.new(0, 30, FAR_END_Z), Vector3.new(MAP_WIDTH, 80, 4))
+
+----------------------------------------------------------------
+-- Spawn point
+----------------------------------------------------------------
+local spawnLocation = Instance.new("SpawnLocation")
+spawnLocation.Name = "AmySpawn"
+spawnLocation.Size = Vector3.new(10, 1, 10)
+spawnLocation.CFrame = CFrame.new(Map.SpawnPosition.X, Map.GroundY + 0.5, Map.SpawnPosition.Z)
+spawnLocation.Anchored = true
+spawnLocation.Color = Color3.fromRGB(214, 190, 140)
+spawnLocation.Material = Enum.Material.WoodPlanks
+spawnLocation.Duration = 0
+spawnLocation.Parent = mapFolder
+
+-- A little wooden jetty behind the spawn (Amy arrived by riverboat)
+makePart({
+	Name = "Jetty",
+	Size = Vector3.new(8, 1, 18),
+	CFrame = CFrame.new(0, Map.GroundY + 0.4, -48),
+	Color = Color3.fromRGB(150, 110, 70),
+	Material = Enum.Material.WoodPlanks,
+})
+
+----------------------------------------------------------------
+-- The winding path (spawn -> village -> river -> tree)
+----------------------------------------------------------------
+local pathPoints = {
+	Vector3.new(0, 0, -38),
+	Vector3.new(4, 0, 10),
+	Vector3.new(-8, 0, 55),
+	Vector3.new(2, 0, 95),
+	Vector3.new(0, 0, 130),
+	Vector3.new(0, 0, 175),
+	Vector3.new(4, 0, 210),
+	Vector3.new(0, 0, 234),
+	-- (bridge crosses the river here)
+	Vector3.new(0, 0, 268),
+	Vector3.new(-6, 0, 310),
+	Vector3.new(4, 0, 350),
+	Vector3.new(0, 0, 382),
+}
+for i = 1, #pathPoints - 1 do
+	local a = pathPoints[i]
+	local b = pathPoints[i + 1]
+	local crossesRiver = (a.Z < riverMidZ) ~= (b.Z < riverMidZ)
+	if not crossesRiver then
+		local mid = (a + b) / 2
+		local length = (b - a).Magnitude + 4
+		makePart({
+			Name = "Path",
+			Size = Vector3.new(9, 0.35, length),
+			CFrame = CFrame.lookAt(Vector3.new(mid.X, Map.GroundY + 0.1, mid.Z), Vector3.new(b.X, Map.GroundY + 0.1, b.Z)),
+			Color = Color3.fromRGB(178, 152, 110),
+			Material = Enum.Material.Ground,
+			CanCollide = false,
+		})
+	end
+end
+
+----------------------------------------------------------------
+-- Jungle trees & undergrowth (kept away from the path corridor)
+----------------------------------------------------------------
+local function nearPath(x, z)
+	for i = 1, #pathPoints - 1 do
+		local a = pathPoints[i]
+		local b = pathPoints[i + 1]
+		local ab = Vector3.new(b.X - a.X, 0, b.Z - a.Z)
+		local t = math.clamp(((x - a.X) * ab.X + (z - a.Z) * ab.Z) / math.max(ab.Magnitude ^ 2, 0.01), 0, 1)
+		local px = a.X + ab.X * t
+		local pz = a.Z + ab.Z * t
+		if (Vector3.new(x - px, 0, z - pz)).Magnitude < 14 then
+			return true
+		end
+	end
+	return false
+end
+
+local function inRiver(z)
+	return z > Map.RiverNearZ - 8 and z < Map.RiverFarZ + 8
+end
+
+local function inVillage(x, z)
+	return math.abs(x) < 34 and z > 138 and z < 195
+end
+
+local function nearGreatTree(x, z)
+	return (Vector3.new(x - Map.TreePosition.X, 0, z - Map.TreePosition.Z)).Magnitude < Map.ClimbRadius + 16
+end
+
+for _ = 1, 110 do
+	local x = rng:NextNumber(-88, 88)
+	local z = rng:NextNumber(-60, 470)
+	if not nearPath(x, z) and not inRiver(z) and not inVillage(x, z) and not nearGreatTree(x, z) then
+		makeTree(x, z, rng:NextNumber(0.7, 1.9))
+	end
+end
+
+for _ = 1, 30 do
+	local x = rng:NextNumber(-80, 80)
+	local z = rng:NextNumber(-50, 460)
+	if not nearPath(x, z) and not inRiver(z) and not inVillage(x, z) and not nearGreatTree(x, z) then
+		makeGlowMushroom(x, z)
+	end
+end
+
+for _ = 1, 14 do
+	local x = rng:NextNumber(-70, 70)
+	local z = rng:NextNumber(-40, 450)
+	if not inRiver(z) then
+		makeFireflies(Vector3.new(x, Map.GroundY + rng:NextNumber(3, 8), z))
+	end
+end
+
+----------------------------------------------------------------
+-- The animal village
+----------------------------------------------------------------
+local function makeHut(x, z, wallColor)
+	local wall = makePart({
+		Name = "HutWall",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(8, 12, 12),
+		CFrame = CFrame.new(x, Map.GroundY + 4, z) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = wallColor,
+		Material = Enum.Material.Wood,
+	})
+	makePart({
+		Name = "HutRoof",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(15, 8, 15),
+		CFrame = CFrame.new(x, Map.GroundY + 9.5, z),
+		Color = Color3.fromRGB(120, 160, 70),
+		Material = Enum.Material.Grass,
+	})
+	-- doorway
+	makePart({
+		Name = "HutDoor",
+		Size = Vector3.new(3.4, 5.5, 1.2),
+		CFrame = CFrame.new(x, Map.GroundY + 2.75, z - 5.8),
+		Color = Color3.fromRGB(80, 55, 38),
+		Material = Enum.Material.Wood,
+		CanCollide = false,
+	})
+	return wall
+end
+
+makeHut(-22, 152, Color3.fromRGB(190, 155, 105))
+makeHut(24, 158, Color3.fromRGB(175, 140, 95))
+makeHut(-18, 184, Color3.fromRGB(200, 165, 115))
+makeHut(22, 186, Color3.fromRGB(185, 150, 100))
+
+-- Village campfire (unlit -- everything is dry!)
+makePart({
+	Name = "CampfireStones",
+	Shape = Enum.PartType.Cylinder,
+	Size = Vector3.new(0.8, 7, 7),
+	CFrame = CFrame.new(0, Map.GroundY + 0.4, 170) * CFrame.Angles(0, 0, math.rad(90)),
+	Color = Color3.fromRGB(120, 120, 120),
+	Material = Enum.Material.Slate,
+})
+
+-- Lantern posts
+local function makeLantern(x, z)
+	makePart({
+		Name = "LanternPost",
+		Size = Vector3.new(0.8, 7, 0.8),
+		CFrame = CFrame.new(x, Map.GroundY + 3.5, z),
+		Color = Color3.fromRGB(110, 80, 50),
+		Material = Enum.Material.Wood,
+	})
+	local bulb = makePart({
+		Name = "LanternBulb",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(1.6, 1.6, 1.6),
+		CFrame = CFrame.new(x, Map.GroundY + 7.3, z),
+		Color = Color3.fromRGB(255, 214, 130),
+		Material = Enum.Material.Neon,
+		CanCollide = false,
+	})
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 214, 130)
+	light.Range = 16
+	light.Brightness = 1.2
+	light.Parent = bulb
+end
+makeLantern(-8, 146)
+makeLantern(10, 178)
+makeLantern(-12, 176)
+
+----------------------------------------------------------------
+-- The bridge (broken + fixed versions; StoryServer swaps them)
+----------------------------------------------------------------
+local bridgeFolder = Instance.new("Folder")
+bridgeFolder.Name = "Bridge"
+bridgeFolder.Parent = mapFolder
+
+local brokenFolder = Instance.new("Folder")
+brokenFolder.Name = "Broken"
+brokenFolder.Parent = bridgeFolder
+
+local fixedFolder = Instance.new("Folder")
+fixedFolder.Name = "Fixed"
+fixedFolder.Parent = bridgeFolder
+
+-- Broken: a couple of sad, tilted planks poking out of each bank
+makePart({
+	Name = "BrokenPlankA",
+	Size = Vector3.new(6, 0.8, 10),
+	CFrame = CFrame.new(-2, Map.GroundY - 0.5, Map.RiverNearZ + 4) * CFrame.Angles(math.rad(-25), math.rad(8), 0),
+	Color = Color3.fromRGB(150, 110, 70),
+	Material = Enum.Material.WoodPlanks,
+}, brokenFolder)
+makePart({
+	Name = "BrokenPlankB",
+	Size = Vector3.new(6, 0.8, 8),
+	CFrame = CFrame.new(3, Map.GroundY - 0.8, Map.RiverFarZ - 3) * CFrame.Angles(math.rad(30), math.rad(-10), 0),
+	Color = Color3.fromRGB(150, 110, 70),
+	Material = Enum.Material.WoodPlanks,
+}, brokenFolder)
+-- Broken support posts
+makePart({
+	Name = "BridgePostNear",
+	Size = Vector3.new(1.2, 6, 1.2),
+	CFrame = CFrame.new(-5, Map.GroundY + 2, Map.RiverNearZ - 1),
+	Color = Color3.fromRGB(110, 80, 50),
+	Material = Enum.Material.Wood,
+}, brokenFolder)
+
+-- Fixed: a proper plank bridge with rope rails (hidden until repaired)
+local riverSpan = (Map.RiverFarZ - Map.RiverNearZ) + 10
+makePart({
+	Name = "BridgeDeck",
+	Size = Vector3.new(8, 0.9, riverSpan),
+	CFrame = CFrame.new(0, Map.GroundY + 0.6, riverMidZ),
+	Color = Color3.fromRGB(160, 118, 74),
+	Material = Enum.Material.WoodPlanks,
+}, fixedFolder)
+for side = -1, 1, 2 do
+	makePart({
+		Name = "BridgeRail",
+		Size = Vector3.new(0.5, 0.5, riverSpan),
+		CFrame = CFrame.new(3.8 * side, Map.GroundY + 3.4, riverMidZ),
+		Color = Color3.fromRGB(190, 170, 120),
+		Material = Enum.Material.Fabric,
+		CanCollide = false,
+	}, fixedFolder)
+	for i = 0, 4 do
+		makePart({
+			Name = "BridgeRailPost",
+			Size = Vector3.new(0.7, 3.4, 0.7),
+			CFrame = CFrame.new(3.8 * side, Map.GroundY + 2.2, Map.RiverNearZ - 4 + i * (riverSpan - 2) / 4),
+			Color = Color3.fromRGB(120, 88, 55),
+			Material = Enum.Material.Wood,
+			CanCollide = false,
+		}, fixedFolder)
+	end
+end
+
+-- Hide the fixed bridge until the story repairs it
+for _, part in ipairs(fixedFolder:GetDescendants()) do
+	if part:IsA("BasePart") then
+		part.Transparency = 1
+		part.CanCollide = false
+	end
+end
+
+----------------------------------------------------------------
+-- The Great Kapok Tree + spiral climb
+----------------------------------------------------------------
+local treePos = Map.TreePosition
+
+-- Trunk
+makePart({
+	Name = "GreatTreeTrunk",
+	Shape = Enum.PartType.Cylinder,
+	Size = Vector3.new(Map.TreeHeight + 14, Map.TreeRadius * 2, Map.TreeRadius * 2),
+	CFrame = CFrame.new(treePos.X, Map.GroundY + (Map.TreeHeight + 14) / 2 - 4, treePos.Z) * CFrame.Angles(0, 0, math.rad(90)),
+	Color = Color3.fromRGB(96, 66, 44),
+	Material = Enum.Material.Wood,
+})
+-- Root flare
+for i = 1, 7 do
+	local angle = (i / 7) * math.pi * 2
+	makePart({
+		Name = "GreatTreeRoot",
+		Size = Vector3.new(4, 5, 14),
+		CFrame = CFrame.new(
+			treePos.X + math.cos(angle) * (Map.TreeRadius + 4),
+			Map.GroundY + 1.5,
+			treePos.Z + math.sin(angle) * (Map.TreeRadius + 4)
+		) * CFrame.Angles(0, -angle + math.pi / 2, math.rad(12)),
+		Color = Color3.fromRGB(88, 60, 40),
+		Material = Enum.Material.Wood,
+	})
+end
+-- Canopy
+for i = 1, 9 do
+	local angle = rng:NextNumber(0, math.pi * 2)
+	local dist = rng:NextNumber(0, 16)
+	makePart({
+		Name = "GreatTreeCanopy",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(1, 1, 1) * rng:NextNumber(18, 30),
+		CFrame = CFrame.new(
+			treePos.X + math.cos(angle) * dist,
+			Map.GroundY + Map.TreeHeight + 10 + rng:NextNumber(-4, 8),
+			treePos.Z + math.sin(angle) * dist
+		),
+		Color = pickGreen(),
+		Material = Enum.Material.Grass,
+		CanCollide = false,
+	})
+end
+
+-- Spiral of branch platforms up the trunk
+local platformY = Map.GroundY + 7
+local angle = math.pi -- start on the path side (facing -Z)
+local step = 0
+while platformY < Map.TopPlatformY - 4 do
+	local px = treePos.X + math.cos(angle) * Map.ClimbRadius
+	local pz = treePos.Z + math.sin(angle) * Map.ClimbRadius
+	makePart({
+		Name = "BranchPlatform" .. step,
+		Size = Vector3.new(9, 1.4, 9),
+		CFrame = CFrame.new(px, platformY, pz) * CFrame.Angles(0, -angle, 0),
+		Color = Color3.fromRGB(104, 72, 48),
+		Material = Enum.Material.Wood,
+	})
+	-- a leafy tuft on every other platform for charm
+	if step % 2 == 0 then
+		makePart({
+			Name = "BranchLeaves",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(4, 2.5, 4),
+			CFrame = CFrame.new(px + 3.2, platformY + 1.6, pz),
+			Color = pickGreen(),
+			Material = Enum.Material.Grass,
+			CanCollide = false,
+		})
+	end
+	platformY = platformY + 5.5
+	angle = angle + 0.5
+	step = step + 1
+end
+
+-- First platform is reachable from a root ramp
+makePart({
+	Name = "TreeRamp",
+	Size = Vector3.new(8, 1, 22),
+	CFrame = CFrame.new(treePos.X + math.cos(math.pi) * Map.ClimbRadius, Map.GroundY + 3.5, treePos.Z + math.sin(math.pi) * Map.ClimbRadius - 9)
+		* CFrame.Angles(math.rad(-18), 0, 0),
+	Color = Color3.fromRGB(104, 72, 48),
+	Material = Enum.Material.Wood,
+})
+
+-- Tree-top platform where the Rain Flower lives
+makePart({
+	Name = "TreeTopPlatform",
+	Shape = Enum.PartType.Cylinder,
+	Size = Vector3.new(2, 26, 26),
+	CFrame = CFrame.new(treePos.X, Map.TopPlatformY, treePos.Z) * CFrame.Angles(0, 0, math.rad(90)),
+	Color = Color3.fromRGB(114, 82, 54),
+	Material = Enum.Material.Wood,
+})
+-- Silver-leaf nest around the top
+for i = 1, 8 do
+	local a = (i / 8) * math.pi * 2
+	makePart({
+		Name = "SilverLeaf",
+		Size = Vector3.new(5, 0.5, 8),
+		CFrame = CFrame.new(
+			treePos.X + math.cos(a) * 11,
+			Map.TopPlatformY + 1.4,
+			treePos.Z + math.sin(a) * 11
+		) * CFrame.Angles(math.rad(-14), -a + math.pi / 2, 0),
+		Color = Color3.fromRGB(196, 220, 200),
+		Material = Enum.Material.Grass,
+		CanCollide = false,
+	})
+end
+
+mapFolder.Parent = Workspace
+print("[WorldBuilder] Rainforest built.")
+]]></ProtectedString>
+</Properties>
+</Item>
+<Item class="Script" referent="RBX00000004">
+<Properties>
+<string name="Name">StoryServer</string>
+<ProtectedString name="Source"><![CDATA[--[[
+	StoryServer
+	===========
+	The story engine. Reads StoryData and runs the game:
+	  * builds the NPCs (and the Rain Flower) with talk prompts
+	  * creates trigger zones and collectible pickups
+	  * walks each player through chapters and quests
+	  * repairs the bridge, starts the rain, and plays the ending
+
+	This is a solo, story-driven experience: each player runs through
+	the story at their own pace with their own state.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local StoryData = require(ReplicatedStorage:WaitForChild("StoryData"))
+local Map = StoryData.Map
+
+----------------------------------------------------------------
+-- Remotes
+----------------------------------------------------------------
+local remotes = Instance.new("Folder")
+remotes.Name = "StoryRemotes"
+
+local function makeRemote(name)
+	local remote = Instance.new("RemoteEvent")
+	remote.Name = name
+	remote.Parent = remotes
+	return remote
+end
+
+local ShowDialogue = makeRemote("ShowDialogue") -- server -> client (lines)
+local DialogueFinished = makeRemote("DialogueFinished") -- client -> server
+local SetObjective = makeRemote("SetObjective") -- server -> client (text or nil)
+local ShowChapter = makeRemote("ShowChapter") -- server -> client (title, subtitle)
+local ShowEnding = makeRemote("ShowEnding") -- server -> client (title, subtitle)
+local ClientReady = makeRemote("ClientReady") -- client -> server
+
+remotes.Parent = ReplicatedStorage
+
+----------------------------------------------------------------
+-- NPC construction
+----------------------------------------------------------------
+local NPC_LOOKS = {
+	monkey = {
+		body = Color3.fromRGB(124, 87, 56),
+		belly = Color3.fromRGB(214, 186, 150),
+		size = 1.0,
+	},
+	sloth = {
+		body = Color3.fromRGB(140, 126, 100),
+		belly = Color3.fromRGB(186, 172, 144),
+		size = 1.15,
+	},
+	toucan = {
+		body = Color3.fromRGB(40, 40, 46),
+		belly = Color3.fromRGB(240, 235, 220),
+		size = 0.85,
+	},
+}
+
+local npcModels = {} -- id -> Model
+local npcPrompts = {} -- id -> ProximityPrompt
+
+local npcFolder = Instance.new("Folder")
+npcFolder.Name = "StoryNPCs"
+npcFolder.Parent = Workspace
+
+local function makeNPCPart(props, model)
+	local part = Instance.new("Part")
+	part.Anchored = true
+	part.CanCollide = false
+	part.TopSurface = Enum.SurfaceType.Smooth
+	part.BottomSurface = Enum.SurfaceType.Smooth
+	for key, value in pairs(props) do
+		part[key] = value
+	end
+	part.Parent = model
+	return part
+end
+
+local function addNameTag(rootPart, displayName)
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "NameTag"
+	billboard.Size = UDim2.new(0, 160, 0, 32)
+	billboard.StudsOffsetWorldSpace = Vector3.new(0, 4.4, 0)
+	billboard.AlwaysOnTop = true
+	billboard.MaxDistance = 60
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.Text = displayName
+	label.TextColor3 = Color3.fromRGB(255, 255, 240)
+	label.TextStrokeTransparency = 0.2
+	label.TextStrokeColor3 = Color3.fromRGB(30, 50, 30)
+	label.Font = Enum.Font.FredokaOne
+	label.TextScaled = true
+	label.Parent = billboard
+	billboard.Parent = rootPart
+end
+
+-- A cute blocky animal: body, belly, head, eyes + one signature feature
+local function buildAnimal(def)
+	local look = NPC_LOOKS[def.kind]
+	local s = look.size
+	local model = Instance.new("Model")
+	model.Name = def.id
+
+	local baseCFrame = CFrame.lookAt(
+		Vector3.new(def.position.X, Map.GroundY + 1.6 * s, def.position.Z),
+		Vector3.new(def.position.X, Map.GroundY + 1.6 * s, def.position.Z + (def.faceZ or 1) * 10)
+	)
+
+	local body = makeNPCPart({
+		Name = "Body",
+		Size = Vector3.new(2.6, 3.2, 2) * s,
+		CFrame = baseCFrame,
+		Color = look.body,
+		Material = Enum.Material.SmoothPlastic,
+		CanCollide = true,
+	}, model)
+
+	makeNPCPart({
+		Name = "Belly",
+		Size = Vector3.new(1.8, 2.2, 0.4) * s,
+		CFrame = baseCFrame * CFrame.new(0, -0.2 * s, -0.9 * s),
+		Color = look.belly,
+	}, model)
+
+	local head = makeNPCPart({
+		Name = "Head",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(2.4, 2.4, 2.4) * s,
+		CFrame = baseCFrame * CFrame.new(0, 2.4 * s, 0),
+		Color = look.body,
+	}, model)
+
+	for side = -1, 1, 2 do
+		makeNPCPart({
+			Name = "Eye",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(0.5, 0.5, 0.5) * s,
+			CFrame = baseCFrame * CFrame.new(0.5 * s * side, 2.6 * s, -1.05 * s),
+			Color = Color3.fromRGB(25, 25, 25),
+		}, model)
+	end
+
+	if def.kind == "monkey" then
+		-- curly tail
+		makeNPCPart({
+			Name = "Tail",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(3.4, 0.6, 0.6) * s,
+			CFrame = baseCFrame * CFrame.new(0, 0.4 * s, 1.6 * s) * CFrame.Angles(0, 0, math.rad(50)),
+			Color = look.body,
+		}, model)
+		-- tan face patch
+		makeNPCPart({
+			Name = "FacePatch",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(1.5, 1.2, 0.8) * s,
+			CFrame = baseCFrame * CFrame.new(0, 2.25 * s, -0.8 * s),
+			Color = look.belly,
+		}, model)
+	elseif def.kind == "sloth" then
+		-- sleepy eye patches
+		for side = -1, 1, 2 do
+			makeNPCPart({
+				Name = "EyePatch",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(0.9, 0.7, 0.4) * s,
+				CFrame = baseCFrame * CFrame.new(0.5 * s * side, 2.6 * s, -0.95 * s),
+				Color = Color3.fromRGB(96, 82, 62),
+			}, model)
+		end
+		-- long arms
+		for side = -1, 1, 2 do
+			makeNPCPart({
+				Name = "Arm",
+				Size = Vector3.new(0.7, 3.4, 0.7) * s,
+				CFrame = baseCFrame * CFrame.new(1.6 * s * side, -0.2 * s, 0),
+				Color = look.body,
+			}, model)
+		end
+	elseif def.kind == "toucan" then
+		-- the big orange beak
+		makeNPCPart({
+			Name = "Beak",
+			Size = Vector3.new(0.9, 0.8, 2.4) * s,
+			CFrame = baseCFrame * CFrame.new(0, 2.3 * s, -2.1 * s) * CFrame.Angles(math.rad(-8), 0, 0),
+			Color = Color3.fromRGB(255, 150, 40),
+			Material = Enum.Material.SmoothPlastic,
+		}, model)
+		-- little wings
+		for side = -1, 1, 2 do
+			makeNPCPart({
+				Name = "Wing",
+				Size = Vector3.new(0.5, 2.2, 1.6) * s,
+				CFrame = baseCFrame * CFrame.new(1.55 * s * side, 0.2 * s, 0.2 * s) * CFrame.Angles(0, 0, math.rad(12 * side)),
+				Color = Color3.fromRGB(60, 60, 66),
+			}, model)
+		end
+	end
+
+	addNameTag(head, def.display)
+	model.PrimaryPart = body
+	model.Parent = npcFolder
+	return model, body
+end
+
+-- The Rain Flower: a big sleeping flower on the tree-top platform
+local flowerPetals = {}
+local function buildRainFlower(def)
+	local model = Instance.new("Model")
+	model.Name = def.id
+	local pos = def.position
+
+	makeNPCPart({
+		Name = "Stem",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(3.2, 1.1, 1.1),
+		CFrame = CFrame.new(pos.X, pos.Y + 1.6, pos.Z) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Color3.fromRGB(80, 140, 80),
+		Material = Enum.Material.Grass,
+	}, model)
+
+	local core = makeNPCPart({
+		Name = "Core",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(2.4, 2.4, 2.4),
+		CFrame = CFrame.new(pos.X, pos.Y + 3.4, pos.Z),
+		Color = Color3.fromRGB(255, 214, 120),
+		Material = Enum.Material.SmoothPlastic,
+	}, model)
+
+	for i = 1, 6 do
+		local a = (i / 6) * math.pi * 2
+		local petal = makeNPCPart({
+			Name = "Petal",
+			Size = Vector3.new(2.2, 0.5, 3.4),
+			CFrame = CFrame.new(pos.X + math.cos(a) * 2.4, pos.Y + 3.4, pos.Z + math.sin(a) * 2.4)
+				* CFrame.Angles(math.rad(18), -a + math.pi / 2, 0),
+			Color = Color3.fromRGB(190, 130, 160), -- dim, sleeping pink
+			Material = Enum.Material.SmoothPlastic,
+		}, model)
+		table.insert(flowerPetals, petal)
+	end
+
+	addNameTag(core, def.display)
+	model.PrimaryPart = core
+	model.Parent = npcFolder
+	return model, core
+end
+
+for _, def in ipairs(StoryData.NPCs) do
+	local model, promptPart
+	if def.kind == "flower" then
+		model, promptPart = buildRainFlower(def)
+	else
+		model, promptPart = buildAnimal(def)
+	end
+	npcModels[def.id] = model
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "TalkPrompt"
+	prompt.ActionText = "Talk"
+	prompt.ObjectText = def.display
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 9
+	prompt.RequiresLineOfSight = false
+	prompt.Enabled = false
+	prompt.Parent = promptPart
+	npcPrompts[def.id] = prompt
+end
+
+----------------------------------------------------------------
+-- Trigger zones
+----------------------------------------------------------------
+local zoneParts = {} -- name -> Part
+local zoneFolder = Instance.new("Folder")
+zoneFolder.Name = "StoryZones"
+zoneFolder.Parent = Workspace
+
+for _, zoneDef in ipairs(StoryData.Zones) do
+	local part = Instance.new("Part")
+	part.Name = zoneDef.name
+	part.Size = zoneDef.size
+	part.CFrame = CFrame.new(zoneDef.position)
+	part.Anchored = true
+	part.CanCollide = false
+	part.Transparency = 1
+	part.Parent = zoneFolder
+	zoneParts[zoneDef.name] = part
+end
+
+----------------------------------------------------------------
+-- Per-player story state
+----------------------------------------------------------------
+local playerStates = {} -- player -> state table
+
+local function getState(player)
+	return playerStates[player]
+end
+
+local function currentQuest(state)
+	local chapter = StoryData.Chapters[state.chapterIndex]
+	if not chapter then
+		return nil, nil
+	end
+	return chapter.quests[state.questIndex], chapter
+end
+
+-- Blocking dialogue: sends lines to the client, waits until the player
+-- has clicked through them all.
+local function playDialogue(player, lines)
+	local state = getState(player)
+	if not state or not lines or #lines == 0 then
+		return
+	end
+	state.dialogueDone = false
+	ShowDialogue:FireClient(player, lines)
+	local waited = 0
+	while playerStates[player] and not state.dialogueDone and waited < 300 do
+		waited = waited + task.wait(0.1)
+	end
+end
+
+DialogueFinished.OnServerEvent:Connect(function(player)
+	local state = getState(player)
+	if state then
+		state.dialogueDone = true
+	end
+end)
+
+----------------------------------------------------------------
+-- Pickups (collect quests)
+----------------------------------------------------------------
+local activePickups = {} -- part -> {player=..., quest=...}
+
+local pickupFolder = Instance.new("Folder")
+pickupFolder.Name = "StoryPickups"
+pickupFolder.Parent = Workspace
+
+local function makePickup(quest, position, player)
+	local part = Instance.new("Part")
+	part.Anchored = true
+	part.CanCollide = false
+
+	if quest.pickupStyle == "plank" then
+		part.Name = "PlankPickup"
+		part.Size = Vector3.new(4, 0.6, 1.6)
+		part.Color = Color3.fromRGB(160, 118, 74)
+		part.Material = Enum.Material.WoodPlanks
+	else
+		part.Name = "PetalPickup"
+		part.Size = Vector3.new(2.6, 0.6, 2.6)
+		part.Color = Color3.fromRGB(255, 130, 190)
+		part.Material = Enum.Material.Neon
+	end
+
+	part.CFrame = CFrame.new(position.X, Map.GroundY + 2.2, position.Z)
+
+	local sparkle = Instance.new("ParticleEmitter")
+	sparkle.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	sparkle.Color = ColorSequence.new(Color3.fromRGB(255, 170, 220))
+	sparkle.LightEmission = 1
+	sparkle.Size = NumberSequence.new(0.5)
+	sparkle.Lifetime = NumberRange.new(0.8, 1.6)
+	sparkle.Rate = 6
+	sparkle.Speed = NumberRange.new(0.5, 1)
+	sparkle.SpreadAngle = Vector2.new(180, 180)
+	sparkle.Parent = part
+
+	local light = Instance.new("PointLight")
+	light.Color = part.Color
+	light.Range = 10
+	light.Brightness = 1.5
+	light.Parent = part
+
+	activePickups[part] = { player = player, quest = quest }
+	part.Parent = pickupFolder
+	return part
+end
+
+-- Gentle spin + bob so pickups catch the eye
+task.spawn(function()
+	local t = 0
+	RunService.Heartbeat:Connect(function(dt)
+		t = t + dt
+		for part in pairs(activePickups) do
+			if part.Parent then
+				local base = part:GetAttribute("BaseY")
+				if not base then
+					base = part.Position.Y
+					part:SetAttribute("BaseY", base)
+				end
+				part.CFrame = CFrame.new(part.Position.X, base + math.sin(t * 2) * 0.5, part.Position.Z)
+					* CFrame.Angles(0, t * 1.2, 0)
+			end
+		end
+	end)
+end)
+
+----------------------------------------------------------------
+-- World reactions to story progress
+----------------------------------------------------------------
+local function fixBridge()
+	local mapFolder = Workspace:FindFirstChild("RainforestMap")
+	if not mapFolder then
+		return
+	end
+	local bridge = mapFolder:FindFirstChild("Bridge")
+	if bridge then
+		local broken = bridge:FindFirstChild("Broken")
+		if broken then
+			broken:Destroy()
+		end
+		local fixed = bridge:FindFirstChild("Fixed")
+		if fixed then
+			for _, part in ipairs(fixed:GetDescendants()) do
+				if part:IsA("BasePart") then
+					TweenService:Create(part, TweenInfo.new(1), { Transparency = 0 }):Play()
+					part.CanCollide = not (part.Name == "BridgeRail" or part.Name == "BridgeRailPost")
+				end
+			end
+			-- rails shouldn't block, but the deck must
+			local deck = fixed:FindFirstChild("BridgeDeck")
+			if deck then
+				deck.CanCollide = true
+			end
+		end
+	end
+	local barrier = mapFolder:FindFirstChild("RiverBarrier")
+	if barrier then
+		barrier:Destroy()
+	end
+end
+
+-- After Amy meets Milo, he "races ahead" to wait at the village
+local function moveMiloToVillage()
+	local milo = npcModels["Milo"]
+	if milo and milo.PrimaryPart then
+		local target = CFrame.lookAt(Vector3.new(-8, Map.GroundY + 1.6, 158), Vector3.new(-8, Map.GroundY + 1.6, 148))
+		milo:PivotTo(target)
+	end
+end
+
+local function startTheRain()
+	-- glowing flower
+	for _, petal in ipairs(flowerPetals) do
+		petal.Material = Enum.Material.Neon
+		petal.Color = Color3.fromRGB(255, 150, 210)
+	end
+	local flower = npcModels["RainFlower"]
+	if flower and flower.PrimaryPart then
+		local light = Instance.new("PointLight")
+		light.Color = Color3.fromRGB(255, 180, 220)
+		light.Range = 40
+		light.Brightness = 2
+		light.Parent = flower.PrimaryPart
+	end
+
+	-- rain across the whole map
+	local rainPart = Instance.new("Part")
+	rainPart.Name = "RainCloudLayer"
+	rainPart.Size = Vector3.new(190, 1, 550)
+	rainPart.CFrame = CFrame.new(0, 150, 205)
+	rainPart.Anchored = true
+	rainPart.CanCollide = false
+	rainPart.Transparency = 1
+
+	local rain = Instance.new("ParticleEmitter")
+	rain.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	rain.Color = ColorSequence.new(Color3.fromRGB(170, 210, 255))
+	rain.Size = NumberSequence.new(0.4)
+	rain.Transparency = NumberSequence.new(0.3)
+	rain.Lifetime = NumberRange.new(3, 4)
+	rain.Rate = 800
+	rain.Speed = NumberRange.new(40, 55)
+	rain.EmissionDirection = Enum.NormalId.Bottom
+	rain.LightEmission = 0.4
+	rain.Parent = rainPart
+	rainPart.Parent = Workspace
+
+	-- the sky freshens up
+	TweenService:Create(Lighting, TweenInfo.new(4), {
+		FogColor = Color3.fromRGB(150, 190, 210),
+		OutdoorAmbient = Color3.fromRGB(135, 155, 150),
+		Brightness = 2.8,
+	}):Play()
+end
+
+local questCompletedHooks = {
+	meet_milo = moveMiloToVillage,
+	find_planks = fixBridge,
+	wake_flower = startTheRain,
+}
+
+----------------------------------------------------------------
+-- Quest engine
+----------------------------------------------------------------
+local advanceStory -- forward declaration
+
+local function questObjectiveText(state, quest)
+	if quest.type == "collect" then
+		return quest.objective .. "  (" .. tostring(state.collected) .. "/" .. tostring(quest.count) .. ")"
+	end
+	return quest.objective
+end
+
+local function startQuest(player, quest)
+	local state = getState(player)
+	if not state then
+		return
+	end
+	state.collected = 0
+	SetObjective:FireClient(player, questObjectiveText(state, quest))
+
+	if quest.intro then
+		playDialogue(player, quest.intro)
+	end
+
+	if quest.type == "talk" then
+		local prompt = npcPrompts[quest.npc]
+		if prompt then
+			if quest.promptText then
+				prompt.ActionText = quest.promptText
+			end
+			prompt.Enabled = true
+		end
+	elseif quest.type == "collect" then
+		for _, point in ipairs(quest.spawnPoints) do
+			makePickup(quest, point, player)
+		end
+	end
+	-- "reach" quests need no setup: the zones are always listening
+end
+
+local function completeQuest(player)
+	local state = getState(player)
+	if not state then
+		return
+	end
+	local quest = currentQuest(state)
+	if not quest then
+		return
+	end
+
+	if quest.type == "talk" then
+		local prompt = npcPrompts[quest.npc]
+		if prompt then
+			prompt.Enabled = false
+		end
+	end
+
+	if quest.onComplete then
+		playDialogue(player, quest.onComplete)
+	end
+
+	local hook = questCompletedHooks[quest.id]
+	if hook then
+		hook()
+	end
+
+	advanceStory(player)
+end
+
+advanceStory = function(player)
+	local state = getState(player)
+	if not state then
+		return
+	end
+
+	local chapter = StoryData.Chapters[state.chapterIndex]
+	state.questIndex = state.questIndex + 1
+
+	if chapter and state.questIndex > #chapter.quests then
+		state.chapterIndex = state.chapterIndex + 1
+		state.questIndex = 1
+		chapter = StoryData.Chapters[state.chapterIndex]
+		if chapter then
+			ShowChapter:FireClient(player, chapter.title, chapter.subtitle)
+			task.wait(3.2) -- let the title card breathe
+		end
+	end
+
+	local quest = currentQuest(state)
+	if quest then
+		startQuest(player, quest)
+	else
+		-- Story complete!
+		SetObjective:FireClient(player, nil)
+		playDialogue(player, StoryData.Ending.lines)
+		ShowEnding:FireClient(player, StoryData.Ending.title, StoryData.Ending.subtitle)
+	end
+end
+
+----------------------------------------------------------------
+-- Interactions
+----------------------------------------------------------------
+for npcId, prompt in pairs(npcPrompts) do
+	prompt.Triggered:Connect(function(player)
+		local state = getState(player)
+		if not state or state.busy then
+			return
+		end
+		local quest = currentQuest(state)
+		if quest and quest.type == "talk" and quest.npc == npcId then
+			state.busy = true
+			prompt.Enabled = false
+			playDialogue(player, quest.dialogue)
+			completeQuest(player)
+			state.busy = false
+		end
+	end)
+end
+
+-- Pickup touches
+pickupFolder.ChildAdded:Connect(function(part)
+	part.Touched:Connect(function(hit)
+		local character = hit.Parent
+		if not character then
+			return
+		end
+		local player = Players:GetPlayerFromCharacter(character)
+		if not player then
+			return
+		end
+		local info = activePickups[part]
+		if not info or info.player ~= player then
+			return
+		end
+		local state = getState(player)
+		if not state then
+			return
+		end
+		local quest = currentQuest(state)
+		if quest ~= info.quest then
+			return
+		end
+
+		activePickups[part] = nil
+		part:Destroy()
+
+		state.collected = state.collected + 1
+		SetObjective:FireClient(player, questObjectiveText(state, quest))
+
+		if state.collected >= quest.count and not state.busy then
+			state.busy = true
+			completeQuest(player)
+			state.busy = false
+		end
+	end)
+end)
+
+-- Zone entry
+local function tryCompleteReach(player, zoneName)
+	local state = getState(player)
+	if not state or state.busy then
+		return
+	end
+	local quest = currentQuest(state)
+	if quest and quest.type == "reach" and quest.zone == zoneName then
+		state.busy = true
+		completeQuest(player)
+		state.busy = false
+	end
+end
+
+for zoneName, zonePart in pairs(zoneParts) do
+	zonePart.Touched:Connect(function(hit)
+		local character = hit.Parent
+		if character then
+			local player = Players:GetPlayerFromCharacter(character)
+			if player then
+				tryCompleteReach(player, zoneName)
+			end
+		end
+	end)
+end
+
+-- Fallback poll: Touched doesn't fire for a player already standing
+-- inside a zone when their "reach" quest begins, so check positions too.
+task.spawn(function()
+	while true do
+		task.wait(0.5)
+		for player, state in pairs(playerStates) do
+			if not state.busy then
+				local quest = currentQuest(state)
+				if quest and quest.type == "reach" then
+					local character = player.Character
+					local root = character and character:FindFirstChild("HumanoidRootPart")
+					local zonePart = zoneParts[quest.zone]
+					if root and zonePart then
+						local offset = zonePart.Position - root.Position
+						local half = zonePart.Size / 2
+						if math.abs(offset.X) <= half.X
+							and math.abs(offset.Y) <= half.Y + 3
+							and math.abs(offset.Z) <= half.Z then
+							task.spawn(tryCompleteReach, player, quest.zone)
+						end
+					end
+				end
+			end
+		end
+	end
+end)
+
+----------------------------------------------------------------
+-- Player lifecycle
+----------------------------------------------------------------
+local function beginStory(player)
+	local state = getState(player)
+	if not state or state.started then
+		return
+	end
+	state.started = true
+
+	local firstChapter = StoryData.Chapters[1]
+	ShowChapter:FireClient(player, firstChapter.title, firstChapter.subtitle)
+	task.wait(3.2)
+
+	startQuest(player, firstChapter.quests[1])
+end
+
+local function initPlayer(player)
+	if playerStates[player] then
+		return
+	end
+	playerStates[player] = {
+		chapterIndex = 1,
+		questIndex = 1,
+		collected = 0,
+		busy = false,
+		started = false,
+		dialogueDone = false,
+	}
+end
+
+Players.PlayerAdded:Connect(initPlayer)
+for _, player in ipairs(Players:GetPlayers()) do
+	initPlayer(player)
+end
+
+ClientReady.OnServerEvent:Connect(function(player)
+	initPlayer(player)
+	task.spawn(beginStory, player)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	playerStates[player] = nil
+	for part, info in pairs(activePickups) do
+		if info.player == player then
+			activePickups[part] = nil
+			part:Destroy()
+		end
+	end
+end)
+
+print("[StoryServer] Story engine ready: " .. StoryData.GameTitle)
+]]></ProtectedString>
+</Properties>
+</Item>
+</Item>
+<Item class="StarterPlayer" referent="RBX00000008">
+<Properties>
+<string name="Name">StarterPlayer</string>
+</Properties>
+<Item class="StarterPlayerScripts" referent="RBX00000007">
+<Properties>
+<string name="Name">StarterPlayerScripts</string>
+</Properties>
+<Item class="LocalScript" referent="RBX00000006">
+<Properties>
+<string name="Name">StoryClient</string>
+<ProtectedString name="Source"><![CDATA[--[[
+	StoryClient
+	===========
+	Everything the player sees on screen:
+	  * the dialogue box with a typewriter effect
+	  * the objective tracker (top right)
+	  * chapter title cards and the ending card
+
+	Click, press E, Space or Enter to advance dialogue.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local remotes = ReplicatedStorage:WaitForChild("StoryRemotes")
+local ShowDialogue = remotes:WaitForChild("ShowDialogue")
+local DialogueFinished = remotes:WaitForChild("DialogueFinished")
+local SetObjective = remotes:WaitForChild("SetObjective")
+local ShowChapter = remotes:WaitForChild("ShowChapter")
+local ShowEnding = remotes:WaitForChild("ShowEnding")
+local ClientReady = remotes:WaitForChild("ClientReady")
+
+----------------------------------------------------------------
+-- Build the UI
+----------------------------------------------------------------
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "StoryUI"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.DisplayOrder = 10
+screenGui.Parent = playerGui
+
+local function addCorner(guiObject, radius)
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, radius)
+	corner.Parent = guiObject
+end
+
+-- Dialogue box -------------------------------------------------
+local dialogueFrame = Instance.new("Frame")
+dialogueFrame.Name = "DialogueFrame"
+dialogueFrame.AnchorPoint = Vector2.new(0.5, 1)
+dialogueFrame.Position = UDim2.new(0.5, 0, 1, -28)
+dialogueFrame.Size = UDim2.new(0.62, 0, 0, 150)
+dialogueFrame.BackgroundColor3 = Color3.fromRGB(24, 44, 30)
+dialogueFrame.BackgroundTransparency = 0.12
+dialogueFrame.BorderSizePixel = 0
+dialogueFrame.Visible = false
+dialogueFrame.Parent = screenGui
+addCorner(dialogueFrame, 16)
+
+local dialogueStroke = Instance.new("UIStroke")
+dialogueStroke.Color = Color3.fromRGB(140, 200, 120)
+dialogueStroke.Thickness = 2.5
+dialogueStroke.Parent = dialogueFrame
+
+local speakerLabel = Instance.new("TextLabel")
+speakerLabel.Name = "Speaker"
+speakerLabel.AnchorPoint = Vector2.new(0, 1)
+speakerLabel.Position = UDim2.new(0, 20, 0, 6)
+speakerLabel.Size = UDim2.new(0, 300, 0, 34)
+speakerLabel.BackgroundColor3 = Color3.fromRGB(94, 160, 80)
+speakerLabel.BorderSizePixel = 0
+speakerLabel.Font = Enum.Font.FredokaOne
+speakerLabel.TextSize = 22
+speakerLabel.TextColor3 = Color3.fromRGB(255, 255, 245)
+speakerLabel.Text = ""
+speakerLabel.AutomaticSize = Enum.AutomaticSize.X
+speakerLabel.Size = UDim2.new(0, 0, 0, 34)
+speakerLabel.Parent = dialogueFrame
+addCorner(speakerLabel, 10)
+
+local speakerPadding = Instance.new("UIPadding")
+speakerPadding.PaddingLeft = UDim.new(0, 14)
+speakerPadding.PaddingRight = UDim.new(0, 14)
+speakerPadding.Parent = speakerLabel
+
+local bodyLabel = Instance.new("TextLabel")
+bodyLabel.Name = "Body"
+bodyLabel.Position = UDim2.new(0, 24, 0, 18)
+bodyLabel.Size = UDim2.new(1, -48, 1, -52)
+bodyLabel.BackgroundTransparency = 1
+bodyLabel.Font = Enum.Font.GothamMedium
+bodyLabel.TextSize = 21
+bodyLabel.TextColor3 = Color3.fromRGB(240, 248, 235)
+bodyLabel.TextWrapped = true
+bodyLabel.TextXAlignment = Enum.TextXAlignment.Left
+bodyLabel.TextYAlignment = Enum.TextYAlignment.Top
+bodyLabel.Text = ""
+bodyLabel.Parent = dialogueFrame
+
+local hintLabel = Instance.new("TextLabel")
+hintLabel.Name = "Hint"
+hintLabel.AnchorPoint = Vector2.new(1, 1)
+hintLabel.Position = UDim2.new(1, -18, 1, -8)
+hintLabel.Size = UDim2.new(0, 260, 0, 20)
+hintLabel.BackgroundTransparency = 1
+hintLabel.Font = Enum.Font.Gotham
+hintLabel.TextSize = 14
+hintLabel.TextColor3 = Color3.fromRGB(190, 215, 180)
+hintLabel.TextXAlignment = Enum.TextXAlignment.Right
+hintLabel.Text = "click / E / Space to continue  ▶"
+hintLabel.Parent = dialogueFrame
+
+-- Invisible full-screen button that advances dialogue on click/tap
+local clickCatcher = Instance.new("TextButton")
+clickCatcher.Name = "ClickCatcher"
+clickCatcher.Size = UDim2.new(1, 0, 1, 0)
+clickCatcher.BackgroundTransparency = 1
+clickCatcher.Text = ""
+clickCatcher.Visible = false
+clickCatcher.ZIndex = 5
+clickCatcher.Parent = screenGui
+
+-- Objective tracker --------------------------------------------
+local objectiveFrame = Instance.new("Frame")
+objectiveFrame.Name = "ObjectiveFrame"
+objectiveFrame.AnchorPoint = Vector2.new(1, 0)
+objectiveFrame.Position = UDim2.new(1, -18, 0, 18)
+objectiveFrame.Size = UDim2.new(0, 320, 0, 74)
+objectiveFrame.BackgroundColor3 = Color3.fromRGB(24, 44, 30)
+objectiveFrame.BackgroundTransparency = 0.25
+objectiveFrame.BorderSizePixel = 0
+objectiveFrame.Visible = false
+objectiveFrame.Parent = screenGui
+addCorner(objectiveFrame, 12)
+
+local objectiveHeader = Instance.new("TextLabel")
+objectiveHeader.Position = UDim2.new(0, 14, 0, 8)
+objectiveHeader.Size = UDim2.new(1, -28, 0, 20)
+objectiveHeader.BackgroundTransparency = 1
+objectiveHeader.Font = Enum.Font.FredokaOne
+objectiveHeader.TextSize = 16
+objectiveHeader.TextColor3 = Color3.fromRGB(255, 214, 120)
+objectiveHeader.TextXAlignment = Enum.TextXAlignment.Left
+objectiveHeader.Text = "✦ Objective"
+objectiveHeader.Parent = objectiveFrame
+
+local objectiveText = Instance.new("TextLabel")
+objectiveText.Position = UDim2.new(0, 14, 0, 30)
+objectiveText.Size = UDim2.new(1, -28, 1, -38)
+objectiveText.BackgroundTransparency = 1
+objectiveText.Font = Enum.Font.GothamMedium
+objectiveText.TextSize = 16
+objectiveText.TextColor3 = Color3.fromRGB(240, 248, 235)
+objectiveText.TextWrapped = true
+objectiveText.TextXAlignment = Enum.TextXAlignment.Left
+objectiveText.TextYAlignment = Enum.TextYAlignment.Top
+objectiveText.Text = ""
+objectiveText.Parent = objectiveFrame
+
+-- Title / chapter card -----------------------------------------
+local titleOverlay = Instance.new("Frame")
+titleOverlay.Name = "TitleOverlay"
+titleOverlay.Size = UDim2.new(1, 0, 1, 0)
+titleOverlay.BackgroundColor3 = Color3.fromRGB(8, 18, 10)
+titleOverlay.BackgroundTransparency = 1
+titleOverlay.BorderSizePixel = 0
+titleOverlay.Visible = false
+titleOverlay.ZIndex = 20
+titleOverlay.Parent = screenGui
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+titleLabel.Position = UDim2.new(0.5, 0, 0.44, 0)
+titleLabel.Size = UDim2.new(0.8, 0, 0, 70)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Font = Enum.Font.FredokaOne
+titleLabel.TextSize = 52
+titleLabel.TextColor3 = Color3.fromRGB(255, 240, 200)
+titleLabel.TextTransparency = 1
+titleLabel.Text = ""
+titleLabel.ZIndex = 21
+titleLabel.Parent = titleOverlay
+
+local subtitleLabel = Instance.new("TextLabel")
+subtitleLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+subtitleLabel.Position = UDim2.new(0.5, 0, 0.54, 0)
+subtitleLabel.Size = UDim2.new(0.8, 0, 0, 40)
+subtitleLabel.BackgroundTransparency = 1
+subtitleLabel.Font = Enum.Font.Gotham
+subtitleLabel.TextSize = 26
+subtitleLabel.TextColor3 = Color3.fromRGB(200, 225, 190)
+subtitleLabel.TextTransparency = 1
+subtitleLabel.Text = ""
+subtitleLabel.ZIndex = 21
+subtitleLabel.Parent = titleOverlay
+
+----------------------------------------------------------------
+-- Dialogue playback
+----------------------------------------------------------------
+local dialogueQueue = {}
+local dialogueActive = false
+local advanceRequested = false
+
+local function requestAdvance()
+	advanceRequested = true
+end
+
+clickCatcher.Activated:Connect(requestAdvance)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then
+		return
+	end
+	if not dialogueActive then
+		return
+	end
+	if input.KeyCode == Enum.KeyCode.E
+		or input.KeyCode == Enum.KeyCode.Space
+		or input.KeyCode == Enum.KeyCode.Return then
+		requestAdvance()
+	end
+end)
+
+local function waitForAdvance()
+	advanceRequested = false
+	while not advanceRequested do
+		task.wait(0.05)
+	end
+end
+
+local function typewrite(label, text)
+	label.Text = text
+	local total = utf8.len(text) or string.len(text)
+	label.MaxVisibleGraphemes = 0
+	advanceRequested = false
+	local shown = 0
+	while shown < total do
+		if advanceRequested then
+			break -- skip straight to the full line
+		end
+		shown = shown + 1
+		label.MaxVisibleGraphemes = shown
+		task.wait(0.022)
+	end
+	label.MaxVisibleGraphemes = -1
+end
+
+local function playLines(lines)
+	dialogueActive = true
+	dialogueFrame.Visible = true
+	clickCatcher.Visible = true
+
+	for _, line in ipairs(lines) do
+		local speaker = line.speaker or ""
+		speakerLabel.Text = speaker
+		speakerLabel.Visible = speaker ~= ""
+
+		if speaker == "Narrator" then
+			speakerLabel.BackgroundColor3 = Color3.fromRGB(120, 110, 160)
+			bodyLabel.TextColor3 = Color3.fromRGB(225, 225, 245)
+		elseif speaker == "Amy" then
+			speakerLabel.BackgroundColor3 = Color3.fromRGB(214, 120, 140)
+			bodyLabel.TextColor3 = Color3.fromRGB(248, 240, 240)
+		else
+			speakerLabel.BackgroundColor3 = Color3.fromRGB(94, 160, 80)
+			bodyLabel.TextColor3 = Color3.fromRGB(240, 248, 235)
+		end
+
+		typewrite(bodyLabel, line.text or "")
+		waitForAdvance()
+	end
+
+	dialogueFrame.Visible = false
+	clickCatcher.Visible = false
+	dialogueActive = false
+	DialogueFinished:FireServer()
+end
+
+ShowDialogue.OnClientEvent:Connect(function(lines)
+	table.insert(dialogueQueue, lines)
+end)
+
+task.spawn(function()
+	while true do
+		if #dialogueQueue > 0 and not dialogueActive then
+			local lines = table.remove(dialogueQueue, 1)
+			playLines(lines)
+		end
+		task.wait(0.1)
+	end
+end)
+
+----------------------------------------------------------------
+-- Objective tracker
+----------------------------------------------------------------
+SetObjective.OnClientEvent:Connect(function(text)
+	if text and text ~= "" then
+		objectiveFrame.Visible = true
+		objectiveText.Text = text
+		-- little pop so updates are noticeable
+		objectiveFrame.BackgroundTransparency = 0
+		TweenService:Create(objectiveFrame, TweenInfo.new(0.6), { BackgroundTransparency = 0.25 }):Play()
+	else
+		objectiveFrame.Visible = false
+	end
+end)
+
+----------------------------------------------------------------
+-- Chapter cards / ending
+----------------------------------------------------------------
+local function showCard(title, subtitle, holdTime, keepDark)
+	titleOverlay.Visible = true
+	titleLabel.Text = title or ""
+	subtitleLabel.Text = subtitle or ""
+
+	local fadeIn = TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	TweenService:Create(titleOverlay, fadeIn, { BackgroundTransparency = 0.25 }):Play()
+	TweenService:Create(titleLabel, fadeIn, { TextTransparency = 0 }):Play()
+	TweenService:Create(subtitleLabel, fadeIn, { TextTransparency = 0 }):Play()
+
+	task.wait(holdTime or 2.6)
+
+	local fadeOut = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+	if not keepDark then
+		TweenService:Create(titleOverlay, fadeOut, { BackgroundTransparency = 1 }):Play()
+	end
+	TweenService:Create(titleLabel, fadeOut, { TextTransparency = 1 }):Play()
+	TweenService:Create(subtitleLabel, fadeOut, { TextTransparency = 1 }):Play()
+	task.wait(0.9)
+	if not keepDark then
+		titleOverlay.Visible = false
+	end
+end
+
+ShowChapter.OnClientEvent:Connect(function(title, subtitle)
+	task.spawn(showCard, title, subtitle, 2.4, false)
+end)
+
+ShowEnding.OnClientEvent:Connect(function(title, subtitle)
+	task.spawn(function()
+		showCard(title, subtitle, 6, false)
+		-- after the card fades, the player is free to wander in the rain
+	end)
+end)
+
+----------------------------------------------------------------
+-- Tell the server we're ready for the story to begin
+----------------------------------------------------------------
+task.wait(1) -- give the world a moment to stream in
+ClientReady:FireServer()
+]]></ProtectedString>
+</Properties>
+</Item>
+</Item>
+</Item>
+</roblox>
