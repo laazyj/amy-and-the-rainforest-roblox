@@ -1,36 +1,43 @@
-# Amy and the Rainforest — a solo Roblox story game
+# Amy and the Rain Forest — a solo Roblox story game
 
-A gentle, single-player, story-driven Roblox adventure. You play as Amy,
-who arrives in a rainforest where the rain has stopped. Guided by Milo
-the Monkey, Grandma Sloth, and Tiki the Toucan, Amy gathers the lost
-petals of the Rain Flower, repairs the river bridge, climbs the Great
-Kapok Tree, and brings the rain back.
+A gentle, single-player, story-driven Roblox adventure based on
+**"Amy and the Rain Forest" by Clara Dineen-Duffett**
+([clara.jasonduffett.net](https://clara.jasonduffett.net)).
 
-**Five chapters, ~10–15 minutes of play:**
+You play as Amy, who isn't allowed outside because of the huge rain
+forest — and whose dog Sam keeps dragging her back every time she tries
+to sneak out. When Sam is away at a farm, Amy slips out at last,
+squeezes through the wall of giant trees, and discovers a world
+parallel to their own: a beautiful paradise, home to a maroon squirrel,
+an orange fox and a golden lion. But when the village hears about it,
+they build a giant tree-chopping machine... and only Amy, standing in
+front of it, can convince them the forest is something to be proud of
+and take care of.
 
-1. **The Edge of the Rainforest** — meet Milo, follow the path to the village
-2. **The Village With No Rain** — Grandma Sloth explains the Great Dry; find 3 glowing petals
-3. **The Broken Bridge** — help Tiki by gathering 3 planks, then cross the river
-4. **The Great Kapok Tree** — climb the spiral of branch platforms
-5. **The Rain Flower** — return the petals and watch the rain come back
+**Four chapters, ~10–15 minutes of play:**
 
-## ⚠️ A note about the story
+1. **One Beautyfull Sunday** — Dad says no; Sam catches Amy at the gate (twice!)
+2. **The Unexplored World** — Sam's at the farm; the dark forest looms; squeeze through the gap
+3. **So Many Animals!** — meet the squirrel, the fox and the lion, then rush home to tell Mum
+4. **The Giant Tree-Chopping Machine** — stand in front of it and save the paradise
 
-This draft was written to match the game's title. The original story at
-`clara.jasonduffett.net` **could not be reached from the build
-environment** (the host is blocked by the sandbox's network policy), so
-the chapters, characters, and dialogue here are a placeholder narrative
-in the same spirit. **Every word of story text lives in one file** —
-[`src/ReplicatedStorage/StoryData.lua`](src/ReplicatedStorage/StoryData.lua)
-— so the real story can be dropped in by editing dialogue lines, chapter
-titles, and character names there, without touching the game engine.
+Narrator lines quoted from Clara's story keep her original spelling on
+purpose — "One beautyfull sunday", "Sam brang her back" — just like the
+highlights on the website.
+
+The scenery follows the site's hand-drawn hero illustration: a cream
+sky with little black birds, a wide scribbly-grass field, and the rain
+forest as a looming wall of giant trunks standing shoulder to shoulder,
+round two-tone canopies on top (bird nests and all) with one narrow
+gap, just Amy's size. The paradise inside uses the site's own palette:
+moss, gold, bubblegum pink and grape purple.
 
 ## How to play it (easiest way)
 
 1. Install [Roblox Studio](https://create.roblox.com/) (free).
 2. Download **`AmyAndTheRainforest.rbxlx`** from this repo.
 3. In Roblox Studio: **File → Open from File…** and pick it.
-4. Press **Play** (F5). The whole rainforest is built by script when the
+4. Press **Play** (F5). The whole world is built by script when the
    game starts — no assets to install.
 
 Controls: normal Roblox movement (WASD + Space). Walk up to characters
@@ -42,8 +49,8 @@ and press **E** to talk; click / **E** / **Space** to advance dialogue.
 |---|---|
 | `AmyAndTheRainforest.rbxlx` | Ready-to-open Roblox place file (generated) |
 | `src/ReplicatedStorage/StoryData.lua` | **The story**: chapters, quests, dialogue, positions |
-| `src/ServerScriptService/WorldBuilder.server.lua` | Builds the map: village, river, bridge, Great Kapok Tree |
-| `src/ServerScriptService/StoryServer.server.lua` | Quest engine: NPCs, prompts, pickups, zones, ending |
+| `src/ServerScriptService/WorldBuilder.server.lua` | Builds the map: village, field, forest wall, paradise |
+| `src/ServerScriptService/StoryServer.server.lua` | Quest engine: characters, prompts, zones, Sam, the machine |
 | `src/StarterPlayer/StarterPlayerScripts/StoryClient.client.lua` | Dialogue box, objective tracker, chapter cards |
 | `tools/build_rbxlx.py` | Regenerates the `.rbxlx` from `src/` |
 | `default.project.json` | [Rojo](https://rojo.space) project, if you prefer syncing |
@@ -54,9 +61,9 @@ Open `src/ReplicatedStorage/StoryData.lua`. The engine understands three
 quest types, so chapters are just data:
 
 ```lua
-{ id = "meet_milo",  type = "talk",    npc = "Milo",  dialogue = { ... } }
-{ id = "find_petals", type = "collect", item = "Rain Flower Petal", count = 3, spawnPoints = { ... } }
-{ id = "cross_river", type = "reach",   zone = "FarBank" }
+{ id = "ask_dad",     type = "talk",  npc = "Dad",       dialogue = { ... } }
+{ id = "sneak_out_1", type = "reach", zone = "GardenGate" }
+-- "collect" quests (touch N glowing pickups) are supported too
 ```
 
 Change any `text = "..."` line to rewrite dialogue. Add or remove quests
@@ -73,7 +80,9 @@ python3 tools/build_rbxlx.py
   could be added to remember progress).
 - No sound or music yet (uploaded audio assets need a Roblox account to
   publish under).
-- NPCs are cute blocky animals built from parts, not rigged/animated
-  characters.
+- Characters are cute blocky figures built from parts, not
+  rigged/animated avatars; Sam "catching" Amy is a friendly teleport
+  back to the garden rather than a chase.
 - Written as a solo experience; multiple players each get their own
-  story progress, but NPCs are shared in the world.
+  story progress, but the characters and the machine are shared in the
+  world.

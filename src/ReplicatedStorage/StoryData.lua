@@ -4,74 +4,92 @@
 	Every word of the story lives in this one module: chapter titles,
 	dialogue, objectives, and where things are placed in the world.
 
-	NOTE FOR THE AUTHOR:
-	This is a first-draft narrative written to match the game's title,
-	"Amy and the Rainforest". The original story at clara.jasonduffett.net
-	could not be reached from the build environment, so treat every line
-	below as a placeholder you can rewrite. Edit the text freely -- the
-	game engine only cares about the structure (ids, types, counts).
+	Based on "Amy and the Rain Forest" by Clara Dineen-Duffett
+	(clara.jasonduffett.net). Narrator lines quoted directly from the
+	story keep Clara's original spelling on purpose -- they're part of
+	its charm, just like the highlights on the website.
 
 	Quest types understood by the engine (StoryServer):
-	  "talk"    -> walk up to an NPC and press E (ProximityPrompt)
+	  "talk"    -> walk up to a character and press E (ProximityPrompt)
 	  "collect" -> touch `count` glowing pickups spawned at `spawnPoints`
 	  "reach"   -> walk into an invisible zone named in `zone`
 ]]
 
 local StoryData = {}
 
-StoryData.GameTitle = "Amy and the Rainforest"
+StoryData.GameTitle = "Amy and the Rain Forest"
+StoryData.Author = "a story by Clara"
 
 ----------------------------------------------------------------
 -- World layout constants (shared by WorldBuilder + StoryServer)
 ----------------------------------------------------------------
 StoryData.Map = {
 	GroundY = 0,
-	SpawnPosition = Vector3.new(0, 4, -30),
 
-	-- The river cuts across the map at these Z coordinates
-	RiverNearZ = 235,
-	RiverFarZ = 265,
+	-- Amy's garden (spawn) and house
+	SpawnPosition = Vector3.new(0, 4, -26),
+	HousePosition = Vector3.new(0, 0, -44),
+	GardenGateZ = -16, -- front fence line of the garden
 
-	-- The Great Kapok Tree
-	TreePosition = Vector3.new(0, 0, 400),
-	TreeHeight = 110,
-	TreeRadius = 10,
-	ClimbRadius = 19, -- distance of the spiral platforms from tree centre
-	TopPlatformY = 112,
+	-- The looming wall of giant trees (like the hero drawing)
+	ForestWallZ = 150,
+	ForestGapHalfWidth = 6, -- the narrow squeeze-through at x = 0
+	ForestEndZ = 420,
+
+	-- Width of the playable world
+	MapHalfWidth = 95,
+
+	-- Where the tree-chopping machine parks in the finale
+	MachinePosition = Vector3.new(0, 0, 95),
 }
 
 ----------------------------------------------------------------
 -- Characters
 ----------------------------------------------------------------
--- kind: "monkey" | "sloth" | "toucan" | "flower" (how StoryServer draws them)
+-- kind: "human" | "dog" | "squirrel" | "fox" | "lion"
 StoryData.NPCs = {
 	{
-		id = "Milo",
-		display = "Milo the Monkey",
-		kind = "monkey",
-		position = Vector3.new(6, 0, 25),
-		faceZ = -1, -- looks back toward the spawn
-	},
-	{
-		id = "GrandmaSloth",
-		display = "Grandma Sloth",
-		kind = "sloth",
-		position = Vector3.new(8, 0, 168),
+		id = "Dad",
+		display = "Dad",
+		kind = "human",
+		shirt = Color3.fromRGB(90, 122, 80),
+		position = Vector3.new(6, 0, -26),
 		faceZ = -1,
 	},
 	{
-		id = "Tiki",
-		display = "Tiki the Toucan",
-		kind = "toucan",
-		position = Vector3.new(10, 0, 226),
+		id = "Mum",
+		display = "Mum",
+		kind = "human",
+		shirt = Color3.fromRGB(124, 77, 178), -- Clara's grape accent
+		position = Vector3.new(-6, 0, -33),
+		faceZ = 1,
+	},
+	{
+		id = "Sam",
+		display = "Sam the Dog",
+		kind = "dog",
+		position = Vector3.new(3, 0, -20),
 		faceZ = -1,
 	},
 	{
-		id = "RainFlower",
-		display = "The Rain Flower",
-		kind = "flower",
-		-- placed on the tree-top platform by StoryServer using Map values
-		position = Vector3.new(0, 113, 400),
+		id = "Squirrel",
+		display = "the Maroon Squirrel",
+		kind = "squirrel",
+		position = Vector3.new(-30, 0, 215),
+		faceZ = -1,
+	},
+	{
+		id = "Fox",
+		display = "the Orange Fox",
+		kind = "fox",
+		position = Vector3.new(35, 0, 248),
+		faceZ = -1,
+	},
+	{
+		id = "Lion",
+		display = "the Golden Lion",
+		kind = "lion",
+		position = Vector3.new(0, 0, 298),
 		faceZ = -1,
 	},
 }
@@ -80,9 +98,18 @@ StoryData.NPCs = {
 -- Trigger zones (invisible boxes the player can walk into)
 ----------------------------------------------------------------
 StoryData.Zones = {
-	{ name = "VillageGate", position = Vector3.new(0, 6, 120), size = Vector3.new(70, 12, 8) },
-	{ name = "FarBank", position = Vector3.new(0, 6, 278), size = Vector3.new(70, 12, 8) },
-	{ name = "TreeTop", position = Vector3.new(0, 116, 400), size = Vector3.new(30, 8, 30) },
+	-- the garden gate Amy keeps trying to sneak through
+	{ name = "GardenGate", position = Vector3.new(0, 5, -13), size = Vector3.new(10, 10, 5) },
+	-- the grass in front of the looming tree wall
+	{ name = "ForestEdge", position = Vector3.new(0, 5, 136), size = Vector3.new(60, 10, 8) },
+	-- just inside the narrow gap between the giant trunks
+	{ name = "ForestGap", position = Vector3.new(0, 5, 160), size = Vector3.new(14, 12, 8) },
+	-- the heart of the parallel world
+	{ name = "HeartGlade", position = Vector3.new(0, 5, 255), size = Vector3.new(40, 10, 30) },
+	-- back home in the garden
+	{ name = "HomeGarden", position = Vector3.new(0, 5, -26), size = Vector3.new(26, 10, 16) },
+	-- the patch of grass between the machine and the forest
+	{ name = "MachineFront", position = Vector3.new(0, 5, 110), size = Vector3.new(16, 10, 9) },
 }
 
 ----------------------------------------------------------------
@@ -94,31 +121,50 @@ StoryData.Chapters = {
 	{
 		id = "chapter1",
 		title = "Chapter One",
-		subtitle = "The Edge of the Rainforest",
+		subtitle = "One Beautyfull Sunday",
 		quests = {
 			{
-				id = "meet_milo",
+				id = "ask_dad",
 				type = "talk",
-				npc = "Milo",
-				objective = "Say hello to the little monkey on the path",
+				npc = "Dad",
+				objective = "Ask Dad if you can go outside",
 				intro = {
-					{ speaker = "Narrator", text = "Amy stepped off the riverboat and into a world of green. The rainforest hummed and whistled and buzzed all around her." },
-					{ speaker = "Amy", text = "Wow... it's even bigger than in my books!" },
+					{ speaker = "Narrator", text = "One beautyfull sunday, Amy asked to go outside." },
 				},
 				dialogue = {
-					{ speaker = "Milo the Monkey", text = "Ooh-ooh! A visitor! We never get visitors anymore. I'm Milo!" },
-					{ speaker = "Amy", text = "Hi Milo! I'm Amy. Why don't you get visitors anymore?" },
-					{ speaker = "Milo the Monkey", text = "Because of the Great Dry, of course. It hasn't rained in the forest for a whole month. A MONTH!" },
-					{ speaker = "Milo the Monkey", text = "Grandma Sloth will explain everything. Follow the path to our village -- I'll race you there!" },
+					{ speaker = "Amy", text = "Dad, can I go outside? Please? It's the most beautiful Sunday there has ever been!" },
+					{ speaker = "Dad", text = "No, it to Dangerous because of the huge rain forest." },
+					{ speaker = "Amy", text = "But Dad--" },
+					{ speaker = "Dad", text = "No buts, Amy. Nobody from the village ever goes near those trees. And besides... Sam is watching you." },
+					{ speaker = "Narrator", text = "By the garden gate, Sam the dog tilted his head and thumped his tail. He was ALWAYS watching." },
 				},
 			},
 			{
-				id = "walk_to_village",
+				id = "sneak_out_1",
 				type = "reach",
-				zone = "VillageGate",
-				objective = "Follow the jungle path to the animal village",
+				zone = "GardenGate",
+				objective = "Sneak out through the garden gate... quietly!",
 				intro = {
-					{ speaker = "Narrator", text = "Milo scampered ahead, swinging from vine to vine. Amy hurried after him along the winding path." },
+					{ speaker = "Amy", text = "Hmph. 'Too dangerous.' I'll just have a tiny little look. What Dad doesn't know can't worry him..." },
+				},
+				onComplete = {
+					{ speaker = "Sam the Dog", text = "WOOF!" },
+					{ speaker = "Narrator", text = "She tryed to go out side but thier dog Sam always brought her back in." },
+					{ speaker = "Amy", text = "Saaaam! Let go of my jumper! Fine. FINE. I'm going." },
+				},
+			},
+			{
+				id = "sneak_out_2",
+				type = "reach",
+				zone = "GardenGate",
+				objective = "Wait for Sam to look away, then try the gate again",
+				intro = {
+					{ speaker = "Amy", text = "Okay. New plan. Tip-toes this time. Sam can't hear tip-toes. Nobody can hear tip-toes." },
+				},
+				onComplete = {
+					{ speaker = "Sam the Dog", text = "Woof woof!" },
+					{ speaker = "Narrator", text = "She tryed again but Sam brang her back." },
+					{ speaker = "Amy", text = "You are the best guard dog in the whole world, Sam, and it is EXTREMELY annoying." },
 				},
 			},
 		},
@@ -128,44 +174,41 @@ StoryData.Chapters = {
 	{
 		id = "chapter2",
 		title = "Chapter Two",
-		subtitle = "The Village With No Rain",
+		subtitle = "The Unexplored World",
 		quests = {
 			{
-				id = "meet_grandma",
-				type = "talk",
-				npc = "GrandmaSloth",
-				objective = "Talk to Grandma Sloth in the village",
+				id = "walk_to_forest",
+				type = "reach",
+				zone = "ForestEdge",
+				objective = "Sam is away at the farm -- cross the field to the rain forest!",
 				intro = {
-					{ speaker = "Narrator", text = "The village was quiet. The flowers drooped, the stream had shrunk to a trickle, and everyone looked terribly thirsty." },
+					{ speaker = "Narrator", text = "One day when her dog was out at a farm, Amy managed to get outside." },
+					{ speaker = "Amy", text = "No Dad. No Sam. Just me, the grass, and... oh my. THAT." },
 				},
-				dialogue = {
-					{ speaker = "Grandma Sloth", text = "Welcome, child. I am... Grandma... Sloth. Forgive me... I talk... slowly... even for a sloth. It is... too dry... to hurry." },
-					{ speaker = "Amy", text = "Milo told me it hasn't rained in a month. What happened?" },
-					{ speaker = "Grandma Sloth", text = "At the top of the Great Kapok Tree grows the Rain Flower. When its petals glow, the clouds come to drink, and then they water the whole forest." },
-					{ speaker = "Grandma Sloth", text = "But a wild wind blew three of its petals away... and without them, the flower sleeps, and the sky has forgotten us." },
-					{ speaker = "Amy", text = "Then I'll find the petals and carry them back up the tree!" },
-					{ speaker = "Grandma Sloth", text = "You have... a brave heart, Amy. The petals still glow -- look for their pink light in the shadows of the forest." },
+				onComplete = {
+					{ speaker = "Narrator", text = "Then suddenly a dark forest loomed infront of her." },
+					{ speaker = "Amy", text = "The trees are like a giant wall... they're holding hands so nobody can get in. But look -- there's a little gap. Just my size." },
 				},
 			},
 			{
-				id = "find_petals",
-				type = "collect",
-				item = "Rain Flower Petal",
-				pickupStyle = "petal",
-				count = 3,
-				objective = "Find the 3 glowing petals near the village",
-				spawnPoints = {
-					Vector3.new(-42, 0, 142),
-					Vector3.new(38, 0, 192),
-					Vector3.new(-28, 0, 212),
-				},
+				id = "enter_forest",
+				type = "reach",
+				zone = "ForestGap",
+				objective = "Squeeze through the gap between the giant trees",
 				intro = {
-					{ speaker = "Milo the Monkey", text = "I saw pink sparkles near the big rocks and under the old trees! Ooh-ooh, let's look everywhere!" },
+					{ speaker = "Amy", text = "She decided to explore the unexplored world. That's me. I'm the she. Here goes nothing..." },
 				},
 				onComplete = {
-					{ speaker = "Amy", text = "That's all three petals! They're so warm... like little pieces of sunshine." },
-					{ speaker = "Milo the Monkey", text = "Now we just have to cross the river. Umm. About that. You'd better come see the bridge." },
+					{ speaker = "Narrator", text = "As soon as she went in Amy saw it was a world parallel to thier own!" },
+					{ speaker = "Narrator", text = "It was a bautyfull paradise!" },
+					{ speaker = "Amy", text = "The colours! The flowers are singing... no wait, that's birds. no, wait. it might be the flowers." },
 				},
+			},
+			{
+				id = "heart_glade",
+				type = "reach",
+				zone = "HeartGlade",
+				objective = "Follow the glowing flowers deeper into the paradise",
 			},
 		},
 	},
@@ -174,42 +217,69 @@ StoryData.Chapters = {
 	{
 		id = "chapter3",
 		title = "Chapter Three",
-		subtitle = "The Broken Bridge",
+		subtitle = "So Many Animals!",
 		quests = {
 			{
-				id = "meet_tiki",
+				id = "meet_squirrel",
 				type = "talk",
-				npc = "Tiki",
-				objective = "Talk to the toucan by the river",
+				npc = "Squirrel",
+				promptText = "Say hello",
+				objective = "Say hello to the maroon squirrel",
+				intro = {
+					{ speaker = "Narrator", text = "Amy discoverd so many animals! Something maroon was hopping between the roots..." },
+				},
 				dialogue = {
-					{ speaker = "Tiki the Toucan", text = "Halt! Who crosses the... oh. Nobody crosses anything. The wild wind smashed our bridge to bits." },
-					{ speaker = "Amy", text = "But I have to get to the Great Kapok Tree! I'm carrying the Rain Flower's petals." },
-					{ speaker = "Tiki the Toucan", text = "The PETALS?! Why didn't you say so! The wind scattered the bridge planks along the riverbank. Bring me three good ones and I'll lash them down with the strongest vines in the forest." },
+					{ speaker = "Amy", text = "A squirrel! A MAROON squirrel! You're the colour of my nanna's favourite cardigan." },
+					{ speaker = "the Maroon Squirrel", text = "And you're the first human I've ever seen! Are all of you this leafless?" },
+					{ speaker = "Amy", text = "You can TALK?!" },
+					{ speaker = "the Maroon Squirrel", text = "Everything talks on this side of the trees. You just have to come in and listen." },
 				},
 			},
 			{
-				id = "find_planks",
-				type = "collect",
-				item = "Bridge Plank",
-				pickupStyle = "plank",
-				count = 3,
-				objective = "Gather 3 planks scattered along the riverbank",
-				spawnPoints = {
-					Vector3.new(-45, 0, 222),
-					Vector3.new(48, 0, 230),
-					Vector3.new(24, 0, 204),
-				},
-				onComplete = {
-					{ speaker = "Tiki the Toucan", text = "Perfect planks! Stand back -- toucan at work!" },
-					{ speaker = "Narrator", text = "Tiki tugged and knotted and tightened the vines, and in no time at all the bridge stood proud across the river again." },
-					{ speaker = "Tiki the Toucan", text = "Off you go, Amy. And tell that old tree Tiki says hello!" },
+				id = "meet_fox",
+				type = "talk",
+				npc = "Fox",
+				promptText = "Say hello",
+				objective = "Find the orange fox",
+				dialogue = {
+					{ speaker = "the Orange Fox", text = "Ooooh, a visitor. I'm sorry about the squirrel. He says 'leafless' to everyone." },
+					{ speaker = "Amy", text = "You're the orangest fox I have ever seen. You look like a sunset with a tail." },
+					{ speaker = "the Orange Fox", text = "Thank you! We take very good care of our colours here. The forest looks after us, and we look after the forest." },
 				},
 			},
 			{
-				id = "cross_river",
+				id = "meet_lion",
+				type = "talk",
+				npc = "Lion",
+				promptText = "Say hello (bravely)",
+				objective = "Meet the golden lion in the deep glade",
+				dialogue = {
+					{ speaker = "Amy", text = "A lion. A golden lion. Right. Be brave, Amy. He probably had a big breakfast." },
+					{ speaker = "the Golden Lion", text = "Peace, little explorer. No one is eaten in the paradise. It is against the whole idea of a paradise." },
+					{ speaker = "the Golden Lion", text = "You have seen our world now, Amy. When you go home... tell them what you saw. Tell them the truth about us." },
+					{ speaker = "Amy", text = "I will. I promise. Mum is NOT going to believe this!" },
+				},
+			},
+			{
+				id = "rush_home",
 				type = "reach",
-				zone = "FarBank",
-				objective = "Cross the bridge to the far side of the river",
+				zone = "HomeGarden",
+				objective = "Rush home and tell Mum everything!",
+				intro = {
+					{ speaker = "Narrator", text = "She rushed Home..." },
+				},
+			},
+			{
+				id = "tell_mum",
+				type = "talk",
+				npc = "Mum",
+				objective = "Tell Mum about the parallel world",
+				dialogue = {
+					{ speaker = "Amy", text = "MUM! The rain forest isn't dangerous, it's a paradise! There's a maroon squirrel and an orange fox and a golden lion and they TALK!" },
+					{ speaker = "Mum", text = "A golden... lion? That talks? Oh Amy. WAIT until your father hears about this." },
+					{ speaker = "Narrator", text = "...and told her mum who told her dad who told the vilage." },
+					{ speaker = "Narrator", text = "But the vilage did not hear 'paradise'. The vilage heard 'LION'." },
+				},
 			},
 		},
 	},
@@ -218,37 +288,36 @@ StoryData.Chapters = {
 	{
 		id = "chapter4",
 		title = "Chapter Four",
-		subtitle = "The Great Kapok Tree",
+		subtitle = "The Giant Tree-Chopping Machine",
 		quests = {
 			{
-				id = "climb_tree",
+				id = "stand_in_front",
 				type = "reach",
-				zone = "TreeTop",
-				objective = "Climb the winding branches to the top of the Great Kapok Tree",
+				zone = "MachineFront",
+				objective = "The machine is heading for the forest -- stand in front of it!",
 				intro = {
-					{ speaker = "Narrator", text = "And there it was: the Great Kapok Tree, taller than a hundred houses, its branches spiralling up into the clouds." },
-					{ speaker = "Amy", text = "Okay, Amy. One branch at a time. Don't look down. Well... maybe look down a little, the view is amazing." },
+					{ speaker = "Narrator", text = "The vilage made a giant tree-chopping machine and they decided to chop down the forest because they thought it was a thret to humankind." },
+					{ speaker = "Amy", text = "No no no no NO. Not my paradise. Not my friends. MOVE, legs!" },
+				},
+				onComplete = {
+					{ speaker = "Narrator", text = "Amy planted her feet in the grass, right between the whirring blade and the giant trees, and did not move." },
+					{ speaker = "Amy", text = "STOP! Everybody just... STOP!" },
 				},
 			},
-		},
-	},
-
-	----------------------------------------------------------------
-	{
-		id = "chapter5",
-		title = "Chapter Five",
-		subtitle = "The Rain Flower",
-		quests = {
 			{
-				id = "wake_flower",
+				id = "explain",
 				type = "talk",
-				npc = "RainFlower",
-				promptText = "Return the petals",
-				objective = "Return the petals to the Rain Flower",
+				npc = "Dad",
+				promptText = "Explain",
+				objective = "Explain to Dad and the village why the forest must be saved",
 				dialogue = {
-					{ speaker = "Narrator", text = "At the very top of the tree, in a nest of silver leaves, the Rain Flower slept. Amy knelt and gently pressed the three petals back into place." },
-					{ speaker = "Amy", text = "There you go. All better now. Please wake up -- the whole forest is waiting for you." },
-					{ speaker = "Narrator", text = "One by one, the petals began to glow. Pink, then gold, then every colour at once..." },
+					{ speaker = "Dad", text = "Amy! Get away from there, it isn't safe!" },
+					{ speaker = "Amy", text = "It IS safe, Dad. I've been inside. It isn't a threat -- it's a paradise, a whole world parallel to ours!" },
+					{ speaker = "Amy", text = "There's a squirrel the colour of nanna's cardigan, and a fox like a sunset, and the golden lion is GENTLE, Dad. Nobody is eaten in a paradise. It's against the whole idea." },
+					{ speaker = "Amy", text = "You shouldn't be scared of the forest. You should be PROUD of it. We should take care of it!" },
+					{ speaker = "Narrator", text = "Lukily Amy managed to stop them by staying in front of it just long enugh to explain to them that they should be proud of it and take care of it." },
+					{ speaker = "Dad", text = "...Proud of it. Well. I suppose it IS the biggest, greenest thing any village ever had." },
+					{ speaker = "Narrator", text = "They took her seriously and stoped." },
 				},
 			},
 		},
@@ -260,14 +329,14 @@ StoryData.Chapters = {
 ----------------------------------------------------------------
 StoryData.Ending = {
 	lines = {
-		{ speaker = "Narrator", text = "The Rain Flower opened wide and sang a single, shimmering note. Far away, the clouds heard it -- and they came racing across the sky." },
-		{ speaker = "Narrator", text = "Rain! Soft, warm, wonderful rain fell on every leaf and flower and thirsty little stream." },
-		{ speaker = "Milo the Monkey", text = "Ooh-ooh! Amy did it! AMY DID IT!" },
-		{ speaker = "Grandma Sloth", text = "Thank you... brave... Amy. The forest... will remember you... forever." },
-		{ speaker = "Amy", text = "I'll come back and visit. I promise. Somebody has to teach Milo how to play tag properly!" },
+		{ speaker = "Narrator", text = "The great machine rolled backwards, away from the trees, and its terrible blade went still." },
+		{ speaker = "Narrator", text = "And from the very top of the giant trees, a maroon squirrel, an orange fox and a golden lion watched the girl who saved their world." },
+		{ speaker = "Dad", text = "Alright, alright. But next time you explore a parallel universe, young lady... you take the dog." },
+		{ speaker = "Sam the Dog", text = "Woof!" },
+		{ speaker = "Amy", text = "Deal." },
 	},
-	title = "The End",
-	subtitle = "Amy and the Rainforest",
+	title = "The end ♥",
+	subtitle = "Amy and the Rain Forest — a story by Clara",
 }
 
 return StoryData
