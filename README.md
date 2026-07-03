@@ -43,6 +43,12 @@ moss, gold, bubblegum pink and grape purple.
 Controls: normal Roblox movement (WASD + Space). Walk up to characters
 and press **E** to talk; click / **E** / **Space** to advance dialogue.
 
+Everyone plays **as Amy herself** — a custom blocky character with the
+red jumper, blue skirt and long brown hair from the drawing, in the
+same style as the story's other characters. Profile avatars are not
+loaded. (Delete `AmyStarterCharacter` from ServerScriptService to
+restore normal avatars.)
+
 ## Project layout
 
 | Path | What it is |
@@ -51,6 +57,7 @@ and press **E** to talk; click / **E** / **Space** to advance dialogue.
 | `src/ReplicatedStorage/StoryData.lua` | **The story**: chapters, quests, dialogue, positions |
 | `src/ServerScriptService/WorldBuilder.server.lua` | Builds the map: village, field, forest wall, paradise |
 | `src/ServerScriptService/StoryServer.server.lua` | Quest engine: characters, prompts, zones, Sam, the machine |
+| `src/ServerScriptService/AmyStarterCharacter.server.lua` | Everyone plays as blocky Amy herself (custom StarterCharacter) |
 | `src/StarterPlayer/StarterPlayerScripts/StoryClient.client.lua` | Dialogue box, objective tracker, chapter cards |
 | `tools/build_rbxlx.py` | Regenerates the `.rbxlx` from `src/` |
 | `default.project.json` | [Rojo](https://rojo.space) project, if you prefer syncing |
