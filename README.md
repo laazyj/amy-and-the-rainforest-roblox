@@ -43,6 +43,12 @@ moss, gold, bubblegum pink and grape purple.
 Controls: normal Roblox movement (WASD + Space). Walk up to characters
 and press **E** to talk; click / **E** / **Space** to advance dialogue.
 
+When you spawn, you're dressed as Amy from the drawing — red jumper,
+blue skirt and long brown hair — while keeping your own head, face and
+skin tone, so it still feels like you inside the story. (Remove
+`AmyOutfit` from ServerScriptService if you'd rather keep everyone's
+normal avatar.)
+
 ## Project layout
 
 | Path | What it is |
@@ -51,6 +57,7 @@ and press **E** to talk; click / **E** / **Space** to advance dialogue.
 | `src/ReplicatedStorage/StoryData.lua` | **The story**: chapters, quests, dialogue, positions |
 | `src/ServerScriptService/WorldBuilder.server.lua` | Builds the map: village, field, forest wall, paradise |
 | `src/ServerScriptService/StoryServer.server.lua` | Quest engine: characters, prompts, zones, Sam, the machine |
+| `src/ServerScriptService/AmyOutfit.server.lua` | Dresses every player as Amy: red jumper, blue skirt, brown hair |
 | `src/StarterPlayer/StarterPlayerScripts/StoryClient.client.lua` | Dialogue box, objective tracker, chapter cards |
 | `tools/build_rbxlx.py` | Regenerates the `.rbxlx` from `src/` |
 | `default.project.json` | [Rojo](https://rojo.space) project, if you prefer syncing |

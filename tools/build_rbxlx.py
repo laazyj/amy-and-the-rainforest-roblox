@@ -76,6 +76,11 @@ def main():
             "Script",
             "StoryServer",
             os.path.join(src, "ServerScriptService", "StoryServer.server.lua"),
+        )
+        + script_item(
+            "Script",
+            "AmyOutfit",
+            os.path.join(src, "ServerScriptService", "AmyOutfit.server.lua"),
         ),
     )
 
