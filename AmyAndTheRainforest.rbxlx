@@ -1,0 +1,2536 @@
+<roblox xmlns:xmime="http://schemas.microsoft.com/appx/2006/xmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
+<External>null</External>
+<External>nil</External>
+<Item class="Workspace" referent="RBX00000009">
+<Properties>
+<string name="Name">Workspace</string>
+</Properties>
+</Item>
+<Item class="Lighting" referent="RBX00000010">
+<Properties>
+<string name="Name">Lighting</string>
+</Properties>
+</Item>
+<Item class="ReplicatedStorage" referent="RBX00000002">
+<Properties>
+<string name="Name">ReplicatedStorage</string>
+</Properties>
+<Item class="ModuleScript" referent="RBX00000001">
+<Properties>
+<string name="Name">StoryData</string>
+<ProtectedString name="Source"><![CDATA[--[[
+	StoryData
+	=========
+	Every word of the story lives in this one module: chapter titles,
+	dialogue, objectives, and where things are placed in the world.
+
+	Based on "Amy and the Rain Forest" by Clara Dineen-Duffett
+	(clara.jasonduffett.net). Narrator lines quoted directly from the
+	story keep Clara's original spelling on purpose -- they're part of
+	its charm, just like the highlights on the website.
+
+	Quest types understood by the engine (StoryServer):
+	  "talk"    -> walk up to a character and press E (ProximityPrompt)
+	  "collect" -> touch `count` glowing pickups spawned at `spawnPoints`
+	  "reach"   -> walk into an invisible zone named in `zone`
+]]
+
+local StoryData = {}
+
+StoryData.GameTitle = "Amy and the Rain Forest"
+StoryData.Author = "a story by Clara"
+
+----------------------------------------------------------------
+-- World layout constants (shared by WorldBuilder + StoryServer)
+----------------------------------------------------------------
+StoryData.Map = {
+	GroundY = 0,
+
+	-- Amy's garden (spawn) and house
+	SpawnPosition = Vector3.new(0, 4, -26),
+	HousePosition = Vector3.new(0, 0, -44),
+	GardenGateZ = -16, -- front fence line of the garden
+
+	-- The looming wall of giant trees (like the hero drawing)
+	ForestWallZ = 150,
+	ForestGapHalfWidth = 6, -- the narrow squeeze-through at x = 0
+	ForestEndZ = 420,
+
+	-- Width of the playable world
+	MapHalfWidth = 95,
+
+	-- Where the tree-chopping machine parks in the finale
+	MachinePosition = Vector3.new(0, 0, 95),
+}
+
+----------------------------------------------------------------
+-- Characters
+----------------------------------------------------------------
+-- kind: "human" | "dog" | "squirrel" | "fox" | "lion"
+StoryData.NPCs = {
+	{
+		id = "Dad",
+		display = "Dad",
+		kind = "human",
+		shirt = Color3.fromRGB(90, 122, 80),
+		position = Vector3.new(6, 0, -26),
+		faceZ = -1,
+	},
+	{
+		id = "Mum",
+		display = "Mum",
+		kind = "human",
+		shirt = Color3.fromRGB(124, 77, 178), -- Clara's grape accent
+		position = Vector3.new(-6, 0, -33),
+		faceZ = 1,
+	},
+	{
+		id = "Sam",
+		display = "Sam the Dog",
+		kind = "dog",
+		position = Vector3.new(3, 0, -20),
+		faceZ = -1,
+	},
+	{
+		id = "Squirrel",
+		display = "the Maroon Squirrel",
+		kind = "squirrel",
+		position = Vector3.new(-30, 0, 215),
+		faceZ = -1,
+	},
+	{
+		id = "Fox",
+		display = "the Orange Fox",
+		kind = "fox",
+		position = Vector3.new(35, 0, 248),
+		faceZ = -1,
+	},
+	{
+		id = "Lion",
+		display = "the Golden Lion",
+		kind = "lion",
+		position = Vector3.new(0, 0, 298),
+		faceZ = -1,
+	},
+}
+
+----------------------------------------------------------------
+-- Trigger zones (invisible boxes the player can walk into)
+----------------------------------------------------------------
+StoryData.Zones = {
+	-- the garden gate Amy keeps trying to sneak through
+	{ name = "GardenGate", position = Vector3.new(0, 5, -13), size = Vector3.new(10, 10, 5) },
+	-- the grass in front of the looming tree wall
+	{ name = "ForestEdge", position = Vector3.new(0, 5, 136), size = Vector3.new(60, 10, 8) },
+	-- just inside the narrow gap between the giant trunks
+	{ name = "ForestGap", position = Vector3.new(0, 5, 160), size = Vector3.new(14, 12, 8) },
+	-- the heart of the parallel world
+	{ name = "HeartGlade", position = Vector3.new(0, 5, 255), size = Vector3.new(40, 10, 30) },
+	-- back home in the garden
+	{ name = "HomeGarden", position = Vector3.new(0, 5, -26), size = Vector3.new(26, 10, 16) },
+	-- the patch of grass between the machine and the forest
+	{ name = "MachineFront", position = Vector3.new(0, 5, 110), size = Vector3.new(16, 10, 9) },
+}
+
+----------------------------------------------------------------
+-- The story, chapter by chapter
+----------------------------------------------------------------
+StoryData.Chapters = {
+
+	----------------------------------------------------------------
+	{
+		id = "chapter1",
+		title = "Chapter One",
+		subtitle = "One Beautyfull Sunday",
+		quests = {
+			{
+				id = "ask_dad",
+				type = "talk",
+				npc = "Dad",
+				objective = "Ask Dad if you can go outside",
+				intro = {
+					{ speaker = "Narrator", text = "One beautyfull sunday, Amy asked to go outside." },
+				},
+				dialogue = {
+					{ speaker = "Amy", text = "Dad, can I go outside? Please? It's the most beautiful Sunday there has ever been!" },
+					{ speaker = "Dad", text = "No, it to Dangerous because of the huge rain forest." },
+					{ speaker = "Amy", text = "But Dad--" },
+					{ speaker = "Dad", text = "No buts, Amy. Nobody from the village ever goes near those trees. And besides... Sam is watching you." },
+					{ speaker = "Narrator", text = "By the garden gate, Sam the dog tilted his head and thumped his tail. He was ALWAYS watching." },
+				},
+			},
+			{
+				id = "sneak_out_1",
+				type = "reach",
+				zone = "GardenGate",
+				objective = "Sneak out through the garden gate... quietly!",
+				intro = {
+					{ speaker = "Amy", text = "Hmph. 'Too dangerous.' I'll just have a tiny little look. What Dad doesn't know can't worry him..." },
+				},
+				onComplete = {
+					{ speaker = "Sam the Dog", text = "WOOF!" },
+					{ speaker = "Narrator", text = "She tryed to go out side but thier dog Sam always brought her back in." },
+					{ speaker = "Amy", text = "Saaaam! Let go of my jumper! Fine. FINE. I'm going." },
+				},
+			},
+			{
+				id = "sneak_out_2",
+				type = "reach",
+				zone = "GardenGate",
+				objective = "Wait for Sam to look away, then try the gate again",
+				intro = {
+					{ speaker = "Amy", text = "Okay. New plan. Tip-toes this time. Sam can't hear tip-toes. Nobody can hear tip-toes." },
+				},
+				onComplete = {
+					{ speaker = "Sam the Dog", text = "Woof woof!" },
+					{ speaker = "Narrator", text = "She tryed again but Sam brang her back." },
+					{ speaker = "Amy", text = "You are the best guard dog in the whole world, Sam, and it is EXTREMELY annoying." },
+				},
+			},
+		},
+	},
+
+	----------------------------------------------------------------
+	{
+		id = "chapter2",
+		title = "Chapter Two",
+		subtitle = "The Unexplored World",
+		quests = {
+			{
+				id = "walk_to_forest",
+				type = "reach",
+				zone = "ForestEdge",
+				objective = "Sam is away at the farm -- cross the field to the rain forest!",
+				intro = {
+					{ speaker = "Narrator", text = "One day when her dog was out at a farm, Amy managed to get outside." },
+					{ speaker = "Amy", text = "No Dad. No Sam. Just me, the grass, and... oh my. THAT." },
+				},
+				onComplete = {
+					{ speaker = "Narrator", text = "Then suddenly a dark forest loomed infront of her." },
+					{ speaker = "Amy", text = "The trees are like a giant wall... they're holding hands so nobody can get in. But look -- there's a little gap. Just my size." },
+				},
+			},
+			{
+				id = "enter_forest",
+				type = "reach",
+				zone = "ForestGap",
+				objective = "Squeeze through the gap between the giant trees",
+				intro = {
+					{ speaker = "Amy", text = "She decided to explore the unexplored world. That's me. I'm the she. Here goes nothing..." },
+				},
+				onComplete = {
+					{ speaker = "Narrator", text = "As soon as she went in Amy saw it was a world parallel to thier own!" },
+					{ speaker = "Narrator", text = "It was a bautyfull paradise!" },
+					{ speaker = "Amy", text = "The colours! The flowers are singing... no wait, that's birds. no, wait. it might be the flowers." },
+				},
+			},
+			{
+				id = "heart_glade",
+				type = "reach",
+				zone = "HeartGlade",
+				objective = "Follow the glowing flowers deeper into the paradise",
+			},
+		},
+	},
+
+	----------------------------------------------------------------
+	{
+		id = "chapter3",
+		title = "Chapter Three",
+		subtitle = "So Many Animals!",
+		quests = {
+			{
+				id = "meet_squirrel",
+				type = "talk",
+				npc = "Squirrel",
+				promptText = "Say hello",
+				objective = "Say hello to the maroon squirrel",
+				intro = {
+					{ speaker = "Narrator", text = "Amy discoverd so many animals! Something maroon was hopping between the roots..." },
+				},
+				dialogue = {
+					{ speaker = "Amy", text = "A squirrel! A MAROON squirrel! You're the colour of my nanna's favourite cardigan." },
+					{ speaker = "the Maroon Squirrel", text = "And you're the first human I've ever seen! Are all of you this leafless?" },
+					{ speaker = "Amy", text = "You can TALK?!" },
+					{ speaker = "the Maroon Squirrel", text = "Everything talks on this side of the trees. You just have to come in and listen." },
+				},
+			},
+			{
+				id = "meet_fox",
+				type = "talk",
+				npc = "Fox",
+				promptText = "Say hello",
+				objective = "Find the orange fox",
+				dialogue = {
+					{ speaker = "the Orange Fox", text = "Ooooh, a visitor. I'm sorry about the squirrel. He says 'leafless' to everyone." },
+					{ speaker = "Amy", text = "You're the orangest fox I have ever seen. You look like a sunset with a tail." },
+					{ speaker = "the Orange Fox", text = "Thank you! We take very good care of our colours here. The forest looks after us, and we look after the forest." },
+				},
+			},
+			{
+				id = "meet_lion",
+				type = "talk",
+				npc = "Lion",
+				promptText = "Say hello (bravely)",
+				objective = "Meet the golden lion in the deep glade",
+				dialogue = {
+					{ speaker = "Amy", text = "A lion. A golden lion. Right. Be brave, Amy. He probably had a big breakfast." },
+					{ speaker = "the Golden Lion", text = "Peace, little explorer. No one is eaten in the paradise. It is against the whole idea of a paradise." },
+					{ speaker = "the Golden Lion", text = "You have seen our world now, Amy. When you go home... tell them what you saw. Tell them the truth about us." },
+					{ speaker = "Amy", text = "I will. I promise. Mum is NOT going to believe this!" },
+				},
+			},
+			{
+				id = "rush_home",
+				type = "reach",
+				zone = "HomeGarden",
+				objective = "Rush home and tell Mum everything!",
+				intro = {
+					{ speaker = "Narrator", text = "She rushed Home..." },
+				},
+			},
+			{
+				id = "tell_mum",
+				type = "talk",
+				npc = "Mum",
+				objective = "Tell Mum about the parallel world",
+				dialogue = {
+					{ speaker = "Amy", text = "MUM! The rain forest isn't dangerous, it's a paradise! There's a maroon squirrel and an orange fox and a golden lion and they TALK!" },
+					{ speaker = "Mum", text = "A golden... lion? That talks? Oh Amy. WAIT until your father hears about this." },
+					{ speaker = "Narrator", text = "...and told her mum who told her dad who told the vilage." },
+					{ speaker = "Narrator", text = "But the vilage did not hear 'paradise'. The vilage heard 'LION'." },
+				},
+			},
+		},
+	},
+
+	----------------------------------------------------------------
+	{
+		id = "chapter4",
+		title = "Chapter Four",
+		subtitle = "The Giant Tree-Chopping Machine",
+		quests = {
+			{
+				id = "stand_in_front",
+				type = "reach",
+				zone = "MachineFront",
+				objective = "The machine is heading for the forest -- stand in front of it!",
+				intro = {
+					{ speaker = "Narrator", text = "The vilage made a giant tree-chopping machine and they decided to chop down the forest because they thought it was a thret to humankind." },
+					{ speaker = "Amy", text = "No no no no NO. Not my paradise. Not my friends. MOVE, legs!" },
+				},
+				onComplete = {
+					{ speaker = "Narrator", text = "Amy planted her feet in the grass, right between the whirring blade and the giant trees, and did not move." },
+					{ speaker = "Amy", text = "STOP! Everybody just... STOP!" },
+				},
+			},
+			{
+				id = "explain",
+				type = "talk",
+				npc = "Dad",
+				promptText = "Explain",
+				objective = "Explain to Dad and the village why the forest must be saved",
+				dialogue = {
+					{ speaker = "Dad", text = "Amy! Get away from there, it isn't safe!" },
+					{ speaker = "Amy", text = "It IS safe, Dad. I've been inside. It isn't a threat -- it's a paradise, a whole world parallel to ours!" },
+					{ speaker = "Amy", text = "There's a squirrel the colour of nanna's cardigan, and a fox like a sunset, and the golden lion is GENTLE, Dad. Nobody is eaten in a paradise. It's against the whole idea." },
+					{ speaker = "Amy", text = "You shouldn't be scared of the forest. You should be PROUD of it. We should take care of it!" },
+					{ speaker = "Narrator", text = "Lukily Amy managed to stop them by staying in front of it just long enugh to explain to them that they should be proud of it and take care of it." },
+					{ speaker = "Dad", text = "...Proud of it. Well. I suppose it IS the biggest, greenest thing any village ever had." },
+					{ speaker = "Narrator", text = "They took her seriously and stoped." },
+				},
+			},
+		},
+	},
+}
+
+----------------------------------------------------------------
+-- Ending
+----------------------------------------------------------------
+StoryData.Ending = {
+	lines = {
+		{ speaker = "Narrator", text = "The great machine rolled backwards, away from the trees, and its terrible blade went still." },
+		{ speaker = "Narrator", text = "And from the very top of the giant trees, a maroon squirrel, an orange fox and a golden lion watched the girl who saved their world." },
+		{ speaker = "Dad", text = "Alright, alright. But next time you explore a parallel universe, young lady... you take the dog." },
+		{ speaker = "Sam the Dog", text = "Woof!" },
+		{ speaker = "Amy", text = "Deal." },
+	},
+	title = "The end ♥",
+	subtitle = "Amy and the Rain Forest — a story by Clara",
+}
+
+return StoryData
+]]></ProtectedString>
+</Properties>
+</Item>
+</Item>
+<Item class="ServerScriptService" referent="RBX00000005">
+<Properties>
+<string name="Name">ServerScriptService</string>
+</Properties>
+<Item class="Script" referent="RBX00000003">
+<Properties>
+<string name="Name">WorldBuilder</string>
+<ProtectedString name="Source"><![CDATA[--[[
+	WorldBuilder
+	============
+	Builds the whole world out of parts when the server starts, styled
+	after the hand-drawn hero illustration on clara.jasonduffett.net:
+
+	  * a cream sky with little black birds and outline clouds
+	  * a wide field of scribbly green grass
+	  * Amy's house and garden (with the gate Sam guards) and a village
+	  * the rain forest as a LOOMING WALL of giant brown trunks standing
+	    shoulder to shoulder, topped with big round two-tone canopies,
+	    bird nests and eggs -- with one narrow gap, just Amy's size
+	  * beyond the wall: the parallel-world paradise, in the site's
+	    palette (moss, gold, bubblegum pink, grape purple)
+
+	All the key coordinates come from StoryData.Map so the story
+	scripts and the map always agree about where things are.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
+
+local StoryData = require(ReplicatedStorage:WaitForChild("StoryData"))
+local Map = StoryData.Map
+
+local rng = Random.new(20260702) -- deterministic layout
+
+local mapFolder = Instance.new("Folder")
+mapFolder.Name = "RainforestMap"
+
+----------------------------------------------------------------
+-- Palette (from the website's story page)
+----------------------------------------------------------------
+local DEEP = Color3.fromRGB(35, 64, 29) -- #23401d
+local MOSS = Color3.fromRGB(90, 138, 68) -- #5a8a44
+local BARK = Color3.fromRGB(107, 68, 38) -- #6b4426
+local GOLD = Color3.fromRGB(231, 181, 58) -- #e7b53a
+local RED = Color3.fromRGB(194, 64, 47) -- #c2402f
+local GRAPE = Color3.fromRGB(124, 77, 255) -- #7c4dff
+local BUBBLEGUM = Color3.fromRGB(255, 93, 162) -- #ff5da2
+local CREAM = Color3.fromRGB(240, 237, 217)
+local GRASS_GREEN = Color3.fromRGB(74, 122, 56)
+local GRASS_LIGHT = Color3.fromRGB(96, 148, 70)
+local CANOPY_DARK = Color3.fromRGB(56, 108, 45)
+local CANOPY_LIGHT = Color3.fromRGB(104, 158, 72)
+
+----------------------------------------------------------------
+-- Helpers
+----------------------------------------------------------------
+local function makePart(props, parent)
+	local part = Instance.new("Part")
+	part.Anchored = true
+	part.TopSurface = Enum.SurfaceType.Smooth
+	part.BottomSurface = Enum.SurfaceType.Smooth
+	for key, value in pairs(props) do
+		part[key] = value
+	end
+	part.Parent = parent or mapFolder
+	return part
+end
+
+local function makeWedge(props, parent)
+	local wedge = Instance.new("WedgePart")
+	wedge.Anchored = true
+	wedge.TopSurface = Enum.SurfaceType.Smooth
+	wedge.BottomSurface = Enum.SurfaceType.Smooth
+	for key, value in pairs(props) do
+		wedge[key] = value
+	end
+	wedge.Parent = parent or mapFolder
+	return wedge
+end
+
+local function makeFireflies(position, color)
+	local holder = makePart({
+		Name = "FireflyHolder",
+		Size = Vector3.new(1, 1, 1),
+		CFrame = CFrame.new(position),
+		Transparency = 1,
+		CanCollide = false,
+	})
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	emitter.Color = ColorSequence.new(color or Color3.fromRGB(255, 240, 150))
+	emitter.LightEmission = 1
+	emitter.Size = NumberSequence.new(0.35)
+	emitter.Lifetime = NumberRange.new(2, 4)
+	emitter.Rate = 3
+	emitter.Speed = NumberRange.new(0.5, 1.5)
+	emitter.SpreadAngle = Vector2.new(180, 180)
+	emitter.Parent = holder
+end
+
+----------------------------------------------------------------
+-- Lighting: a warm cream-sky afternoon
+----------------------------------------------------------------
+Lighting.ClockTime = 13.5
+Lighting.Brightness = 2.2
+Lighting.Ambient = Color3.fromRGB(118, 118, 100)
+Lighting.OutdoorAmbient = Color3.fromRGB(150, 148, 126)
+Lighting.FogColor = CREAM
+Lighting.FogEnd = 700
+
+local atmosphere = Instance.new("Atmosphere")
+atmosphere.Density = 0.3
+atmosphere.Color = Color3.fromRGB(227, 233, 191) -- the drawing's pale ground-sky tint
+atmosphere.Haze = 1.6
+atmosphere.Parent = Lighting
+
+----------------------------------------------------------------
+-- Ground
+----------------------------------------------------------------
+local WORLD_START_Z = -75
+local WORLD_END_Z = Map.ForestEndZ
+local WIDTH = Map.MapHalfWidth * 2
+
+-- Home-and-field side: the drawing's flat green grass
+local fieldLength = Map.ForestWallZ - WORLD_START_Z
+makePart({
+	Name = "GroundField",
+	Size = Vector3.new(WIDTH, 4, fieldLength),
+	CFrame = CFrame.new(0, Map.GroundY - 2, WORLD_START_Z + fieldLength / 2),
+	Color = GRASS_GREEN,
+	Material = Enum.Material.Grass,
+})
+
+-- Paradise side: a touch lighter and springier
+local paradiseLength = WORLD_END_Z - Map.ForestWallZ
+makePart({
+	Name = "GroundParadise",
+	Size = Vector3.new(WIDTH, 4, paradiseLength),
+	CFrame = CFrame.new(0, Map.GroundY - 2, Map.ForestWallZ + paradiseLength / 2),
+	Color = GRASS_LIGHT,
+	Material = Enum.Material.Grass,
+})
+
+-- Invisible walls around the whole map
+local function makeWall(cframe, size)
+	makePart({ Name = "BoundaryWall", Size = size, CFrame = cframe, Transparency = 1 })
+end
+local midZ = (WORLD_START_Z + WORLD_END_Z) / 2
+local totalLength = WORLD_END_Z - WORLD_START_Z
+makeWall(CFrame.new(-Map.MapHalfWidth, 40, midZ), Vector3.new(4, 100, totalLength))
+makeWall(CFrame.new(Map.MapHalfWidth, 40, midZ), Vector3.new(4, 100, totalLength))
+makeWall(CFrame.new(0, 40, WORLD_START_Z), Vector3.new(WIDTH, 100, 4))
+makeWall(CFrame.new(0, 40, WORLD_END_Z), Vector3.new(WIDTH, 100, 4))
+
+----------------------------------------------------------------
+-- Scribbly grass + field flowers (the drawing's pen strokes)
+----------------------------------------------------------------
+local function makeGrassTuft(x, z, side)
+	local shade
+	if side == "field" then
+		shade = Color3.fromRGB(52, 92, 40)
+	else
+		shade = Color3.fromRGB(70, 120, 52)
+	end
+	local blades = rng:NextInteger(2, 3)
+	for _ = 1, blades do
+		local height = rng:NextNumber(1, 2.4)
+		makePart({
+			Name = "GrassBlade",
+			Size = Vector3.new(0.25, height, 0.9),
+			CFrame = CFrame.new(x + rng:NextNumber(-0.8, 0.8), Map.GroundY + height / 2, z + rng:NextNumber(-0.8, 0.8))
+				* CFrame.Angles(rng:NextNumber(-0.15, 0.15), rng:NextNumber(0, math.pi), rng:NextNumber(-0.25, 0.25)),
+			Color = shade,
+			Material = Enum.Material.Grass,
+			CanCollide = false,
+		})
+	end
+end
+
+for _ = 1, 160 do
+	makeGrassTuft(rng:NextNumber(-90, 90), rng:NextNumber(-60, Map.ForestWallZ - 8), "field")
+end
+for _ = 1, 120 do
+	makeGrassTuft(rng:NextNumber(-90, 90), rng:NextNumber(Map.ForestWallZ + 10, WORLD_END_Z - 10), "paradise")
+end
+
+-- A few little gold and red flowers dotting the field (site accents)
+for _ = 1, 26 do
+	local x = rng:NextNumber(-85, 85)
+	local z = rng:NextNumber(-55, Map.ForestWallZ - 12)
+	local color
+	if rng:NextNumber() < 0.5 then
+		color = GOLD
+	else
+		color = RED
+	end
+	makePart({
+		Name = "FieldFlower",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(0.9, 0.7, 0.9),
+		CFrame = CFrame.new(x, Map.GroundY + 1.1, z),
+		Color = color,
+		Material = Enum.Material.SmoothPlastic,
+		CanCollide = false,
+	})
+	makePart({
+		Name = "FieldFlowerStem",
+		Size = Vector3.new(0.2, 1, 0.2),
+		CFrame = CFrame.new(x, Map.GroundY + 0.5, z),
+		Color = MOSS,
+		Material = Enum.Material.Grass,
+		CanCollide = false,
+	})
+end
+
+----------------------------------------------------------------
+-- Birds and clouds in the cream sky (like the drawing)
+----------------------------------------------------------------
+local function makeBird(position, scale)
+	-- a little "v" of two angled black strokes
+	for side = -1, 1, 2 do
+		makePart({
+			Name = "BirdWing",
+			Size = Vector3.new(2.2 * scale, 0.3 * scale, 0.4 * scale),
+			CFrame = CFrame.new(position + Vector3.new(side * 0.9 * scale, 0, 0))
+				* CFrame.Angles(0, 0, math.rad(24 * side)),
+			Color = Color3.fromRGB(30, 30, 30),
+			Material = Enum.Material.SmoothPlastic,
+			CanCollide = false,
+		})
+	end
+end
+
+makeBird(Vector3.new(-40, 72, 100), 1.2)
+makeBird(Vector3.new(-28, 66, 112), 0.9)
+makeBird(Vector3.new(52, 78, 90), 1.1)
+makeBird(Vector3.new(38, 70, 60), 0.8)
+makeBird(Vector3.new(10, 82, 130), 1.0)
+
+local function makeCloud(position, scale)
+	for i = 1, 3 do
+		makePart({
+			Name = "Cloud",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(10, 6, 8) * scale * rng:NextNumber(0.7, 1.1),
+			CFrame = CFrame.new(position + Vector3.new((i - 2) * 6 * scale, rng:NextNumber(-1, 1), 0)),
+			Color = Color3.fromRGB(250, 248, 240),
+			Material = Enum.Material.SmoothPlastic,
+			CanCollide = false,
+		})
+	end
+end
+
+makeCloud(Vector3.new(-60, 85, 40), 1.2)
+makeCloud(Vector3.new(65, 92, 110), 1.0)
+makeCloud(Vector3.new(-20, 95, 170), 1.4)
+
+----------------------------------------------------------------
+-- Amy's house and garden
+----------------------------------------------------------------
+local housePos = Map.HousePosition
+
+local function makeHouse(x, z, wallColor, roofColor, scale, parent)
+	local w = 20 * scale
+	local d = 14 * scale
+	local h = 10 * scale
+	-- walls
+	makePart({
+		Name = "HouseWalls",
+		Size = Vector3.new(w, h, d),
+		CFrame = CFrame.new(x, Map.GroundY + h / 2, z),
+		Color = wallColor,
+		Material = Enum.Material.SmoothPlastic,
+	}, parent)
+	-- pitched roof from two wedges
+	for side = -1, 1, 2 do
+		makeWedge({
+			Name = "HouseRoof",
+			Size = Vector3.new(w + 2 * scale, 5 * scale, (d + 2 * scale) / 2),
+			CFrame = CFrame.new(x, Map.GroundY + h + 2.5 * scale, z + side * (d + 2 * scale) / 4)
+				* CFrame.Angles(0, side == 1 and math.pi or 0, 0),
+			Color = roofColor,
+			Material = Enum.Material.Wood,
+		}, parent)
+	end
+	-- door (facing +Z, toward the field)
+	makePart({
+		Name = "HouseDoor",
+		Size = Vector3.new(3.4 * scale, 6 * scale, 0.6),
+		CFrame = CFrame.new(x, Map.GroundY + 3 * scale, z + d / 2 + 0.2),
+		Color = BARK,
+		Material = Enum.Material.Wood,
+		CanCollide = false,
+	}, parent)
+	-- windows
+	for side = -1, 1, 2 do
+		makePart({
+			Name = "HouseWindow",
+			Size = Vector3.new(3 * scale, 3 * scale, 0.6),
+			CFrame = CFrame.new(x + side * w / 3.2, Map.GroundY + 5.5 * scale, z + d / 2 + 0.2),
+			Color = Color3.fromRGB(200, 226, 235),
+			Material = Enum.Material.Glass,
+			CanCollide = false,
+		}, parent)
+	end
+end
+
+-- Amy's house: red like her jumper in the drawing, gold roof
+makeHouse(housePos.X, housePos.Z, Color3.fromRGB(206, 92, 74), BARK, 1, mapFolder)
+
+-- Garden fence with a gate opening at the front
+local GATE_HALF = 3
+local fenceY = Map.GroundY + 1.4
+local function fenceRun(x1, z1, x2, z2)
+	local a = Vector3.new(x1, fenceY, z1)
+	local b = Vector3.new(x2, fenceY, z2)
+	local length = (b - a).Magnitude
+	local mid = (a + b) / 2
+	makePart({
+		Name = "FenceRail",
+		Size = Vector3.new(0.5, 0.5, length),
+		CFrame = CFrame.lookAt(mid + Vector3.new(0, 0.6, 0), b + Vector3.new(0, 0.6, 0)),
+		Color = Color3.fromRGB(168, 132, 90),
+		Material = Enum.Material.Wood,
+	})
+	makePart({
+		Name = "FenceRail",
+		Size = Vector3.new(0.5, 0.5, length),
+		CFrame = CFrame.lookAt(mid + Vector3.new(0, -0.4, 0), b + Vector3.new(0, -0.4, 0)),
+		Color = Color3.fromRGB(168, 132, 90),
+		Material = Enum.Material.Wood,
+	})
+	local posts = math.max(2, math.floor(length / 6) + 1)
+	for i = 0, posts - 1 do
+		local t = i / (posts - 1)
+		local p = a:Lerp(b, t)
+		makePart({
+			Name = "FencePost",
+			Size = Vector3.new(0.8, 3.4, 0.8),
+			CFrame = CFrame.new(p.X, Map.GroundY + 1.7, p.Z),
+			Color = Color3.fromRGB(150, 116, 78),
+			Material = Enum.Material.Wood,
+		})
+	end
+end
+
+local GARDEN_HALF_W = 15
+local gardenBackZ = housePos.Z - 10
+local gateZ = Map.GardenGateZ
+-- front fence, split around the gate
+fenceRun(-GARDEN_HALF_W, gateZ, -GATE_HALF, gateZ)
+fenceRun(GATE_HALF, gateZ, GARDEN_HALF_W, gateZ)
+-- sides and back
+fenceRun(-GARDEN_HALF_W, gateZ, -GARDEN_HALF_W, gardenBackZ)
+fenceRun(GARDEN_HALF_W, gateZ, GARDEN_HALF_W, gardenBackZ)
+fenceRun(-GARDEN_HALF_W, gardenBackZ, GARDEN_HALF_W, gardenBackZ)
+
+-- Spawn inside the garden
+local spawnLocation = Instance.new("SpawnLocation")
+spawnLocation.Name = "AmySpawn"
+spawnLocation.Size = Vector3.new(8, 1, 8)
+spawnLocation.CFrame = CFrame.new(Map.SpawnPosition.X, Map.GroundY + 0.5, Map.SpawnPosition.Z)
+spawnLocation.Anchored = true
+spawnLocation.Color = GRASS_LIGHT
+spawnLocation.Material = Enum.Material.Grass
+spawnLocation.Duration = 0
+spawnLocation.Transparency = 1
+spawnLocation.Parent = mapFolder
+
+----------------------------------------------------------------
+-- The village (a few more little houses behind Amy's)
+----------------------------------------------------------------
+makeHouse(-44, -50, Color3.fromRGB(222, 196, 150), DEEP, 0.9, mapFolder)
+makeHouse(44, -44, Color3.fromRGB(196, 176, 208), BARK, 0.85, mapFolder)
+makeHouse(-64, -20, Color3.fromRGB(176, 196, 160), BARK, 0.8, mapFolder)
+makeHouse(62, -24, Color3.fromRGB(228, 180, 120), DEEP, 0.9, mapFolder)
+
+----------------------------------------------------------------
+-- The dirt path from the garden gate toward the forest gap
+----------------------------------------------------------------
+local pathPoints = {
+	Vector3.new(0, 0, gateZ + 2),
+	Vector3.new(6, 0, 20),
+	Vector3.new(-8, 0, 60),
+	Vector3.new(4, 0, 100),
+	Vector3.new(0, 0, Map.ForestWallZ - 6),
+}
+for i = 1, #pathPoints - 1 do
+	local a = pathPoints[i]
+	local b = pathPoints[i + 1]
+	local mid = (a + b) / 2
+	local length = (b - a).Magnitude + 4
+	makePart({
+		Name = "Path",
+		Size = Vector3.new(7, 0.3, length),
+		CFrame = CFrame.lookAt(Vector3.new(mid.X, Map.GroundY + 0.1, mid.Z), Vector3.new(b.X, Map.GroundY + 0.1, b.Z)),
+		Color = Color3.fromRGB(186, 160, 116),
+		Material = Enum.Material.Ground,
+		CanCollide = false,
+	})
+end
+
+----------------------------------------------------------------
+-- THE LOOMING FOREST WALL
+-- Giant trunks standing shoulder to shoulder, exactly like the
+-- drawing: a fence of trees with one gap, just Amy's size.
+----------------------------------------------------------------
+local wallZ = Map.ForestWallZ
+local TRUNK_DIAMETER = 13
+local TRUNK_HEIGHT = 42
+
+local function makeNest(x, y, z)
+	makePart({
+		Name = "Nest",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(1.4, 4.6, 4.6),
+		CFrame = CFrame.new(x, y, z) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Color3.fromRGB(122, 88, 48),
+		Material = Enum.Material.Wood,
+		CanCollide = false,
+	})
+	for i = 1, 3 do
+		makePart({
+			Name = "NestEgg",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(1, 1.3, 1),
+			CFrame = CFrame.new(x + (i - 2) * 0.9, y + 1, z + rng:NextNumber(-0.4, 0.4)),
+			Color = Color3.fromRGB(248, 244, 230),
+			Material = Enum.Material.SmoothPlastic,
+			CanCollide = false,
+		})
+	end
+end
+
+local function makeWallTree(x, hasNest)
+	local heightJitter = rng:NextNumber(-3, 4)
+	local height = TRUNK_HEIGHT + heightJitter
+	-- the giant trunk
+	makePart({
+		Name = "WallTrunk",
+		Size = Vector3.new(TRUNK_DIAMETER, height, TRUNK_DIAMETER * 0.85),
+		CFrame = CFrame.new(x, Map.GroundY + height / 2, wallZ),
+		Color = Color3.fromRGB(139, 101, 64),
+		Material = Enum.Material.Wood,
+	})
+	-- rounded edges illusion: a slightly darker core cylinder in front
+	makePart({
+		Name = "WallTrunkBark",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(height, TRUNK_DIAMETER * 0.55, TRUNK_DIAMETER * 0.55),
+		CFrame = CFrame.new(x, Map.GroundY + height / 2, wallZ - TRUNK_DIAMETER * 0.28) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = BARK,
+		Material = Enum.Material.Wood,
+		CanCollide = false,
+	})
+	-- a knot hole on some trunks (like the drawing's swirls)
+	if rng:NextNumber() < 0.4 then
+		makePart({
+			Name = "TrunkKnot",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(2.6, 3.4, 1.5),
+			CFrame = CFrame.new(x + rng:NextNumber(-3, 3), Map.GroundY + rng:NextNumber(10, 24), wallZ - TRUNK_DIAMETER * 0.52),
+			Color = Color3.fromRGB(92, 62, 38),
+			Material = Enum.Material.Wood,
+			CanCollide = false,
+		})
+	end
+	-- big round two-tone canopy
+	local canopyY = Map.GroundY + height + 6
+	local canopyR = rng:NextNumber(17, 22)
+	makePart({
+		Name = "WallCanopy",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(canopyR * 2, canopyR * 1.4, canopyR * 1.8),
+		CFrame = CFrame.new(x, canopyY, wallZ),
+		Color = CANOPY_DARK,
+		Material = Enum.Material.Grass,
+		CanCollide = false,
+	})
+	makePart({
+		Name = "WallCanopyHighlight",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(canopyR * 1.3, canopyR * 0.8, canopyR * 1.1),
+		CFrame = CFrame.new(x - canopyR * 0.15, canopyY + canopyR * 0.28, wallZ - canopyR * 0.2),
+		Color = CANOPY_LIGHT,
+		Material = Enum.Material.Grass,
+		CanCollide = false,
+	})
+	if hasNest then
+		makeNest(x, canopyY + canopyR * 0.72 + 1, wallZ - 2)
+	end
+end
+
+-- Trunks marching out from the central gap to both edges
+local gap = Map.ForestGapHalfWidth
+local firstX = gap + TRUNK_DIAMETER / 2 + 0.5
+local nestSpots = { [2] = true, [5] = true } -- which trees (per side) carry nests
+local i = 0
+local x = firstX
+while x < Map.MapHalfWidth + TRUNK_DIAMETER do
+	i = i + 1
+	makeWallTree(x, nestSpots[i] == true)
+	makeWallTree(-x, nestSpots[i] == true and i ~= 2) -- vary the sides a little
+	x = x + TRUNK_DIAMETER + rng:NextNumber(-0.5, 1)
+end
+
+-- Above the gap the canopies close over, so the way in feels like a doorway
+makePart({
+	Name = "GapArchCanopy",
+	Shape = Enum.PartType.Ball,
+	Size = Vector3.new(26, 18, 22),
+	CFrame = CFrame.new(0, Map.GroundY + TRUNK_HEIGHT + 8, wallZ),
+	Color = CANOPY_DARK,
+	Material = Enum.Material.Grass,
+	CanCollide = false,
+})
+-- Shadowy earth in the gap itself
+makePart({
+	Name = "GapFloor",
+	Size = Vector3.new(gap * 2, 0.3, TRUNK_DIAMETER + 4),
+	CFrame = CFrame.new(0, Map.GroundY + 0.12, wallZ),
+	Color = Color3.fromRGB(70, 84, 52),
+	Material = Enum.Material.Ground,
+	CanCollide = false,
+})
+
+----------------------------------------------------------------
+-- THE PARALLEL-WORLD PARADISE (beyond the wall)
+----------------------------------------------------------------
+local PARADISE_LEAF_COLORS = {
+	MOSS,
+	Color3.fromRGB(120, 190, 90),
+	BUBBLEGUM,
+	GRAPE,
+	Color3.fromRGB(90, 200, 170), -- teal
+	GOLD,
+}
+
+local function paradiseLeafColor()
+	return PARADISE_LEAF_COLORS[rng:NextInteger(1, #PARADISE_LEAF_COLORS)]
+end
+
+local function makeParadiseTree(px, pz, scale)
+	local trunkHeight = 14 * scale
+	makePart({
+		Name = "ParadiseTrunk",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(trunkHeight, 2.4 * scale, 2.4 * scale),
+		CFrame = CFrame.new(px, Map.GroundY + trunkHeight / 2, pz) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = Color3.fromRGB(122, 84, 56),
+		Material = Enum.Material.Wood,
+	})
+	for _ = 1, rng:NextInteger(2, 4) do
+		local offset = Vector3.new(
+			rng:NextNumber(-3.5, 3.5) * scale,
+			rng:NextNumber(-1, 3.5) * scale,
+			rng:NextNumber(-3.5, 3.5) * scale
+		)
+		makePart({
+			Name = "ParadiseLeaves",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(1, 1, 1) * rng:NextNumber(7, 12) * scale,
+			CFrame = CFrame.new(Vector3.new(px, Map.GroundY + trunkHeight, pz) + offset),
+			Color = paradiseLeafColor(),
+			Material = Enum.Material.Grass,
+			CanCollide = false,
+		})
+	end
+end
+
+local function makeGlowFlower(px, pz, big)
+	local scale
+	if big then
+		scale = rng:NextNumber(2.2, 3)
+	else
+		scale = rng:NextNumber(0.8, 1.3)
+	end
+	local stemH = 2.2 * scale
+	makePart({
+		Name = "GlowFlowerStem",
+		Size = Vector3.new(0.3 * scale, stemH, 0.3 * scale),
+		CFrame = CFrame.new(px, Map.GroundY + stemH / 2, pz),
+		Color = MOSS,
+		Material = Enum.Material.Grass,
+		CanCollide = false,
+	})
+	local petalColor
+	if rng:NextNumber() < 0.5 then
+		petalColor = BUBBLEGUM
+	else
+		petalColor = GRAPE
+	end
+	local head = makePart({
+		Name = "GlowFlowerHead",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(1.6, 1.1, 1.6) * scale,
+		CFrame = CFrame.new(px, Map.GroundY + stemH + 0.5 * scale, pz),
+		Color = petalColor,
+		Material = Enum.Material.Neon,
+		CanCollide = false,
+	})
+	local core = makePart({
+		Name = "GlowFlowerCore",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(0.7, 0.7, 0.7) * scale,
+		CFrame = CFrame.new(px, Map.GroundY + stemH + 0.9 * scale, pz),
+		Color = GOLD,
+		Material = Enum.Material.Neon,
+		CanCollide = false,
+	})
+	if big then
+		local light = Instance.new("PointLight")
+		light.Color = petalColor
+		light.Range = 14
+		light.Brightness = 1.2
+		light.Parent = core
+	end
+	return head
+end
+
+local function inParadiseKeepClear(px, pz)
+	-- keep the walking line from the gap to the glade, and the glade
+	-- itself, free of trunks
+	if math.abs(px) < 10 and pz < 265 then
+		return true
+	end
+	if (Vector3.new(px, 0, pz) - Vector3.new(0, 0, 255)).Magnitude < 24 then
+		return true
+	end
+	-- keep breathing room where the animals stand
+	for _, npc in ipairs(StoryData.NPCs) do
+		if (Vector3.new(px - npc.position.X, 0, pz - npc.position.Z)).Magnitude < 12 then
+			return true
+		end
+	end
+	return false
+end
+
+for _ = 1, 90 do
+	local px = rng:NextNumber(-88, 88)
+	local pz = rng:NextNumber(Map.ForestWallZ + 18, WORLD_END_Z - 12)
+	if not inParadiseKeepClear(px, pz) then
+		makeParadiseTree(px, pz, rng:NextNumber(0.7, 1.8))
+	end
+end
+
+for _ = 1, 40 do
+	local px = rng:NextNumber(-80, 80)
+	local pz = rng:NextNumber(Map.ForestWallZ + 14, WORLD_END_Z - 14)
+	if not inParadiseKeepClear(px, pz) then
+		makeGlowFlower(px, pz, false)
+	end
+end
+
+-- A trail of glowing flowers leads from the gap to the heart glade
+local trailZ = Map.ForestWallZ + 14
+while trailZ < 240 do
+	makeGlowFlower(((trailZ % 20 < 10) and 5 or -5), trailZ, false)
+	trailZ = trailZ + 12
+end
+
+-- The heart glade: a ring of big glowing flowers
+for j = 1, 9 do
+	local a = (j / 9) * math.pi * 2
+	makeGlowFlower(math.cos(a) * 20, 255 + math.sin(a) * 20, true)
+end
+
+-- Shafts of golden light falling through the paradise canopy
+for _ = 1, 8 do
+	local px = rng:NextNumber(-70, 70)
+	local pz = rng:NextNumber(Map.ForestWallZ + 25, WORLD_END_Z - 30)
+	makePart({
+		Name = "LightShaft",
+		Size = Vector3.new(rng:NextNumber(3, 6), 60, rng:NextNumber(3, 6)),
+		CFrame = CFrame.new(px, Map.GroundY + 30, pz) * CFrame.Angles(0, 0, math.rad(rng:NextNumber(-6, 6))),
+		Color = GOLD,
+		Material = Enum.Material.Neon,
+		Transparency = 0.82,
+		CanCollide = false,
+	})
+end
+
+-- Drifting sparkles everywhere in the paradise
+for _ = 1, 16 do
+	local px = rng:NextNumber(-70, 70)
+	local pz = rng:NextNumber(Map.ForestWallZ + 15, WORLD_END_Z - 15)
+	local color
+	local roll = rng:NextNumber()
+	if roll < 0.34 then
+		color = BUBBLEGUM
+	elseif roll < 0.67 then
+		color = GOLD
+	else
+		color = Color3.fromRGB(190, 240, 255)
+	end
+	makeFireflies(Vector3.new(px, Map.GroundY + rng:NextNumber(3, 9), pz), color)
+end
+
+mapFolder.Parent = Workspace
+print("[WorldBuilder] World built: village, field, forest wall, paradise.")
+]]></ProtectedString>
+</Properties>
+</Item>
+<Item class="Script" referent="RBX00000004">
+<Properties>
+<string name="Name">StoryServer</string>
+<ProtectedString name="Source"><![CDATA[--[[
+	StoryServer
+	===========
+	The story engine for "Amy and the Rain Forest" (a story by Clara).
+	Reads StoryData and runs the game:
+	  * builds the characters: Dad, Mum, Sam the dog, and the three
+	    parallel-world animals (maroon squirrel, orange fox, golden lion)
+	  * creates trigger zones and (if a quest needs them) pickups
+	  * walks each player through chapters and quests
+	  * Sam drags Amy back when she tries to sneak out
+	  * the paradise lights up when she steps through the tree wall
+	  * the giant tree-chopping machine arrives for the finale -- and
+	    backs down when Amy stands in front of it and explains
+
+	This is a solo, story-driven experience: each player runs through
+	the story at their own pace with their own state.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local StoryData = require(ReplicatedStorage:WaitForChild("StoryData"))
+local Map = StoryData.Map
+
+----------------------------------------------------------------
+-- Remotes
+----------------------------------------------------------------
+local remotes = Instance.new("Folder")
+remotes.Name = "StoryRemotes"
+
+local function makeRemote(name)
+	local remote = Instance.new("RemoteEvent")
+	remote.Name = name
+	remote.Parent = remotes
+	return remote
+end
+
+local ShowDialogue = makeRemote("ShowDialogue") -- server -> client (lines)
+local DialogueFinished = makeRemote("DialogueFinished") -- client -> server
+local SetObjective = makeRemote("SetObjective") -- server -> client (text or nil)
+local ShowChapter = makeRemote("ShowChapter") -- server -> client (title, subtitle)
+local ShowEnding = makeRemote("ShowEnding") -- server -> client (title, subtitle)
+local ClientReady = makeRemote("ClientReady") -- client -> server
+
+remotes.Parent = ReplicatedStorage
+
+----------------------------------------------------------------
+-- Character construction
+----------------------------------------------------------------
+local npcModels = {} -- id -> Model
+local npcPrompts = {} -- id -> ProximityPrompt
+local npcHomePivots = {} -- id -> CFrame (so characters can be moved and restored)
+
+local npcFolder = Instance.new("Folder")
+npcFolder.Name = "StoryNPCs"
+npcFolder.Parent = Workspace
+
+local SKIN = Color3.fromRGB(228, 194, 160)
+local HAIR = Color3.fromRGB(94, 64, 44)
+
+local function makeNPCPart(props, model)
+	local part = Instance.new("Part")
+	part.Anchored = true
+	part.CanCollide = false
+	part.TopSurface = Enum.SurfaceType.Smooth
+	part.BottomSurface = Enum.SurfaceType.Smooth
+	for key, value in pairs(props) do
+		part[key] = value
+	end
+	part.Parent = model
+	return part
+end
+
+local function addNameTag(rootPart, displayName, offsetY)
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "NameTag"
+	billboard.Size = UDim2.new(0, 170, 0, 30)
+	billboard.StudsOffsetWorldSpace = Vector3.new(0, offsetY or 4.4, 0)
+	billboard.AlwaysOnTop = true
+	billboard.MaxDistance = 60
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.Text = displayName
+	label.TextColor3 = Color3.fromRGB(255, 255, 240)
+	label.TextStrokeTransparency = 0.2
+	label.TextStrokeColor3 = Color3.fromRGB(38, 51, 31)
+	label.Font = Enum.Font.FredokaOne
+	label.TextScaled = true
+	label.Parent = billboard
+	billboard.Parent = rootPart
+end
+
+local function baseCFrameFor(def, heightAboveGround)
+	local at = Vector3.new(def.position.X, Map.GroundY + heightAboveGround, def.position.Z)
+	return CFrame.lookAt(at, at + Vector3.new(0, 0, (def.faceZ or 1) * 10))
+end
+
+-- A friendly blocky villager (Dad, Mum, and the crowd in the finale)
+local function buildHuman(def)
+	local model = Instance.new("Model")
+	model.Name = def.id
+	local base = baseCFrameFor(def, 2.9)
+	local shirt = def.shirt or Color3.fromRGB(120, 120, 140)
+
+	-- legs
+	for side = -1, 1, 2 do
+		makeNPCPart({
+			Name = "Leg",
+			Size = Vector3.new(0.9, 2.4, 1),
+			CFrame = base * CFrame.new(0.55 * side, -2.1, 0),
+			Color = Color3.fromRGB(64, 74, 94),
+		}, model)
+	end
+	-- torso
+	local body = makeNPCPart({
+		Name = "Body",
+		Size = Vector3.new(2.6, 3, 1.5),
+		CFrame = base * CFrame.new(0, 0.6, 0),
+		Color = shirt,
+		CanCollide = true,
+	}, model)
+	-- arms
+	for side = -1, 1, 2 do
+		makeNPCPart({
+			Name = "Arm",
+			Size = Vector3.new(0.8, 2.8, 1),
+			CFrame = base * CFrame.new(1.75 * side, 0.5, 0),
+			Color = shirt,
+		}, model)
+		makeNPCPart({
+			Name = "Hand",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(0.8, 0.8, 0.8),
+			CFrame = base * CFrame.new(1.75 * side, -1.1, 0),
+			Color = SKIN,
+		}, model)
+	end
+	-- head + hair + eyes
+	local head = makeNPCPart({
+		Name = "Head",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(2.1, 2.1, 2.1),
+		CFrame = base * CFrame.new(0, 3, 0),
+		Color = SKIN,
+	}, model)
+	makeNPCPart({
+		Name = "Hair",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(2.25, 1.5, 2.25),
+		CFrame = base * CFrame.new(0, 3.55, 0.25),
+		Color = HAIR,
+	}, model)
+	for side = -1, 1, 2 do
+		makeNPCPart({
+			Name = "Eye",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(0.34, 0.34, 0.34),
+			CFrame = base * CFrame.new(0.42 * side, 3.15, -0.92),
+			Color = Color3.fromRGB(25, 25, 25),
+		}, model)
+	end
+
+	addNameTag(head, def.display, 2.6)
+	model.PrimaryPart = body
+	model.Parent = npcFolder
+	return model, body
+end
+
+-- A four-legged friend. kind decides colours and signature features.
+local function buildAnimal(def)
+	local model = Instance.new("Model")
+	model.Name = def.id
+
+	local bodyColor, bellyColor, scale, tailStyle
+	if def.kind == "dog" then
+		bodyColor = Color3.fromRGB(238, 230, 214)
+		bellyColor = Color3.fromRGB(150, 110, 74)
+		scale = 1.0
+		tailStyle = "up"
+	elseif def.kind == "squirrel" then
+		bodyColor = Color3.fromRGB(128, 32, 48) -- maroon!
+		bellyColor = Color3.fromRGB(214, 168, 150)
+		scale = 0.55
+		tailStyle = "fluff"
+	elseif def.kind == "fox" then
+		bodyColor = Color3.fromRGB(240, 120, 32) -- the orangest orange
+		bellyColor = Color3.fromRGB(248, 240, 226)
+		scale = 0.85
+		tailStyle = "brush"
+	else -- lion
+		bodyColor = Color3.fromRGB(226, 178, 68) -- golden
+		bellyColor = Color3.fromRGB(240, 214, 150)
+		scale = 1.5
+		tailStyle = "tuft"
+	end
+
+	local bodyLift = 1.6 * scale + 0.6
+	local base = baseCFrameFor(def, bodyLift)
+
+	-- body (horizontal)
+	local body = makeNPCPart({
+		Name = "Body",
+		Size = Vector3.new(2 * scale, 1.8 * scale, 3.6 * scale),
+		CFrame = base,
+		Color = bodyColor,
+		CanCollide = true,
+	}, model)
+	-- belly / chest patch
+	makeNPCPart({
+		Name = "Chest",
+		Size = Vector3.new(1.4 * scale, 1.2 * scale, 0.5 * scale),
+		CFrame = base * CFrame.new(0, -0.2 * scale, -1.7 * scale),
+		Color = bellyColor,
+	}, model)
+	-- legs
+	for sx = -1, 1, 2 do
+		for sz = -1, 1, 2 do
+			makeNPCPart({
+				Name = "Leg",
+				Size = Vector3.new(0.6 * scale, 1.5 * scale, 0.6 * scale),
+				CFrame = base * CFrame.new(0.6 * sx * scale, -1.5 * scale, 1.2 * sz * scale),
+				Color = bodyColor,
+			}, model)
+		end
+	end
+	-- head
+	local head = makeNPCPart({
+		Name = "Head",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(1.9, 1.9, 1.9) * scale,
+		CFrame = base * CFrame.new(0, 1.3 * scale, -2 * scale),
+		Color = bodyColor,
+	}, model)
+	-- eyes
+	for side = -1, 1, 2 do
+		makeNPCPart({
+			Name = "Eye",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(0.32, 0.32, 0.32) * scale,
+			CFrame = base * CFrame.new(0.4 * side * scale, 1.5 * scale, -2.8 * scale),
+			Color = Color3.fromRGB(25, 25, 25),
+		}, model)
+	end
+	-- snout
+	makeNPCPart({
+		Name = "Snout",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(0.8, 0.6, 0.9) * scale,
+		CFrame = base * CFrame.new(0, 1.1 * scale, -2.85 * scale),
+		Color = bellyColor,
+	}, model)
+	makeNPCPart({
+		Name = "Nose",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(0.3, 0.3, 0.3) * scale,
+		CFrame = base * CFrame.new(0, 1.15 * scale, -3.3 * scale),
+		Color = Color3.fromRGB(30, 26, 26),
+	}, model)
+	-- ears
+	local earShape
+	if def.kind == "dog" then
+		earShape = Vector3.new(0.5, 1.1, 0.3) -- floppy
+	elseif def.kind == "lion" then
+		earShape = Vector3.new(0.55, 0.55, 0.3) -- little and round
+	else
+		earShape = Vector3.new(0.45, 0.8, 0.3) -- pointy-ish
+	end
+	for side = -1, 1, 2 do
+		makeNPCPart({
+			Name = "Ear",
+			Size = earShape * scale * 1.6,
+			CFrame = base * CFrame.new(0.6 * side * scale, 2.1 * scale, -1.9 * scale)
+				* CFrame.Angles(0, 0, math.rad(def.kind == "dog" and 35 * side or 10 * side)),
+			Color = def.kind == "fox" and Color3.fromRGB(40, 36, 36) or bodyColor,
+		}, model)
+	end
+	-- tails
+	if tailStyle == "up" then
+		makeNPCPart({
+			Name = "Tail",
+			Size = Vector3.new(0.4, 1.6, 0.4) * scale,
+			CFrame = base * CFrame.new(0, 0.9 * scale, 2 * scale) * CFrame.Angles(math.rad(-30), 0, 0),
+			Color = bodyColor,
+		}, model)
+	elseif tailStyle == "fluff" then
+		-- the squirrel's giant question-mark tail
+		makeNPCPart({
+			Name = "Tail",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(1.4, 2.6, 1.4) * scale,
+			CFrame = base * CFrame.new(0, 1.4 * scale, 2.2 * scale),
+			Color = bodyColor,
+		}, model)
+		makeNPCPart({
+			Name = "TailTip",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(1, 1.2, 1) * scale,
+			CFrame = base * CFrame.new(0, 2.8 * scale, 1.6 * scale),
+			Color = bodyColor,
+		}, model)
+	elseif tailStyle == "brush" then
+		makeNPCPart({
+			Name = "Tail",
+			Size = Vector3.new(0.8, 0.8, 2.4) * scale,
+			CFrame = base * CFrame.new(0, 0.4 * scale, 2.8 * scale) * CFrame.Angles(math.rad(18), 0, 0),
+			Color = bodyColor,
+		}, model)
+		makeNPCPart({
+			Name = "TailTip",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(0.85, 0.85, 1) * scale,
+			CFrame = base * CFrame.new(0, 0.75 * scale, 3.9 * scale),
+			Color = Color3.fromRGB(248, 240, 226), -- white tip
+		}, model)
+	else -- tuft
+		makeNPCPart({
+			Name = "Tail",
+			Size = Vector3.new(0.35, 0.35, 2.6) * scale,
+			CFrame = base * CFrame.new(0, 0.5 * scale, 2.9 * scale) * CFrame.Angles(math.rad(12), 0, 0),
+			Color = bodyColor,
+		}, model)
+		makeNPCPart({
+			Name = "TailTuft",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(0.7, 0.7, 0.7) * scale,
+			CFrame = base * CFrame.new(0, 0.8 * scale, 4.1 * scale),
+			Color = Color3.fromRGB(150, 96, 40),
+		}, model)
+	end
+	-- the lion's magnificent mane
+	if def.kind == "lion" then
+		makeNPCPart({
+			Name = "Mane",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(2.9, 2.9, 2.2) * scale,
+			CFrame = base * CFrame.new(0, 1.3 * scale, -1.55 * scale),
+			Color = Color3.fromRGB(168, 108, 40),
+			Material = Enum.Material.Grass,
+		}, model)
+	end
+
+	addNameTag(head, def.display, def.kind == "lion" and 4.6 or 3.2)
+	model.PrimaryPart = body
+	model.Parent = npcFolder
+	return model, body
+end
+
+for _, def in ipairs(StoryData.NPCs) do
+	local model, promptPart
+	if def.kind == "human" then
+		model, promptPart = buildHuman(def)
+	else
+		model, promptPart = buildAnimal(def)
+	end
+	npcModels[def.id] = model
+	npcHomePivots[def.id] = model:GetPivot()
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "TalkPrompt"
+	prompt.ActionText = "Talk"
+	prompt.ObjectText = def.display
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 10
+	prompt.RequiresLineOfSight = false
+	prompt.Enabled = false
+	prompt.Parent = promptPart
+	npcPrompts[def.id] = prompt
+end
+
+----------------------------------------------------------------
+-- Trigger zones
+----------------------------------------------------------------
+local zoneParts = {} -- name -> Part
+local zoneFolder = Instance.new("Folder")
+zoneFolder.Name = "StoryZones"
+zoneFolder.Parent = Workspace
+
+for _, zoneDef in ipairs(StoryData.Zones) do
+	local part = Instance.new("Part")
+	part.Name = zoneDef.name
+	part.Size = zoneDef.size
+	part.CFrame = CFrame.new(zoneDef.position)
+	part.Anchored = true
+	part.CanCollide = false
+	part.Transparency = 1
+	part.Parent = zoneFolder
+	zoneParts[zoneDef.name] = part
+end
+
+----------------------------------------------------------------
+-- Per-player story state
+----------------------------------------------------------------
+local playerStates = {} -- player -> state table
+
+local function getState(player)
+	return playerStates[player]
+end
+
+local function currentQuest(state)
+	local chapter = StoryData.Chapters[state.chapterIndex]
+	if not chapter then
+		return nil, nil
+	end
+	return chapter.quests[state.questIndex], chapter
+end
+
+-- Blocking dialogue: sends lines to the client, waits until the player
+-- has clicked through them all.
+local function playDialogue(player, lines)
+	local state = getState(player)
+	if not state or not lines or #lines == 0 then
+		return
+	end
+	state.dialogueDone = false
+	ShowDialogue:FireClient(player, lines)
+	local waited = 0
+	while playerStates[player] and not state.dialogueDone and waited < 300 do
+		waited = waited + task.wait(0.1)
+	end
+end
+
+DialogueFinished.OnServerEvent:Connect(function(player)
+	local state = getState(player)
+	if state then
+		state.dialogueDone = true
+	end
+end)
+
+----------------------------------------------------------------
+-- Pickups (collect quests -- none in the base story, but the
+-- engine keeps supporting them so new chapters can use them)
+----------------------------------------------------------------
+local activePickups = {} -- part -> {player=..., quest=...}
+
+local pickupFolder = Instance.new("Folder")
+pickupFolder.Name = "StoryPickups"
+pickupFolder.Parent = Workspace
+
+local function makePickup(quest, position, player)
+	local part = Instance.new("Part")
+	part.Anchored = true
+	part.CanCollide = false
+	part.Name = "Pickup"
+	part.Size = Vector3.new(2.4, 0.6, 2.4)
+	part.Color = Color3.fromRGB(255, 130, 190)
+	part.Material = Enum.Material.Neon
+	part.CFrame = CFrame.new(position.X, Map.GroundY + 2.2, position.Z)
+
+	local sparkle = Instance.new("ParticleEmitter")
+	sparkle.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	sparkle.Color = ColorSequence.new(Color3.fromRGB(255, 170, 220))
+	sparkle.LightEmission = 1
+	sparkle.Size = NumberSequence.new(0.5)
+	sparkle.Lifetime = NumberRange.new(0.8, 1.6)
+	sparkle.Rate = 6
+	sparkle.Speed = NumberRange.new(0.5, 1)
+	sparkle.SpreadAngle = Vector2.new(180, 180)
+	sparkle.Parent = part
+
+	activePickups[part] = { player = player, quest = quest }
+	part.Parent = pickupFolder
+	return part
+end
+
+task.spawn(function()
+	local t = 0
+	RunService.Heartbeat:Connect(function(dt)
+		t = t + dt
+		for part in pairs(activePickups) do
+			if part.Parent then
+				local baseY = part:GetAttribute("BaseY")
+				if not baseY then
+					baseY = part.Position.Y
+					part:SetAttribute("BaseY", baseY)
+				end
+				part.CFrame = CFrame.new(part.Position.X, baseY + math.sin(t * 2) * 0.5, part.Position.Z)
+					* CFrame.Angles(0, t * 1.2, 0)
+			end
+		end
+	end)
+end)
+
+----------------------------------------------------------------
+-- The giant tree-chopping machine (built for the finale)
+----------------------------------------------------------------
+local machineModel = nil
+local machineBladeModel = nil
+local machineBladeBase = nil
+local machineSpinning = false
+local machineSmoke = nil
+local villagerModels = {}
+
+local function buildMachine()
+	if machineModel then
+		return
+	end
+	local pos = Map.MachinePosition
+	local model = Instance.new("Model")
+	model.Name = "TreeChoppingMachine"
+
+	local METAL = Color3.fromRGB(74, 78, 84)
+	local METAL_DARK = Color3.fromRGB(52, 54, 58)
+	local WARN_GOLD = Color3.fromRGB(231, 181, 58)
+
+	local function machinePart(props, parent)
+		local part = Instance.new("Part")
+		part.Anchored = true
+		part.TopSurface = Enum.SurfaceType.Smooth
+		part.BottomSurface = Enum.SurfaceType.Smooth
+		for key, value in pairs(props) do
+			part[key] = value
+		end
+		part.Parent = parent or model
+		return part
+	end
+
+	-- hull (facing +Z, toward the forest)
+	local hull = machinePart({
+		Name = "Hull",
+		Size = Vector3.new(12, 8, 16),
+		CFrame = CFrame.new(pos.X, Map.GroundY + 6, pos.Z),
+		Color = METAL,
+		Material = Enum.Material.DiamondPlate,
+	})
+	-- cab on top
+	machinePart({
+		Name = "Cab",
+		Size = Vector3.new(8, 5, 6),
+		CFrame = CFrame.new(pos.X, Map.GroundY + 12.5, pos.Z - 3),
+		Color = METAL_DARK,
+		Material = Enum.Material.Metal,
+	})
+	machinePart({
+		Name = "CabWindow",
+		Size = Vector3.new(6.5, 3, 0.5),
+		CFrame = CFrame.new(pos.X, Map.GroundY + 12.8, pos.Z + 0.2),
+		Color = Color3.fromRGB(160, 200, 210),
+		Material = Enum.Material.Glass,
+		Transparency = 0.3,
+		CanCollide = false,
+	})
+	-- warning stripes across the front
+	for k = 0, 3 do
+		machinePart({
+			Name = "WarnStripe",
+			Size = Vector3.new(1.6, 1.2, 0.4),
+			CFrame = CFrame.new(pos.X - 4.5 + k * 3, Map.GroundY + 3, pos.Z + 8.1),
+			Color = k % 2 == 0 and WARN_GOLD or METAL_DARK,
+			Material = Enum.Material.SmoothPlastic,
+			CanCollide = false,
+		})
+	end
+	-- wheels
+	for sx = -1, 1, 2 do
+		for _, wz in ipairs({ -5, 5 }) do
+			machinePart({
+				Name = "Wheel",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(2.4, 5.5, 5.5),
+				CFrame = CFrame.new(pos.X + sx * 7, Map.GroundY + 2.75, pos.Z + wz) * CFrame.Angles(0, 0, math.rad(90)),
+				Color = Color3.fromRGB(30, 30, 32),
+				Material = Enum.Material.SmoothPlastic,
+			})
+		end
+	end
+	-- chimney + smoke
+	local chimney = machinePart({
+		Name = "Chimney",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(6, 1.8, 1.8),
+		CFrame = CFrame.new(pos.X + 4, Map.GroundY + 13, pos.Z - 6) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = METAL_DARK,
+		Material = Enum.Material.Metal,
+	})
+	machineSmoke = Instance.new("ParticleEmitter")
+	machineSmoke.Texture = "rbxasset://textures/particles/smoke_main.dds"
+	machineSmoke.Color = ColorSequence.new(Color3.fromRGB(90, 90, 90))
+	machineSmoke.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 2),
+		NumberSequenceKeypoint.new(1, 6),
+	})
+	machineSmoke.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.4),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	machineSmoke.Lifetime = NumberRange.new(2, 3.5)
+	machineSmoke.Rate = 12
+	machineSmoke.Speed = NumberRange.new(6, 9)
+	machineSmoke.EmissionDirection = Enum.NormalId.Right
+	machineSmoke.Parent = chimney
+
+	-- THE BLADE: a giant circular saw on the front
+	local bladeModel = Instance.new("Model")
+	bladeModel.Name = "Blade"
+	local bladeCenter = CFrame.new(pos.X, Map.GroundY + 6.5, pos.Z + 9.5)
+	local hub = machinePart({
+		Name = "BladeHub",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(1.4, 3, 3),
+		CFrame = bladeCenter * CFrame.Angles(0, math.rad(90), 0),
+		Color = METAL_DARK,
+		Material = Enum.Material.Metal,
+		CanCollide = false,
+	}, bladeModel)
+	machinePart({
+		Name = "BladeDisc",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.8, 11, 11),
+		CFrame = bladeCenter * CFrame.Angles(0, math.rad(90), 0),
+		Color = Color3.fromRGB(168, 172, 178),
+		Material = Enum.Material.Metal,
+		CanCollide = false,
+	}, bladeModel)
+	-- radial teeth marks so the spin reads clearly
+	for k = 0, 5 do
+		local a = (k / 6) * math.pi * 2
+		machinePart({
+			Name = "BladeTooth",
+			Size = Vector3.new(1.1, 4.6, 0.5),
+			CFrame = bladeCenter * CFrame.Angles(0, 0, a) * CFrame.new(0, 3.6, -0.5),
+			Color = METAL_DARK,
+			Material = Enum.Material.Metal,
+			CanCollide = false,
+		}, bladeModel)
+	end
+	bladeModel.PrimaryPart = hub
+	bladeModel.Parent = model
+
+	model.PrimaryPart = hull
+	model.Parent = Workspace
+
+	machineModel = model
+	machineBladeModel = bladeModel
+	machineBladeBase = bladeModel:GetPivot()
+	machineSpinning = true
+
+	-- spin the blade until the story stops it
+	task.spawn(function()
+		local angle = 0
+		while machineModel do
+			if machineSpinning then
+				-- the hub cylinder's axis (its local X) points at the forest,
+				-- so spinning about local X turns the disc in its own plane
+				angle = angle + 0.18
+				machineBladeModel:PivotTo(machineBladeBase * CFrame.Angles(angle, 0, 0))
+			end
+			task.wait(0.03)
+		end
+	end)
+end
+
+local VILLAGER_SHIRTS = {
+	Color3.fromRGB(180, 120, 70),
+	Color3.fromRGB(96, 130, 170),
+	Color3.fromRGB(170, 96, 96),
+	Color3.fromRGB(120, 150, 96),
+}
+
+local function buildVillagers()
+	if #villagerModels > 0 then
+		return
+	end
+	local spots = {
+		{ x = -14, z = 84 },
+		{ x = -5, z = 80 },
+		{ x = 6, z = 81 },
+		{ x = 15, z = 85 },
+	}
+	for k, spot in ipairs(spots) do
+		local def = {
+			id = "Villager" .. k,
+			display = "Villager",
+			kind = "human",
+			shirt = VILLAGER_SHIRTS[k],
+			position = Vector3.new(spot.x, 0, spot.z),
+			faceZ = 1,
+		}
+		local model = buildHuman(def)
+		table.insert(villagerModels, model)
+	end
+end
+
+----------------------------------------------------------------
+-- World reactions to story progress (hooks receive the player)
+----------------------------------------------------------------
+local colorCorrection = Instance.new("ColorCorrectionEffect")
+colorCorrection.Name = "StoryColorGrade"
+colorCorrection.Saturation = 0
+colorCorrection.Parent = Lighting
+
+local function pivotNPC(id, position, faceZ)
+	local model = npcModels[id]
+	if model then
+		local at = Vector3.new(position.X, position.Y, position.Z)
+		model:PivotTo(CFrame.lookAt(at, at + Vector3.new(0, 0, (faceZ or 1) * 10)))
+	end
+end
+
+-- Sam catches Amy at the gate and hauls her back to the garden
+local function samCatches(player)
+	local character = player.Character
+	local samPivotY = npcHomePivots.Sam and npcHomePivots.Sam.Position.Y or 2
+	-- Sam bounds over to the gate...
+	pivotNPC("Sam", Vector3.new(2, samPivotY, Map.GardenGateZ + 2), -1)
+	task.wait(0.5)
+	-- ...and both of them end up back in the garden.
+	if character then
+		local root = character:FindFirstChild("HumanoidRootPart")
+		if root then
+			root.CFrame = CFrame.lookAt(
+				Vector3.new(Map.SpawnPosition.X, Map.GroundY + 3.5, Map.SpawnPosition.Z - 2),
+				Vector3.new(Map.SpawnPosition.X, Map.GroundY + 3.5, Map.ForestWallZ)
+			)
+		end
+	end
+	pivotNPC("Sam", Vector3.new(3, samPivotY, Map.SpawnPosition.Z + 4), -1)
+	task.wait(0.4)
+end
+
+-- Sam is off at the farm for chapter 2
+local function samGoesToFarm()
+	local samPivotY = npcHomePivots.Sam and npcHomePivots.Sam.Position.Y or 2
+	pivotNPC("Sam", Vector3.new(80, samPivotY, -58), 1)
+end
+
+-- Stepping through the gap: the parallel world turns the colour up
+local function paradiseReveal()
+	TweenService:Create(colorCorrection, TweenInfo.new(2.5), {
+		Saturation = 0.35,
+		Contrast = 0.06,
+		TintColor = Color3.fromRGB(255, 250, 240),
+	}):Play()
+end
+
+-- Back home: the ordinary world is a little greyer than she remembered
+local function ordinaryWorld()
+	TweenService:Create(colorCorrection, TweenInfo.new(2), {
+		Saturation = 0,
+		Contrast = 0,
+		TintColor = Color3.fromRGB(255, 255, 255),
+	}):Play()
+end
+
+-- The village arrives with the machine (and Dad, Mum and Sam relocate)
+local function machineArrives()
+	buildMachine()
+	buildVillagers()
+	local dadY = npcHomePivots.Dad and npcHomePivots.Dad.Position.Y or 3
+	local mumY = npcHomePivots.Mum and npcHomePivots.Mum.Position.Y or 3
+	local samY = npcHomePivots.Sam and npcHomePivots.Sam.Position.Y or 2
+	pivotNPC("Dad", Vector3.new(9, dadY, 108), 1)
+	pivotNPC("Mum", Vector3.new(-9, mumY, 106), 1)
+	pivotNPC("Sam", Vector3.new(13, samY, 104), 1)
+end
+
+-- Amy wins: the blade stops, the smoke dies, the machine backs away
+local function machineStops()
+	machineSpinning = false
+	if machineSmoke then
+		machineSmoke.Enabled = false
+	end
+	-- celebration sparkles over the crowd
+	local burstColors = { Color3.fromRGB(255, 93, 162), Color3.fromRGB(231, 181, 58), Color3.fromRGB(124, 77, 255) }
+	for k, color in ipairs(burstColors) do
+		local holder = Instance.new("Part")
+		holder.Anchored = true
+		holder.CanCollide = false
+		holder.Transparency = 1
+		holder.Size = Vector3.new(1, 1, 1)
+		holder.CFrame = CFrame.new((k - 2) * 10, Map.GroundY + 12, 100)
+		local emitter = Instance.new("ParticleEmitter")
+		emitter.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		emitter.Color = ColorSequence.new(color)
+		emitter.LightEmission = 1
+		emitter.Size = NumberSequence.new(0.7)
+		emitter.Lifetime = NumberRange.new(1.5, 2.5)
+		emitter.Rate = 40
+		emitter.Speed = NumberRange.new(8, 14)
+		emitter.SpreadAngle = Vector2.new(180, 180)
+		emitter.Parent = holder
+		holder.Parent = Workspace
+		task.delay(6, function()
+			holder:Destroy()
+		end)
+	end
+	-- the machine slowly reverses away from the forest
+	task.spawn(function()
+		if not machineModel then
+			return
+		end
+		local start = machineModel:GetPivot()
+		local bladeStart = machineBladeModel and machineBladeModel:GetPivot()
+		local distance = 34
+		local duration = 6
+		local elapsed = 0
+		while elapsed < duration and machineModel do
+			local dt = task.wait(0.05)
+			elapsed = elapsed + dt
+			local alpha = math.min(elapsed / duration, 1)
+			local offset = Vector3.new(0, 0, -distance * alpha)
+			machineModel:PivotTo(start + offset)
+			if machineBladeModel and bladeStart then
+				machineBladeModel:PivotTo(bladeStart + offset)
+			end
+		end
+	end)
+end
+
+local questCompletedHooks = {
+	sneak_out_1 = samCatches,
+	sneak_out_2 = samCatches,
+	enter_forest = paradiseReveal,
+	rush_home = ordinaryWorld,
+	tell_mum = machineArrives,
+	explain = machineStops,
+}
+
+local questStartedHooks = {
+	walk_to_forest = samGoesToFarm,
+}
+
+----------------------------------------------------------------
+-- Quest engine
+----------------------------------------------------------------
+local advanceStory -- forward declaration
+
+local function questObjectiveText(state, quest)
+	if quest.type == "collect" then
+		return quest.objective .. "  (" .. tostring(state.collected) .. "/" .. tostring(quest.count) .. ")"
+	end
+	return quest.objective
+end
+
+local function startQuest(player, quest)
+	local state = getState(player)
+	if not state then
+		return
+	end
+	state.collected = 0
+
+	local startHook = questStartedHooks[quest.id]
+	if startHook then
+		startHook(player)
+	end
+
+	SetObjective:FireClient(player, questObjectiveText(state, quest))
+
+	if quest.intro then
+		playDialogue(player, quest.intro)
+	end
+
+	if quest.type == "talk" then
+		local prompt = npcPrompts[quest.npc]
+		if prompt then
+			if quest.promptText then
+				prompt.ActionText = quest.promptText
+			else
+				prompt.ActionText = "Talk"
+			end
+			prompt.Enabled = true
+		end
+	elseif quest.type == "collect" then
+		for _, point in ipairs(quest.spawnPoints) do
+			makePickup(quest, point, player)
+		end
+	end
+	-- "reach" quests need no setup: the zones are always listening
+end
+
+local function completeQuest(player)
+	local state = getState(player)
+	if not state then
+		return
+	end
+	local quest = currentQuest(state)
+	if not quest then
+		return
+	end
+
+	if quest.type == "talk" then
+		local prompt = npcPrompts[quest.npc]
+		if prompt then
+			prompt.Enabled = false
+		end
+	end
+
+	if quest.onComplete then
+		playDialogue(player, quest.onComplete)
+	end
+
+	local hook = questCompletedHooks[quest.id]
+	if hook then
+		hook(player)
+	end
+
+	advanceStory(player)
+end
+
+advanceStory = function(player)
+	local state = getState(player)
+	if not state then
+		return
+	end
+
+	local chapter = StoryData.Chapters[state.chapterIndex]
+	state.questIndex = state.questIndex + 1
+
+	if chapter and state.questIndex > #chapter.quests then
+		state.chapterIndex = state.chapterIndex + 1
+		state.questIndex = 1
+		chapter = StoryData.Chapters[state.chapterIndex]
+		if chapter then
+			ShowChapter:FireClient(player, chapter.title, chapter.subtitle)
+			task.wait(3.2) -- let the title card breathe
+		end
+	end
+
+	local quest = currentQuest(state)
+	if quest then
+		startQuest(player, quest)
+	else
+		-- Story complete!
+		SetObjective:FireClient(player, nil)
+		playDialogue(player, StoryData.Ending.lines)
+		ShowEnding:FireClient(player, StoryData.Ending.title, StoryData.Ending.subtitle)
+	end
+end
+
+----------------------------------------------------------------
+-- Interactions
+----------------------------------------------------------------
+for npcId, prompt in pairs(npcPrompts) do
+	prompt.Triggered:Connect(function(player)
+		local state = getState(player)
+		if not state or state.busy then
+			return
+		end
+		local quest = currentQuest(state)
+		if quest and quest.type == "talk" and quest.npc == npcId then
+			state.busy = true
+			prompt.Enabled = false
+			playDialogue(player, quest.dialogue)
+			completeQuest(player)
+			state.busy = false
+		end
+	end)
+end
+
+-- Pickup touches
+pickupFolder.ChildAdded:Connect(function(part)
+	part.Touched:Connect(function(hit)
+		local character = hit.Parent
+		if not character then
+			return
+		end
+		local player = Players:GetPlayerFromCharacter(character)
+		if not player then
+			return
+		end
+		local info = activePickups[part]
+		if not info or info.player ~= player then
+			return
+		end
+		local state = getState(player)
+		if not state then
+			return
+		end
+		local quest = currentQuest(state)
+		if quest ~= info.quest then
+			return
+		end
+
+		activePickups[part] = nil
+		part:Destroy()
+
+		state.collected = state.collected + 1
+		SetObjective:FireClient(player, questObjectiveText(state, quest))
+
+		if state.collected >= quest.count and not state.busy then
+			state.busy = true
+			completeQuest(player)
+			state.busy = false
+		end
+	end)
+end)
+
+-- Zone entry
+local function tryCompleteReach(player, zoneName)
+	local state = getState(player)
+	if not state or state.busy then
+		return
+	end
+	local quest = currentQuest(state)
+	if quest and quest.type == "reach" and quest.zone == zoneName then
+		state.busy = true
+		completeQuest(player)
+		state.busy = false
+	end
+end
+
+for zoneName, zonePart in pairs(zoneParts) do
+	zonePart.Touched:Connect(function(hit)
+		local character = hit.Parent
+		if character then
+			local player = Players:GetPlayerFromCharacter(character)
+			if player then
+				tryCompleteReach(player, zoneName)
+			end
+		end
+	end)
+end
+
+-- Fallback poll: Touched doesn't fire for a player already standing
+-- inside a zone when their "reach" quest begins, so check positions too.
+task.spawn(function()
+	while true do
+		task.wait(0.5)
+		for player, state in pairs(playerStates) do
+			if not state.busy then
+				local quest = currentQuest(state)
+				if quest and quest.type == "reach" then
+					local character = player.Character
+					local root = character and character:FindFirstChild("HumanoidRootPart")
+					local zonePart = zoneParts[quest.zone]
+					if root and zonePart then
+						local offset = zonePart.Position - root.Position
+						local half = zonePart.Size / 2
+						if math.abs(offset.X) <= half.X
+							and math.abs(offset.Y) <= half.Y + 3
+							and math.abs(offset.Z) <= half.Z then
+							task.spawn(tryCompleteReach, player, quest.zone)
+						end
+					end
+				end
+			end
+		end
+	end
+end)
+
+----------------------------------------------------------------
+-- Player lifecycle
+----------------------------------------------------------------
+local function beginStory(player)
+	local state = getState(player)
+	if not state or state.started then
+		return
+	end
+	state.started = true
+
+	local firstChapter = StoryData.Chapters[1]
+	ShowChapter:FireClient(player, firstChapter.title, firstChapter.subtitle)
+	task.wait(3.2)
+
+	startQuest(player, firstChapter.quests[1])
+end
+
+local function initPlayer(player)
+	if playerStates[player] then
+		return
+	end
+	playerStates[player] = {
+		chapterIndex = 1,
+		questIndex = 1,
+		collected = 0,
+		busy = false,
+		started = false,
+		dialogueDone = false,
+	}
+end
+
+Players.PlayerAdded:Connect(initPlayer)
+for _, existing in ipairs(Players:GetPlayers()) do
+	initPlayer(existing)
+end
+
+ClientReady.OnServerEvent:Connect(function(player)
+	initPlayer(player)
+	task.spawn(beginStory, player)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	playerStates[player] = nil
+	for part, info in pairs(activePickups) do
+		if info.player == player then
+			activePickups[part] = nil
+			part:Destroy()
+		end
+	end
+end)
+
+print("[StoryServer] Story engine ready: " .. StoryData.GameTitle)
+]]></ProtectedString>
+</Properties>
+</Item>
+</Item>
+<Item class="StarterPlayer" referent="RBX00000008">
+<Properties>
+<string name="Name">StarterPlayer</string>
+</Properties>
+<Item class="StarterPlayerScripts" referent="RBX00000007">
+<Properties>
+<string name="Name">StarterPlayerScripts</string>
+</Properties>
+<Item class="LocalScript" referent="RBX00000006">
+<Properties>
+<string name="Name">StoryClient</string>
+<ProtectedString name="Source"><![CDATA[--[[
+	StoryClient
+	===========
+	Everything the player sees on screen:
+	  * the dialogue box with a typewriter effect
+	  * the objective tracker (top right)
+	  * chapter title cards and the ending card
+
+	Click, press E, Space or Enter to advance dialogue.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local remotes = ReplicatedStorage:WaitForChild("StoryRemotes")
+local ShowDialogue = remotes:WaitForChild("ShowDialogue")
+local DialogueFinished = remotes:WaitForChild("DialogueFinished")
+local SetObjective = remotes:WaitForChild("SetObjective")
+local ShowChapter = remotes:WaitForChild("ShowChapter")
+local ShowEnding = remotes:WaitForChild("ShowEnding")
+local ClientReady = remotes:WaitForChild("ClientReady")
+
+----------------------------------------------------------------
+-- Build the UI
+----------------------------------------------------------------
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "StoryUI"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.DisplayOrder = 10
+screenGui.Parent = playerGui
+
+local function addCorner(guiObject, radius)
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, radius)
+	corner.Parent = guiObject
+end
+
+-- Dialogue box -------------------------------------------------
+local dialogueFrame = Instance.new("Frame")
+dialogueFrame.Name = "DialogueFrame"
+dialogueFrame.AnchorPoint = Vector2.new(0.5, 1)
+dialogueFrame.Position = UDim2.new(0.5, 0, 1, -28)
+dialogueFrame.Size = UDim2.new(0.62, 0, 0, 150)
+dialogueFrame.BackgroundColor3 = Color3.fromRGB(24, 44, 30)
+dialogueFrame.BackgroundTransparency = 0.12
+dialogueFrame.BorderSizePixel = 0
+dialogueFrame.Visible = false
+dialogueFrame.Parent = screenGui
+addCorner(dialogueFrame, 16)
+
+local dialogueStroke = Instance.new("UIStroke")
+dialogueStroke.Color = Color3.fromRGB(140, 200, 120)
+dialogueStroke.Thickness = 2.5
+dialogueStroke.Parent = dialogueFrame
+
+local speakerLabel = Instance.new("TextLabel")
+speakerLabel.Name = "Speaker"
+speakerLabel.AnchorPoint = Vector2.new(0, 1)
+speakerLabel.Position = UDim2.new(0, 20, 0, 6)
+speakerLabel.Size = UDim2.new(0, 300, 0, 34)
+speakerLabel.BackgroundColor3 = Color3.fromRGB(94, 160, 80)
+speakerLabel.BorderSizePixel = 0
+speakerLabel.Font = Enum.Font.FredokaOne
+speakerLabel.TextSize = 22
+speakerLabel.TextColor3 = Color3.fromRGB(255, 255, 245)
+speakerLabel.Text = ""
+speakerLabel.AutomaticSize = Enum.AutomaticSize.X
+speakerLabel.Size = UDim2.new(0, 0, 0, 34)
+speakerLabel.Parent = dialogueFrame
+addCorner(speakerLabel, 10)
+
+local speakerPadding = Instance.new("UIPadding")
+speakerPadding.PaddingLeft = UDim.new(0, 14)
+speakerPadding.PaddingRight = UDim.new(0, 14)
+speakerPadding.Parent = speakerLabel
+
+local bodyLabel = Instance.new("TextLabel")
+bodyLabel.Name = "Body"
+bodyLabel.Position = UDim2.new(0, 24, 0, 18)
+bodyLabel.Size = UDim2.new(1, -48, 1, -52)
+bodyLabel.BackgroundTransparency = 1
+bodyLabel.Font = Enum.Font.GothamMedium
+bodyLabel.TextSize = 21
+bodyLabel.TextColor3 = Color3.fromRGB(240, 248, 235)
+bodyLabel.TextWrapped = true
+bodyLabel.TextXAlignment = Enum.TextXAlignment.Left
+bodyLabel.TextYAlignment = Enum.TextYAlignment.Top
+bodyLabel.Text = ""
+bodyLabel.Parent = dialogueFrame
+
+local hintLabel = Instance.new("TextLabel")
+hintLabel.Name = "Hint"
+hintLabel.AnchorPoint = Vector2.new(1, 1)
+hintLabel.Position = UDim2.new(1, -18, 1, -8)
+hintLabel.Size = UDim2.new(0, 260, 0, 20)
+hintLabel.BackgroundTransparency = 1
+hintLabel.Font = Enum.Font.Gotham
+hintLabel.TextSize = 14
+hintLabel.TextColor3 = Color3.fromRGB(190, 215, 180)
+hintLabel.TextXAlignment = Enum.TextXAlignment.Right
+hintLabel.Text = "click / E / Space to continue  ▶"
+hintLabel.Parent = dialogueFrame
+
+-- Invisible full-screen button that advances dialogue on click/tap
+local clickCatcher = Instance.new("TextButton")
+clickCatcher.Name = "ClickCatcher"
+clickCatcher.Size = UDim2.new(1, 0, 1, 0)
+clickCatcher.BackgroundTransparency = 1
+clickCatcher.Text = ""
+clickCatcher.Visible = false
+clickCatcher.ZIndex = 5
+clickCatcher.Parent = screenGui
+
+-- Objective tracker --------------------------------------------
+local objectiveFrame = Instance.new("Frame")
+objectiveFrame.Name = "ObjectiveFrame"
+objectiveFrame.AnchorPoint = Vector2.new(1, 0)
+objectiveFrame.Position = UDim2.new(1, -18, 0, 18)
+objectiveFrame.Size = UDim2.new(0, 320, 0, 74)
+objectiveFrame.BackgroundColor3 = Color3.fromRGB(24, 44, 30)
+objectiveFrame.BackgroundTransparency = 0.25
+objectiveFrame.BorderSizePixel = 0
+objectiveFrame.Visible = false
+objectiveFrame.Parent = screenGui
+addCorner(objectiveFrame, 12)
+
+local objectiveHeader = Instance.new("TextLabel")
+objectiveHeader.Position = UDim2.new(0, 14, 0, 8)
+objectiveHeader.Size = UDim2.new(1, -28, 0, 20)
+objectiveHeader.BackgroundTransparency = 1
+objectiveHeader.Font = Enum.Font.FredokaOne
+objectiveHeader.TextSize = 16
+objectiveHeader.TextColor3 = Color3.fromRGB(255, 214, 120)
+objectiveHeader.TextXAlignment = Enum.TextXAlignment.Left
+objectiveHeader.Text = "✦ Objective"
+objectiveHeader.Parent = objectiveFrame
+
+local objectiveText = Instance.new("TextLabel")
+objectiveText.Position = UDim2.new(0, 14, 0, 30)
+objectiveText.Size = UDim2.new(1, -28, 1, -38)
+objectiveText.BackgroundTransparency = 1
+objectiveText.Font = Enum.Font.GothamMedium
+objectiveText.TextSize = 16
+objectiveText.TextColor3 = Color3.fromRGB(240, 248, 235)
+objectiveText.TextWrapped = true
+objectiveText.TextXAlignment = Enum.TextXAlignment.Left
+objectiveText.TextYAlignment = Enum.TextYAlignment.Top
+objectiveText.Text = ""
+objectiveText.Parent = objectiveFrame
+
+-- Title / chapter card -----------------------------------------
+local titleOverlay = Instance.new("Frame")
+titleOverlay.Name = "TitleOverlay"
+titleOverlay.Size = UDim2.new(1, 0, 1, 0)
+titleOverlay.BackgroundColor3 = Color3.fromRGB(8, 18, 10)
+titleOverlay.BackgroundTransparency = 1
+titleOverlay.BorderSizePixel = 0
+titleOverlay.Visible = false
+titleOverlay.ZIndex = 20
+titleOverlay.Parent = screenGui
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+titleLabel.Position = UDim2.new(0.5, 0, 0.44, 0)
+titleLabel.Size = UDim2.new(0.8, 0, 0, 70)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Font = Enum.Font.FredokaOne
+titleLabel.TextSize = 52
+titleLabel.TextColor3 = Color3.fromRGB(255, 240, 200)
+titleLabel.TextTransparency = 1
+titleLabel.Text = ""
+titleLabel.ZIndex = 21
+titleLabel.Parent = titleOverlay
+
+local subtitleLabel = Instance.new("TextLabel")
+subtitleLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+subtitleLabel.Position = UDim2.new(0.5, 0, 0.54, 0)
+subtitleLabel.Size = UDim2.new(0.8, 0, 0, 40)
+subtitleLabel.BackgroundTransparency = 1
+subtitleLabel.Font = Enum.Font.Gotham
+subtitleLabel.TextSize = 26
+subtitleLabel.TextColor3 = Color3.fromRGB(200, 225, 190)
+subtitleLabel.TextTransparency = 1
+subtitleLabel.Text = ""
+subtitleLabel.ZIndex = 21
+subtitleLabel.Parent = titleOverlay
+
+----------------------------------------------------------------
+-- Dialogue playback
+----------------------------------------------------------------
+local dialogueQueue = {}
+local dialogueActive = false
+local advanceRequested = false
+
+local function requestAdvance()
+	advanceRequested = true
+end
+
+clickCatcher.Activated:Connect(requestAdvance)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then
+		return
+	end
+	if not dialogueActive then
+		return
+	end
+	if input.KeyCode == Enum.KeyCode.E
+		or input.KeyCode == Enum.KeyCode.Space
+		or input.KeyCode == Enum.KeyCode.Return then
+		requestAdvance()
+	end
+end)
+
+local function waitForAdvance()
+	advanceRequested = false
+	while not advanceRequested do
+		task.wait(0.05)
+	end
+end
+
+local function typewrite(label, text)
+	label.Text = text
+	local total = utf8.len(text) or string.len(text)
+	label.MaxVisibleGraphemes = 0
+	advanceRequested = false
+	local shown = 0
+	while shown < total do
+		if advanceRequested then
+			break -- skip straight to the full line
+		end
+		shown = shown + 1
+		label.MaxVisibleGraphemes = shown
+		task.wait(0.022)
+	end
+	label.MaxVisibleGraphemes = -1
+end
+
+local function playLines(lines)
+	dialogueActive = true
+	dialogueFrame.Visible = true
+	clickCatcher.Visible = true
+
+	for _, line in ipairs(lines) do
+		local speaker = line.speaker or ""
+		speakerLabel.Text = speaker
+		speakerLabel.Visible = speaker ~= ""
+
+		if speaker == "Narrator" then
+			speakerLabel.BackgroundColor3 = Color3.fromRGB(120, 110, 160)
+			bodyLabel.TextColor3 = Color3.fromRGB(225, 225, 245)
+		elseif speaker == "Amy" then
+			speakerLabel.BackgroundColor3 = Color3.fromRGB(214, 120, 140)
+			bodyLabel.TextColor3 = Color3.fromRGB(248, 240, 240)
+		else
+			speakerLabel.BackgroundColor3 = Color3.fromRGB(94, 160, 80)
+			bodyLabel.TextColor3 = Color3.fromRGB(240, 248, 235)
+		end
+
+		typewrite(bodyLabel, line.text or "")
+		waitForAdvance()
+	end
+
+	dialogueFrame.Visible = false
+	clickCatcher.Visible = false
+	dialogueActive = false
+	DialogueFinished:FireServer()
+end
+
+ShowDialogue.OnClientEvent:Connect(function(lines)
+	table.insert(dialogueQueue, lines)
+end)
+
+task.spawn(function()
+	while true do
+		if #dialogueQueue > 0 and not dialogueActive then
+			local lines = table.remove(dialogueQueue, 1)
+			playLines(lines)
+		end
+		task.wait(0.1)
+	end
+end)
+
+----------------------------------------------------------------
+-- Objective tracker
+----------------------------------------------------------------
+SetObjective.OnClientEvent:Connect(function(text)
+	if text and text ~= "" then
+		objectiveFrame.Visible = true
+		objectiveText.Text = text
+		-- little pop so updates are noticeable
+		objectiveFrame.BackgroundTransparency = 0
+		TweenService:Create(objectiveFrame, TweenInfo.new(0.6), { BackgroundTransparency = 0.25 }):Play()
+	else
+		objectiveFrame.Visible = false
+	end
+end)
+
+----------------------------------------------------------------
+-- Chapter cards / ending
+----------------------------------------------------------------
+local function showCard(title, subtitle, holdTime, keepDark)
+	titleOverlay.Visible = true
+	titleLabel.Text = title or ""
+	subtitleLabel.Text = subtitle or ""
+
+	local fadeIn = TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	TweenService:Create(titleOverlay, fadeIn, { BackgroundTransparency = 0.25 }):Play()
+	TweenService:Create(titleLabel, fadeIn, { TextTransparency = 0 }):Play()
+	TweenService:Create(subtitleLabel, fadeIn, { TextTransparency = 0 }):Play()
+
+	task.wait(holdTime or 2.6)
+
+	local fadeOut = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+	if not keepDark then
+		TweenService:Create(titleOverlay, fadeOut, { BackgroundTransparency = 1 }):Play()
+	end
+	TweenService:Create(titleLabel, fadeOut, { TextTransparency = 1 }):Play()
+	TweenService:Create(subtitleLabel, fadeOut, { TextTransparency = 1 }):Play()
+	task.wait(0.9)
+	if not keepDark then
+		titleOverlay.Visible = false
+	end
+end
+
+ShowChapter.OnClientEvent:Connect(function(title, subtitle)
+	task.spawn(showCard, title, subtitle, 2.4, false)
+end)
+
+ShowEnding.OnClientEvent:Connect(function(title, subtitle)
+	task.spawn(function()
+		showCard(title, subtitle, 6, false)
+		-- after the card fades, the player is free to wander in the rain
+	end)
+end)
+
+----------------------------------------------------------------
+-- Tell the server we're ready for the story to begin
+----------------------------------------------------------------
+task.wait(1) -- give the world a moment to stream in
+ClientReady:FireServer()
+]]></ProtectedString>
+</Properties>
+</Item>
+</Item>
+</Item>
+</roblox>
