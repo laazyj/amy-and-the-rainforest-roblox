@@ -702,24 +702,14 @@ end
 -- a Decal (Studio > Asset Manager, or create.roblox.com), then paste
 -- its numeric asset id here:
 local SITE_SNAPSHOT_DECAL_ID = 0
-local SITE_URL = "clara.jasonduffett.net"
 
--- PUBLISHING SAFETY SWITCHES ----------------------------------
--- Roblox's rules prohibit directing players to off-platform links,
--- so an on-screen URL can get a PUBLIC experience moderated. It is
--- fine in practice for a Private / friends-only family build.
---   SHOW_SITE_URL = true   -> private/friends builds (default here)
---   SHOW_SITE_URL = false  -> set this before publishing PUBLICLY;
---                             the billboard keeps the credit but
---                             drops the URL strip (leave the link in
---                             the GitHub README instead)
-local SHOW_SITE_URL = true
-
--- The in-game credit deliberately uses a first name only. Keeping a
--- child's full name off a public Roblox listing is both kinder to
--- her privacy and avoids Roblox's personal-information moderation
--- rules; her full byline lives on the website itself and in this
--- repo's README.
+-- This game is published publicly, so the billboard is public-safe
+-- by design: no web address (Roblox prohibits directing players to
+-- off-platform links -- the link lives in the GitHub README), and
+-- the credit uses a first name only, keeping a child's full name out
+-- of the game for her privacy and to stay clear of Roblox's
+-- personal-information rules. Her full byline lives on the website
+-- itself.
 local STORY_CREDIT = "a story by Clara"
 
 -- beside the path, angled to face players walking up from the village
@@ -780,10 +770,9 @@ billboardRoot.BackgroundColor3 = DEEP
 billboardRoot.BorderSizePixel = 0
 billboardRoot.Parent = billboardGui
 
--- upper area: either the recreated hero header, or the real artwork
--- (fills the whole board when the URL strip is switched off)
+-- either the recreated hero header, or the real artwork
 local heroArea = Instance.new("Frame")
-heroArea.Size = UDim2.new(1, 0, 1, SHOW_SITE_URL and -56 or 0)
+heroArea.Size = UDim2.new(1, 0, 1, 0)
 heroArea.BackgroundTransparency = 1
 heroArea.Parent = billboardRoot
 
@@ -829,45 +818,19 @@ byline.Parent = heroArea
 if SITE_SNAPSHOT_DECAL_ID > 0 then
 	kicker.Visible = false
 	siteTitle.Visible = false
-	byline.Visible = false
 	local artwork = Instance.new("ImageLabel")
 	artwork.Size = UDim2.new(1, 0, 1, 0)
 	artwork.BackgroundTransparency = 1
 	artwork.Image = "rbxassetid://" .. tostring(SITE_SNAPSHOT_DECAL_ID)
 	artwork.ScaleType = Enum.ScaleType.Crop
 	artwork.Parent = heroArea
-end
-
--- the URL strip along the bottom (omitted entirely in public builds)
-if SHOW_SITE_URL then
-	local urlStrip = Instance.new("Frame")
-	urlStrip.AnchorPoint = Vector2.new(0, 1)
-	urlStrip.Position = UDim2.new(0, 0, 1, 0)
-	urlStrip.Size = UDim2.new(1, 0, 0, 56)
-	urlStrip.BackgroundColor3 = CREAM
-	urlStrip.BorderSizePixel = 0
-	urlStrip.Parent = billboardRoot
-
-	local urlLabel = Instance.new("TextLabel")
-	urlLabel.Position = UDim2.new(0, 0, 0, 4)
-	urlLabel.Size = UDim2.new(1, 0, 0, 30)
-	urlLabel.BackgroundTransparency = 1
-	urlLabel.Font = Enum.Font.FredokaOne
-	urlLabel.TextSize = 27
-	urlLabel.TextColor3 = DEEP
-	urlLabel.Text = SITE_URL
-	urlLabel.Parent = urlStrip
-
-	local urlNote = Instance.new("TextLabel")
-	urlNote.AnchorPoint = Vector2.new(0, 1)
-	urlNote.Position = UDim2.new(0, 0, 1, -4)
-	urlNote.Size = UDim2.new(1, 0, 0, 18)
-	urlNote.BackgroundTransparency = 1
-	urlNote.Font = Enum.Font.PatrickHand
-	urlNote.TextSize = 17
-	urlNote.TextColor3 = Color3.fromRGB(107, 68, 38)
-	urlNote.Text = "come read the original story — a non-commercial site"
-	urlNote.Parent = urlStrip
+	-- keep the credit readable over the artwork
+	byline.ZIndex = 2
+	byline.BackgroundColor3 = DEEP
+	byline.BackgroundTransparency = 0.25
+	local bylineCorner = Instance.new("UICorner")
+	bylineCorner.CornerRadius = UDim.new(0, 10)
+	bylineCorner.Parent = byline
 end
 
 mapFolder.Parent = Workspace
