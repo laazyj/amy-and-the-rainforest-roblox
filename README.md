@@ -55,6 +55,41 @@ and press **E** to talk; click / **E** / **Space** to advance dialogue.
 | `tools/build_rbxlx.py` | Regenerates the `.rbxlx` from `src/` |
 | `default.project.json` | [Rojo](https://rojo.space) project, if you prefer syncing |
 
+## Crediting the source
+
+A wooden billboard stands beside the path, just before the forest
+wall, crediting the original story: it recreates the website's hero
+header in a gold-trimmed wooden frame — the tilted "a little tale of
+the wild" kicker, the big title with "Rain Forest" in gold, and
+"a story by Clara".
+
+The game is built to be published **publicly**, so the billboard is
+public-safe by design:
+
+- **No web address in-game.** Roblox's rules prohibit directing
+  players to off-platform links, so the billboard carries the credit
+  without the URL — this README is the home of the link to
+  [clara.jasonduffett.net](https://clara.jasonduffett.net).
+- **First name only.** The in-game credit reads "a story by Clara",
+  keeping a child's full name out of a public Roblox experience for
+  her privacy and to stay clear of Roblox's personal-information
+  rules. The full byline lives on the website itself.
+
+Roblox can only display external images through uploaded Decal
+assets, so out of the box the billboard is drawn with text and
+colours (no upload needed). To show the site's real hand-drawn hero
+artwork instead:
+
+1. Upload `assets-src/site-hero.png` as a **Decal** (Roblox Studio →
+   Asset Manager → Import, or [create.roblox.com](https://create.roblox.com)).
+2. Copy the decal's numeric asset id.
+3. Paste it into `SITE_SNAPSHOT_DECAL_ID` at the billboard section of
+   `src/ServerScriptService/WorldBuilder.server.lua` (and rebuild or
+   edit the script in Studio).
+
+The artwork then fills the board, with the credit kept readable on
+top of it.
+
 ## Editing the story
 
 Open `src/ReplicatedStorage/StoryData.lua`. The engine understands three
