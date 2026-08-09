@@ -59,9 +59,9 @@ and press **E** to talk; click / **E** / **Space** to advance dialogue.
 
 A wooden billboard stands beside the path, just before the forest
 wall, crediting the original story: it recreates the website's hero
-header (deep green, gold "Rain Forest", "a story by Clara
-Dineen-Duffett") with **clara.jasonduffett.net** on a cream strip
-along the bottom, noting it's a non-commercial site.
+header (deep green, gold "Rain Forest", "a story by Clara") with
+**clara.jasonduffett.net** on a cream strip along the bottom, noting
+it's a non-commercial site.
 
 Roblox can only display external images through uploaded Decal
 assets, so out of the box the billboard is drawn with text and
@@ -76,6 +76,23 @@ artwork instead:
    edit the script in Studio).
 
 The artwork then fills the board, with the URL strip kept below it.
+
+### Before publishing the game publicly
+
+Two deliberate choices in the billboard, controlled at the top of its
+section in `WorldBuilder.server.lua`:
+
+- **`SHOW_SITE_URL`** — Roblox's rules prohibit directing players to
+  off-platform links, so an on-screen URL can get a *public*
+  experience moderated. The default (`true`) is intended for
+  Private / friends-only family builds; **set it to `false` before a
+  public release** and the billboard keeps the credit but drops the
+  URL strip. This README remains the home of the link.
+- **`STORY_CREDIT`** — the in-game credit reads "a story by Clara",
+  first name only. Keeping a child's full name out of a public Roblox
+  experience is kinder to her privacy and avoids Roblox's
+  personal-information moderation rules; the full byline lives on the
+  website and in this README.
 
 ## Editing the story
 
