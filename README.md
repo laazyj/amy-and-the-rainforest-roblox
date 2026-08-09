@@ -55,6 +55,28 @@ and press **E** to talk; click / **E** / **Space** to advance dialogue.
 | `tools/build_rbxlx.py` | Regenerates the `.rbxlx` from `src/` |
 | `default.project.json` | [Rojo](https://rojo.space) project, if you prefer syncing |
 
+## Crediting the source
+
+A wooden billboard stands beside the path, just before the forest
+wall, crediting the original story: it recreates the website's hero
+header (deep green, gold "Rain Forest", "a story by Clara
+Dineen-Duffett") with **clara.jasonduffett.net** on a cream strip
+along the bottom, noting it's a non-commercial site.
+
+Roblox can only display external images through uploaded Decal
+assets, so out of the box the billboard is drawn with text and
+colours (no upload needed). To show the site's real hand-drawn hero
+artwork instead:
+
+1. Upload `assets-src/site-hero.png` as a **Decal** (Roblox Studio →
+   Asset Manager → Import, or [create.roblox.com](https://create.roblox.com)).
+2. Copy the decal's numeric asset id.
+3. Paste it into `SITE_SNAPSHOT_DECAL_ID` at the billboard section of
+   `src/ServerScriptService/WorldBuilder.server.lua` (and rebuild or
+   edit the script in Studio).
+
+The artwork then fills the board, with the URL strip kept below it.
+
 ## Editing the story
 
 Open `src/ReplicatedStorage/StoryData.lua`. The engine understands three

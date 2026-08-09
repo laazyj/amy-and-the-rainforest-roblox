@@ -1063,6 +1063,165 @@ for _ = 1, 16 do
 	makeFireflies(Vector3.new(px, Map.GroundY + rng:NextNumber(3, 9), pz), color)
 end
 
+----------------------------------------------------------------
+-- Billboard crediting the original story website
+----------------------------------------------------------------
+-- The story comes from Clara's non-commercial site. This billboard
+-- stands beside the path just before the forest wall and recreates
+-- the site's hero header (deep green, gold "Rain Forest", the URL).
+--
+-- OPTIONAL: to show the site's real hand-drawn hero artwork on the
+-- board, upload assets-src/site-hero.png from this repo to Roblox as
+-- a Decal (Studio > Asset Manager, or create.roblox.com), then paste
+-- its numeric asset id here:
+local SITE_SNAPSHOT_DECAL_ID = 0
+local SITE_URL = "clara.jasonduffett.net"
+
+-- beside the path, angled to face players walking up from the village
+local billboardCFrame = CFrame.new(17, Map.GroundY, 126) * CFrame.Angles(0, math.rad(15), 0)
+
+for side = -1, 1, 2 do
+	makePart({
+		Name = "BillboardPost",
+		Size = Vector3.new(0.9, 8.4, 0.9),
+		CFrame = billboardCFrame * CFrame.new(5.6 * side, 4.2, 0.5),
+		Color = Color3.fromRGB(122, 88, 55),
+		Material = Enum.Material.Wood,
+	})
+end
+makePart({
+	Name = "BillboardBacking",
+	Size = Vector3.new(14.6, 7.6, 0.5),
+	CFrame = billboardCFrame * CFrame.new(0, 8.2, 0.45),
+	Color = BARK,
+	Material = Enum.Material.Wood,
+})
+local billboardPanel = makePart({
+	Name = "BillboardPanel",
+	Size = Vector3.new(14, 7, 0.4),
+	CFrame = billboardCFrame * CFrame.new(0, 8.2, 0),
+	Color = DEEP,
+	Material = Enum.Material.SmoothPlastic,
+})
+-- gold trim, like the site's golden squiggle rule
+for side = -1, 1, 2 do
+	makePart({
+		Name = "BillboardTrim",
+		Size = Vector3.new(14.6, 0.35, 0.5),
+		CFrame = billboardCFrame * CFrame.new(0, 8.2 + 3.68 * side, -0.02),
+		Color = GOLD,
+		Material = Enum.Material.SmoothPlastic,
+	})
+	makePart({
+		Name = "BillboardTrim",
+		Size = Vector3.new(0.35, 7.4, 0.5),
+		CFrame = billboardCFrame * CFrame.new(7.15 * side, 8.2, -0.02),
+		Color = GOLD,
+		Material = Enum.Material.SmoothPlastic,
+	})
+end
+
+local billboardGui = Instance.new("SurfaceGui")
+billboardGui.Name = "SiteCredit"
+billboardGui.Face = Enum.NormalId.Front
+billboardGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+billboardGui.PixelsPerStud = 40
+billboardGui.LightInfluence = 0
+billboardGui.Parent = billboardPanel
+
+local billboardRoot = Instance.new("Frame")
+billboardRoot.Size = UDim2.new(1, 0, 1, 0)
+billboardRoot.BackgroundColor3 = DEEP
+billboardRoot.BorderSizePixel = 0
+billboardRoot.Parent = billboardGui
+
+-- upper area: either the recreated hero header, or the real artwork
+local heroArea = Instance.new("Frame")
+heroArea.Size = UDim2.new(1, 0, 1, -56)
+heroArea.BackgroundTransparency = 1
+heroArea.Parent = billboardRoot
+
+local kicker = Instance.new("TextLabel")
+kicker.AnchorPoint = Vector2.new(0.5, 0)
+kicker.Position = UDim2.new(0.5, 0, 0, 12)
+kicker.Size = UDim2.new(0, 250, 0, 34)
+kicker.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+kicker.BackgroundTransparency = 0.12
+kicker.Rotation = -2
+kicker.Font = Enum.Font.PatrickHand
+kicker.TextSize = 24
+kicker.TextColor3 = DEEP
+kicker.Text = "a little tale of the wild"
+kicker.Parent = heroArea
+local kickerCorner = Instance.new("UICorner")
+kickerCorner.CornerRadius = UDim.new(0, 17)
+kickerCorner.Parent = kicker
+
+local siteTitle = Instance.new("TextLabel")
+siteTitle.AnchorPoint = Vector2.new(0.5, 0)
+siteTitle.Position = UDim2.new(0.5, 0, 0, 50)
+siteTitle.Size = UDim2.new(1, -50, 0, 100)
+siteTitle.BackgroundTransparency = 1
+siteTitle.Font = Enum.Font.PatrickHand
+siteTitle.TextScaled = true
+siteTitle.RichText = true
+siteTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+siteTitle.Text = 'Amy &amp; the <font color="#E7B53A">Rain Forest</font>'
+siteTitle.Parent = heroArea
+
+local byline = Instance.new("TextLabel")
+byline.AnchorPoint = Vector2.new(0.5, 1)
+byline.Position = UDim2.new(0.5, 0, 1, -8)
+byline.Size = UDim2.new(1, -40, 0, 30)
+byline.BackgroundTransparency = 1
+byline.Font = Enum.Font.PatrickHand
+byline.TextSize = 26
+byline.TextColor3 = CREAM
+byline.Text = "a story by Clara Dineen-Duffett"
+byline.Parent = heroArea
+
+if SITE_SNAPSHOT_DECAL_ID > 0 then
+	kicker.Visible = false
+	siteTitle.Visible = false
+	byline.Visible = false
+	local artwork = Instance.new("ImageLabel")
+	artwork.Size = UDim2.new(1, 0, 1, 0)
+	artwork.BackgroundTransparency = 1
+	artwork.Image = "rbxassetid://" .. tostring(SITE_SNAPSHOT_DECAL_ID)
+	artwork.ScaleType = Enum.ScaleType.Crop
+	artwork.Parent = heroArea
+end
+
+-- the URL strip along the bottom, always visible
+local urlStrip = Instance.new("Frame")
+urlStrip.AnchorPoint = Vector2.new(0, 1)
+urlStrip.Position = UDim2.new(0, 0, 1, 0)
+urlStrip.Size = UDim2.new(1, 0, 0, 56)
+urlStrip.BackgroundColor3 = CREAM
+urlStrip.BorderSizePixel = 0
+urlStrip.Parent = billboardRoot
+
+local urlLabel = Instance.new("TextLabel")
+urlLabel.Position = UDim2.new(0, 0, 0, 4)
+urlLabel.Size = UDim2.new(1, 0, 0, 30)
+urlLabel.BackgroundTransparency = 1
+urlLabel.Font = Enum.Font.FredokaOne
+urlLabel.TextSize = 27
+urlLabel.TextColor3 = DEEP
+urlLabel.Text = SITE_URL
+urlLabel.Parent = urlStrip
+
+local urlNote = Instance.new("TextLabel")
+urlNote.AnchorPoint = Vector2.new(0, 1)
+urlNote.Position = UDim2.new(0, 0, 1, -4)
+urlNote.Size = UDim2.new(1, 0, 0, 18)
+urlNote.BackgroundTransparency = 1
+urlNote.Font = Enum.Font.PatrickHand
+urlNote.TextSize = 17
+urlNote.TextColor3 = Color3.fromRGB(107, 68, 38)
+urlNote.Text = "come read the original story — a non-commercial site"
+urlNote.Parent = urlStrip
+
 mapFolder.Parent = Workspace
 print("[WorldBuilder] World built: village, field, forest wall, paradise.")
 ]]></ProtectedString>
