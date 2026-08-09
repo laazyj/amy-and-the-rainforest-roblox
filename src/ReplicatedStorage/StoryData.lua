@@ -47,11 +47,20 @@ StoryData.Map = {
 -- Characters
 ----------------------------------------------------------------
 -- kind: "human" | "dog" | "squirrel" | "fox" | "lion"
+-- expression (drawn by the engine, no assets needed):
+--   "stern"   thick angled brows, straight mouth  (the protective parent)
+--   "warm"    raised brows, big smile, blush      (the kind listener)
+--   "loyal"   wide eyes, happy open mouth, tongue (the faithful guard dog)
+--   "cheeky"  one raised brow, grin, buck teeth   (the teasing squirrel)
+--   "sly"     narrowed eyes, lopsided smirk       (the charming fox)
+--   "wise"    heavy calm eyelids, gentle smile    (the gentle king)
+--   "worried" up-slanted brows, little "o" mouth  (the frightened village)
 StoryData.NPCs = {
 	{
 		id = "Dad",
 		display = "Dad",
 		kind = "human",
+		expression = "stern",
 		shirt = Color3.fromRGB(90, 122, 80),
 		position = Vector3.new(6, 0, -26),
 		faceZ = -1,
@@ -60,6 +69,7 @@ StoryData.NPCs = {
 		id = "Mum",
 		display = "Mum",
 		kind = "human",
+		expression = "warm",
 		shirt = Color3.fromRGB(124, 77, 178), -- Clara's grape accent
 		position = Vector3.new(-6, 0, -33),
 		faceZ = 1,
@@ -68,6 +78,7 @@ StoryData.NPCs = {
 		id = "Sam",
 		display = "Sam the Dog",
 		kind = "dog",
+		expression = "loyal",
 		position = Vector3.new(3, 0, -20),
 		faceZ = -1,
 	},
@@ -75,6 +86,7 @@ StoryData.NPCs = {
 		id = "Squirrel",
 		display = "the Maroon Squirrel",
 		kind = "squirrel",
+		expression = "cheeky",
 		position = Vector3.new(-30, 0, 215),
 		faceZ = -1,
 	},
@@ -82,6 +94,7 @@ StoryData.NPCs = {
 		id = "Fox",
 		display = "the Orange Fox",
 		kind = "fox",
+		expression = "sly",
 		position = Vector3.new(35, 0, 248),
 		faceZ = -1,
 	},
@@ -89,6 +102,7 @@ StoryData.NPCs = {
 		id = "Lion",
 		display = "the Golden Lion",
 		kind = "lion",
+		expression = "wise",
 		position = Vector3.new(0, 0, 298),
 		faceZ = -1,
 	},

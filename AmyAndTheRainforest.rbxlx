@@ -67,11 +67,20 @@ StoryData.Map = {
 -- Characters
 ----------------------------------------------------------------
 -- kind: "human" | "dog" | "squirrel" | "fox" | "lion"
+-- expression (drawn by the engine, no assets needed):
+--   "stern"   thick angled brows, straight mouth  (the protective parent)
+--   "warm"    raised brows, big smile, blush      (the kind listener)
+--   "loyal"   wide eyes, happy open mouth, tongue (the faithful guard dog)
+--   "cheeky"  one raised brow, grin, buck teeth   (the teasing squirrel)
+--   "sly"     narrowed eyes, lopsided smirk       (the charming fox)
+--   "wise"    heavy calm eyelids, gentle smile    (the gentle king)
+--   "worried" up-slanted brows, little "o" mouth  (the frightened village)
 StoryData.NPCs = {
 	{
 		id = "Dad",
 		display = "Dad",
 		kind = "human",
+		expression = "stern",
 		shirt = Color3.fromRGB(90, 122, 80),
 		position = Vector3.new(6, 0, -26),
 		faceZ = -1,
@@ -80,6 +89,7 @@ StoryData.NPCs = {
 		id = "Mum",
 		display = "Mum",
 		kind = "human",
+		expression = "warm",
 		shirt = Color3.fromRGB(124, 77, 178), -- Clara's grape accent
 		position = Vector3.new(-6, 0, -33),
 		faceZ = 1,
@@ -88,6 +98,7 @@ StoryData.NPCs = {
 		id = "Sam",
 		display = "Sam the Dog",
 		kind = "dog",
+		expression = "loyal",
 		position = Vector3.new(3, 0, -20),
 		faceZ = -1,
 	},
@@ -95,6 +106,7 @@ StoryData.NPCs = {
 		id = "Squirrel",
 		display = "the Maroon Squirrel",
 		kind = "squirrel",
+		expression = "cheeky",
 		position = Vector3.new(-30, 0, 215),
 		faceZ = -1,
 	},
@@ -102,6 +114,7 @@ StoryData.NPCs = {
 		id = "Fox",
 		display = "the Orange Fox",
 		kind = "fox",
+		expression = "sly",
 		position = Vector3.new(35, 0, 248),
 		faceZ = -1,
 	},
@@ -109,6 +122,7 @@ StoryData.NPCs = {
 		id = "Lion",
 		display = "the Golden Lion",
 		kind = "lion",
+		expression = "wise",
 		position = Vector3.new(0, 0, 298),
 		faceZ = -1,
 	},
@@ -1173,6 +1187,202 @@ local function baseCFrameFor(def, heightAboveGround)
 	return CFrame.lookAt(at, at + Vector3.new(0, 0, (def.faceZ or 1) * 10))
 end
 
+----------------------------------------------------------------
+-- Expression faces
+----------------------------------------------------------------
+local DARK_FEATURE = Color3.fromRGB(25, 25, 25)
+
+-- Draws eyes, brows and a mouth onto a spherical head, matched to the
+-- character's role in the story. faceFrame sits at the head's centre
+-- with -Z pointing out of the face; r is the head's radius. Everything
+-- is plain little parts -- no decals or uploaded assets.
+--
+-- Expressions: "stern", "warm", "loyal", "cheeky", "sly", "wise",
+-- "worried" (see the comment in StoryData.NPCs).
+--
+-- Roll sign convention for angled features: a roll of
+-- `angle * side` with a POSITIVE angle tips the INNER ends down
+-- (cross/smile-corners-up); negative tips the inner ends up (worry).
+local function addFace(model, faceFrame, r, expression, opts)
+	expression = expression or "warm"
+	opts = opts or {}
+	local browColor = opts.browColor or DARK_FEATURE
+	local lidColor = opts.lidColor or browColor
+	local mouthY = (opts.mouthY or -0.38) * r
+	local mouthZ = (opts.mouthZ or -0.88) * r
+
+	local function feature(props)
+		return makeNPCPart(props, model)
+	end
+
+	-- eyes
+	local eyeSize = (expression == "loyal" and 0.38 or 0.32) * r
+	for side = -1, 1, 2 do
+		feature({
+			Name = "Eye",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(eyeSize, eyeSize, eyeSize),
+			CFrame = faceFrame * CFrame.new(0.42 * r * side, 0.18 * r, -0.86 * r),
+			Color = DARK_FEATURE,
+		})
+	end
+	-- heavy calm lids for the wise lion, narrowed lids for the sly fox
+	if expression == "wise" then
+		for side = -1, 1, 2 do
+			feature({
+				Name = "Eyelid",
+				Size = Vector3.new(0.44 * r, 0.18 * r, 0.12 * r),
+				CFrame = faceFrame * CFrame.new(0.42 * r * side, 0.32 * r, -0.88 * r),
+				Color = lidColor,
+			})
+		end
+	elseif expression == "sly" then
+		for side = -1, 1, 2 do
+			feature({
+				Name = "Eyelid",
+				Size = Vector3.new(0.46 * r, 0.14 * r, 0.12 * r),
+				CFrame = faceFrame * CFrame.new(0.42 * r * side, 0.3 * r, -0.88 * r)
+					* CFrame.Angles(0, 0, math.rad(-14) * side),
+				Color = lidColor,
+			})
+		end
+	end
+
+	-- brows (wise and sly lean on their eyelids instead)
+	if expression == "stern" then
+		for side = -1, 1, 2 do
+			feature({
+				Name = "Brow",
+				Size = Vector3.new(0.54 * r, 0.15 * r, 0.1 * r),
+				CFrame = faceFrame * CFrame.new(0.42 * r * side, 0.46 * r, -0.86 * r)
+					* CFrame.Angles(0, 0, math.rad(14) * side),
+				Color = browColor,
+			})
+		end
+	elseif expression == "worried" then
+		for side = -1, 1, 2 do
+			feature({
+				Name = "Brow",
+				Size = Vector3.new(0.46 * r, 0.11 * r, 0.1 * r),
+				CFrame = faceFrame * CFrame.new(0.42 * r * side, 0.5 * r, -0.86 * r)
+					* CFrame.Angles(0, 0, math.rad(-16) * side),
+				Color = browColor,
+			})
+		end
+	elseif expression == "cheeky" then
+		-- one eyebrow up, one flat
+		feature({
+			Name = "Brow",
+			Size = Vector3.new(0.44 * r, 0.11 * r, 0.1 * r),
+			CFrame = faceFrame * CFrame.new(-0.42 * r, 0.62 * r, -0.84 * r)
+				* CFrame.Angles(0, 0, math.rad(10)),
+			Color = browColor,
+		})
+		feature({
+			Name = "Brow",
+			Size = Vector3.new(0.44 * r, 0.11 * r, 0.1 * r),
+			CFrame = faceFrame * CFrame.new(0.42 * r, 0.48 * r, -0.84 * r),
+			Color = browColor,
+		})
+	elseif expression == "warm" or expression == "loyal" then
+		for side = -1, 1, 2 do
+			feature({
+				Name = "Brow",
+				Size = Vector3.new(0.42 * r, 0.1 * r, 0.1 * r),
+				CFrame = faceFrame * CFrame.new(0.42 * r * side, 0.56 * r, -0.84 * r),
+				Color = browColor,
+			})
+		end
+	end
+
+	-- mouths
+	if expression == "stern" then
+		feature({
+			Name = "Mouth",
+			Size = Vector3.new(0.52 * r, 0.1 * r, 0.08 * r),
+			CFrame = faceFrame * CFrame.new(0, mouthY, mouthZ),
+			Color = DARK_FEATURE,
+		})
+	elseif expression == "worried" then
+		feature({
+			Name = "Mouth",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(0.24 * r, 0.3 * r, 0.12 * r),
+			CFrame = faceFrame * CFrame.new(0, mouthY, mouthZ),
+			Color = DARK_FEATURE,
+		})
+	elseif expression == "loyal" then
+		feature({
+			Name = "Mouth",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(0.5 * r, 0.36 * r, 0.16 * r),
+			CFrame = faceFrame * CFrame.new(0, mouthY, mouthZ),
+			Color = DARK_FEATURE,
+		})
+		feature({
+			Name = "Tongue",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(0.26 * r, 0.3 * r, 0.14 * r),
+			CFrame = faceFrame * CFrame.new(0.05 * r, mouthY - 0.18 * r, mouthZ + 0.02 * r),
+			Color = Color3.fromRGB(232, 120, 140),
+		})
+	elseif expression == "sly" then
+		-- lopsided smirk: flat centre, one corner turned up
+		feature({
+			Name = "Mouth",
+			Size = Vector3.new(0.34 * r, 0.09 * r, 0.08 * r),
+			CFrame = faceFrame * CFrame.new(-0.06 * r, mouthY, mouthZ),
+			Color = DARK_FEATURE,
+		})
+		feature({
+			Name = "MouthCorner",
+			Size = Vector3.new(0.22 * r, 0.09 * r, 0.08 * r),
+			CFrame = faceFrame * CFrame.new(0.22 * r, mouthY + 0.05 * r, mouthZ)
+				* CFrame.Angles(0, 0, math.rad(28)),
+			Color = DARK_FEATURE,
+		})
+	else
+		-- smile (warm, wise, cheeky): a three-piece upward arc
+		feature({
+			Name = "Mouth",
+			Size = Vector3.new(0.34 * r, 0.09 * r, 0.08 * r),
+			CFrame = faceFrame * CFrame.new(0, mouthY - 0.05 * r, mouthZ),
+			Color = DARK_FEATURE,
+		})
+		for side = -1, 1, 2 do
+			feature({
+				Name = "MouthCorner",
+				Size = Vector3.new(0.2 * r, 0.09 * r, 0.08 * r),
+				CFrame = faceFrame * CFrame.new(0.25 * r * side, mouthY + 0.02 * r, mouthZ)
+					* CFrame.Angles(0, 0, math.rad(28) * side),
+				Color = DARK_FEATURE,
+			})
+		end
+	end
+
+	-- extras
+	if expression == "warm" then
+		for side = -1, 1, 2 do
+			feature({
+				Name = "Blush",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(0.26 * r, 0.18 * r, 0.1 * r),
+				CFrame = faceFrame * CFrame.new(0.62 * r * side, -0.12 * r, -0.74 * r),
+				Color = Color3.fromRGB(240, 150, 150),
+			})
+		end
+	elseif expression == "cheeky" then
+		for side = -1, 1, 2 do
+			feature({
+				Name = "Tooth",
+				Size = Vector3.new(0.15 * r, 0.22 * r, 0.08 * r),
+				CFrame = faceFrame * CFrame.new(0.09 * r * side, mouthY - 0.14 * r, mouthZ + 0.02 * r),
+				Color = Color3.fromRGB(250, 248, 240),
+			})
+		end
+	end
+end
+
 -- A friendly blocky villager (Dad, Mum, and the crowd in the finale)
 local function buildHuman(def)
 	local model = Instance.new("Model")
@@ -1228,15 +1438,12 @@ local function buildHuman(def)
 		CFrame = base * CFrame.new(0, 3.55, 0.25),
 		Color = HAIR,
 	}, model)
-	for side = -1, 1, 2 do
-		makeNPCPart({
-			Name = "Eye",
-			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(0.34, 0.34, 0.34),
-			CFrame = base * CFrame.new(0.42 * side, 3.15, -0.92),
-			Color = Color3.fromRGB(25, 25, 25),
-		}, model)
-	end
+
+	-- the face that fits their part in the story
+	addFace(model, base * CFrame.new(0, 3, 0), 1.05, def.expression, {
+		browColor = HAIR,
+		mouthY = -0.38,
+	})
 
 	addNameTag(head, def.display, 2.6)
 	model.PrimaryPart = body
@@ -1309,16 +1516,14 @@ local function buildAnimal(def)
 		CFrame = base * CFrame.new(0, 1.3 * scale, -2 * scale),
 		Color = bodyColor,
 	}, model)
-	-- eyes
-	for side = -1, 1, 2 do
-		makeNPCPart({
-			Name = "Eye",
-			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(0.32, 0.32, 0.32) * scale,
-			CFrame = base * CFrame.new(0.4 * side * scale, 1.5 * scale, -2.8 * scale),
-			Color = Color3.fromRGB(25, 25, 25),
-		}, model)
-	end
+	-- the face that fits their part in the story (drawn around the
+	-- snout, so the mouth sits lower than on the humans)
+	addFace(model, base * CFrame.new(0, 1.3 * scale, -2 * scale), 0.95 * scale, def.expression, {
+		browColor = Color3.fromRGB(40, 34, 32),
+		lidColor = bodyColor,
+		mouthY = -0.62,
+		mouthZ = -0.78,
+	})
 	-- snout
 	makeNPCPart({
 		Name = "Snout",
@@ -1749,6 +1954,7 @@ local function buildVillagers()
 			id = "Villager" .. k,
 			display = "Villager",
 			kind = "human",
+			expression = "worried", -- they think the forest is a threat
 			shirt = VILLAGER_SHIRTS[k],
 			position = Vector3.new(spot.x, 0, spot.z),
 			faceZ = 1,
