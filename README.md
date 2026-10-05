@@ -32,6 +32,13 @@ round two-tone canopies on top (bird nests and all) with one narrow
 gap, just Amy's size. The paradise inside uses the site's own palette:
 moss, gold, bubblegum pink and grape purple.
 
+## Where this is going
+
+The game is an early proof of concept. The plan to take it to a public
+release with Dev/Release channels, an automated test harness and
+agent-driven feature development is in
+[`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md).
+
 ## How to play it (easiest way)
 
 1. Install [Roblox Studio](https://create.roblox.com/) (free).
