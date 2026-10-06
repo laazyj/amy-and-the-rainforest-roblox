@@ -184,7 +184,7 @@ actually needs reactive state; the Phase 1 screens do not.
 
 | System | Approach |
 |---|---|
-| Saves | DataStore via ProfileStore. Schema in `core/Save`, versioned with migrations and a unit test per migration, plus a tolerance test that old code can read a one-version-newer save (so Release can roll back one schema version). Store names carry a prefix from config so tests never touch tester data. |
+| Saves | DataStore via ProfileStore, keyed by Roblox user id so progress follows the account across PC, phone and tablet. **Progress is written on every Story event** (quest started or completed, collectible found, bond changed) and on leave, so a player who quits mid-chapter resumes at their current Quest, not at the chapter start. Resuming re-establishes the world from Progress alone (see **Resume** in 2.4): Sam at the farm, the machine on the field, the paradise lit. One save slot per player with a "start again" option behind a confirmation; chapter select for completed chapters arrives in Phase 2. Schema in `core/Save`, versioned with migrations and a unit test per migration, plus a tolerance test that old code can read a one-version-newer save (so Release can roll back one schema version). Dev and Release have separate stores, so Dev progress never carries over. Store names carry a prefix from config so tests never touch tester data. |
 | Player identity | The player **is Amy**: a forced `HumanoidDescription` (free catalog items, body colours from Clara's palette). Decided now because dialogue speaker labels and the camera depend on it. |
 | Input | `ContextActionService` with touch buttons on phone and tablet; proximity prompts stay the universal "talk" affordance. UI scales via `UIScale` + safe-area insets with separate layouts for the three **device classes** below; a minimum dialogue text size on a 6-inch phone and a maximum line length on a 13-inch tablet are specified in `docs/design/feel.md`. |
 | Device classes | Three first-class targets, each with its own UI layout, touch-target rules and test coverage: **PC** (keyboard and mouse, gamepad later), **Phone** (small touch screen, portrait and landscape), **Tablet** (large touch screen, landscape first; iPad and Android tablets). Tablet is not "a big phone": thumbs reach from the edges, so controls sit at the corners, dialogue is centred and wider, and text is scaled to viewing distance rather than screen size. The client binder picks the class from screen size and input type, and every screen is laid out for all three. |
@@ -256,8 +256,9 @@ Scene (look + sound)                     Player
 | **Cue** | A named sound, music track or effect, resolved to an asset through the manifest. | none | `cue:sam_bark`, `music:paradise_theme` |
 | **Shot** | A named camera framing used by a Beat or a Dialogue. | none | `shot:ForestWallReveal` |
 | **Lighting preset** | A named look for a Scene. | `paradiseReveal` / `ordinaryWorld` | `lighting:paradise` |
-| **Progress** | Where a player is in the Story: current Chapter and Quest, completed Quest ids, Pickup counts, Collectibles, Bonds. This is what gets saved. | `getState(player)` | |
-| **Checkpoint** | The Progress snapshot taken at a Chapter start; where "Continue" resumes. | none | |
+| **Progress** | Where a player is in the Story: current Chapter and Quest, completed Quest ids, Pickup counts, Collectibles, Bonds, Prop states that matter (machine present or not). This is what gets saved, on every Story event and on leave. | `getState(player)` | |
+| **Resume** | Rebuilding the world for a returning player from Progress alone: `StoryEngine.resume(progress)` returns the World commands that put every Character, Prop, lighting preset and Pickup where the current Quest expects them, then shows the objective. "Continue" on the title screen is a Resume at the current Quest. | none | |
+| **Checkpoint** | The Progress snapshot taken at a Chapter start, kept alongside current Progress; "Play this chapter again" restarts from it. | none | |
 | **World** | The one interface the core uses to act on the engine. Every Beat is written against it. | scattered engine calls | `World.moveCharacter(id, spot)` |
 
 #### The verbs
@@ -279,7 +280,7 @@ StoryEngine.step(progress, playerEvent) → progress', storyEvents[], worldComma
 - **World commands** go *out* as instructions to the engine:
   `ShowDialogue`, `SetObjective`, `ShowChapterCard`, `MoveCharacter`,
   `TeleportPlayer`, `SetPropState`, `PlayCue`, `SetLighting`, `FrameShot`,
-  `SpawnPickups`, `ClearPickups`, `SaveCheckpoint`.
+  `SpawnPickups`, `ClearPickups`, `SaveProgress`, `SaveCheckpoint`.
 
 A Beat is a list of World commands with optional waits. A Hook maps a
 Quest moment to Beats. The server adapter's only jobs are to turn engine
@@ -438,8 +439,8 @@ for a Release promotion**. Tier 4 is you, on a real phone and a real tablet.
 | Tier | Runs where | Runs when | Proves | Time |
 |---|---|---|---|---|
 | 0 Static | GitHub runner | Every push | StyLua, Selene, luau-lsp strict types with Roblox definitions, core/content purity, content schema validation (every hook referenced exists, every `rbxassetid://` is in the manifest, no `http` strings in content or UI text) | < 1 min |
-| 1 Unit (Lune) | GitHub runner | Every push | Core and view-model logic: every chapter completable from a fresh save and every checkpoint; dialogue graphs have no dead ends; save migrations round-trip and one-version tolerance; canon text byte-identical; collectible, puzzle and companion logic; dialogue view-model with emoji and `♥` graphemes | < 1 min |
-| 2 Engine (Open Cloud Luau Execution) | Roblox servers | Every PR, after build | Place loads; `SceneBuilder` produces expected zones, NPCs, prompts, spawns; **reachability**: `PathfindingService` finds a path from spawn to every zone and prompt with R15 agent parameters; story walkthrough with a fake player through all chapters via the server adapter; two fake players at different chapters do not cross-talk; `Players.MaxPlayers == 1`; remote payloads validate against the core Net contract; no errors in the log; instance, part and triangle counts within budget; ProfileStore session lock released on `BindToClose` | 2–5 min |
+| 1 Unit (Lune) | GitHub runner | Every push | Core and view-model logic: every chapter completable from a fresh save, from every checkpoint and from a Resume at every Quest; for every Quest, the world state implied by walking there equals the world state produced by `resume` from the saved Progress; dialogue graphs have no dead ends; save migrations round-trip and one-version tolerance; canon text byte-identical; collectible, puzzle and companion logic; dialogue view-model with emoji and `♥` graphemes | < 1 min |
+| 2 Engine (Open Cloud Luau Execution) | Roblox servers | Every PR, after build | Place loads; `SceneBuilder` produces expected zones, NPCs, prompts, spawns; **reachability**: `PathfindingService` finds a path from spawn to every zone and prompt with R15 agent parameters; story walkthrough with a fake player through all chapters via the server adapter; save at every Quest, resume in a fresh DataModel, and assert the same Characters, Props and lighting are in place; two fake players at different chapters do not cross-talk; `Players.MaxPlayers == 1`; remote payloads validate against the core Net contract; no errors in the log; instance, part and triangle counts within budget; ProfileStore session lock released on `BindToClose` | 2–5 min |
 | 3 Studio (Mac) | Self-hosted runner | Opportunistic on PRs (label `needs-playtest`), **mandatory for Release** | Real client playthrough: scripted character walks each chapter, prompts fire, dialogue advances, touch input works under device emulation for a phone and a tablet preset in both orientations; on-screen assertions (text fits, safe areas, contrast, visibility, animations playing, nothing floating, lighting range, cues playing); screenshots at every Shot, chapter card and Scene entry per device class, diffed against `docs/screens/` baselines with a tolerance and a palette check; the agent reviews new frames against the `feel.md` rubric; client frame time, memory and `Stats` texture memory | 5–10 min |
 | 4 Human | You and Clara, on Dev, on PC, a real phone and a real tablet | Before promotion | Feel, pacing, readability, fun; `RELEASE_CHECKLIST.md` | as needed |
 
@@ -706,7 +707,11 @@ Outcome: version 1.0 on the Release channel.
 
 - **Mac runner** set up with the Studio MCP bridge, one end-to-end smoke
   playthrough, screenshots, baselines for the existing scenes.
-- Save system with chapter checkpoints and a "continue" title screen.
+- Save system: Progress written on every Story event and on leave, Resume
+  at the current Quest with the world rebuilt from Progress, chapter
+  checkpoints, a "continue" title screen, and "start again" behind a
+  confirmation. Studio DataStore access enabled on the Dev experience so
+  Mac playtests can exercise it under the test prefix.
 - Phone and tablet support as separate device classes: touch controls,
   per-class UI layouts, safe areas, first-minute onboarding (where the
   thumbstick is, how to talk), tested under Studio device emulation on the
