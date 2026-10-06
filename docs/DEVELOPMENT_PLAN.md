@@ -20,8 +20,8 @@ It answers five requirements:
 
 Decisions already agreed are in the log at the end. In short: personal
 Roblox account, two separate experiences for Dev and Release, Open Cloud
-keys as GitHub secrets, ages 7–12 and family-friendly, strictly free, PC +
-mobile, single player first, exploration + animal companions + light
+keys as GitHub secrets, ages 7–12 and family-friendly, strictly free, PC,
+phone and tablet, single player first, exploration + animal companions + light
 puzzles, new chapters + collectibles as the retention loop, agent drafts
 story in Clara's voice for approval with her original text untouched, free
 assets and Clara's illustrations, review by playing Dev plus reading the
@@ -184,7 +184,8 @@ actually needs reactive state; the Phase 1 screens do not.
 |---|---|
 | Saves | DataStore via ProfileStore. Schema in `core/Save`, versioned with migrations and a unit test per migration, plus a tolerance test that old code can read a one-version-newer save (so Release can roll back one schema version). Store names carry a prefix from config so tests never touch tester data. |
 | Player identity | The player **is Amy**: a forced `HumanoidDescription` (free catalog items, body colours from Clara's palette). Decided now because dialogue speaker labels and the camera depend on it. |
-| Input | `ContextActionService` with touch buttons on mobile; proximity prompts stay the universal "talk" affordance. UI scales via `UIScale` + safe-area insets; a minimum dialogue text size on a 6-inch phone is specified in `docs/design/feel.md`. |
+| Input | `ContextActionService` with touch buttons on phone and tablet; proximity prompts stay the universal "talk" affordance. UI scales via `UIScale` + safe-area insets with separate layouts for the three **device classes** below; a minimum dialogue text size on a 6-inch phone and a maximum line length on a 13-inch tablet are specified in `docs/design/feel.md`. |
+| Device classes | Three first-class targets, each with its own UI layout, touch-target rules and test coverage: **PC** (keyboard and mouse, gamepad later), **Phone** (small touch screen, portrait and landscape), **Tablet** (large touch screen, landscape first; iPad and Android tablets). Tablet is not "a big phone": thumbs reach from the edges, so controls sit at the corners, dialogue is centred and wider, and text is scaled to viewing distance rather than screen size. The client binder picks the class from screen size and input type, and every screen is laid out for all three. |
 | UI | Plain Roblox UI driven by the core view-model. Dialogue, objectives, chapter cards, journal, settings, pause. |
 | Audio | `AudioManager` with named cues from the manifest; music per scene with crossfades; SFX for prompts, pickups, footsteps. Narration (see section 7) as the largest quality lever for non-fluent readers. |
 | World | Scenes as data (terrain instructions, placed models, zones, spawn points) built by `SceneBuilder`. Meshes and models checked in as `.rbxm` under `assets/meshes` and referenced by id in the manifest. |
@@ -430,15 +431,15 @@ a Studio publish would silently overwrite CI's version. This goes in
 
 Four automated tiers plus one human tier. Tiers 0–2 run on every PR on
 Linux with no Studio. Tier 3 runs when the Mac is awake and is **required
-for a Release promotion**. Tier 4 is you, on a real phone.
+for a Release promotion**. Tier 4 is you, on a real phone and a real tablet.
 
 | Tier | Runs where | Runs when | Proves | Time |
 |---|---|---|---|---|
 | 0 Static | GitHub runner | Every push | StyLua, Selene, luau-lsp strict types with Roblox definitions, core/content purity, content schema validation (every hook referenced exists, every `rbxassetid://` is in the manifest, no `http` strings in content or UI text) | < 1 min |
 | 1 Unit (Lune) | GitHub runner | Every push | Core and view-model logic: every chapter completable from a fresh save and every checkpoint; dialogue graphs have no dead ends; save migrations round-trip and one-version tolerance; canon text byte-identical; collectible, puzzle and companion logic; dialogue view-model with emoji and `♥` graphemes | < 1 min |
 | 2 Engine (Open Cloud Luau Execution) | Roblox servers | Every PR, after build | Place loads; `SceneBuilder` produces expected zones, NPCs, prompts, spawns; **reachability**: `PathfindingService` finds a path from spawn to every zone and prompt with R15 agent parameters; story walkthrough with a fake player through all chapters via the server adapter; two fake players at different chapters do not cross-talk; `Players.MaxPlayers == 1`; remote payloads validate against the core Net contract; no errors in the log; instance, part and triangle counts within budget; ProfileStore session lock released on `BindToClose` | 2–5 min |
-| 3 Studio (Mac) | Self-hosted runner | Opportunistic on PRs (label `needs-playtest`), **mandatory for Release** | Real client playthrough: scripted character walks each chapter, prompts fire, dialogue advances, touch input works under device emulation; screenshots at chapter cards and key scenes diffed against `docs/screens/` baselines with a tolerance; client frame time, memory and `Stats` texture memory | 5–10 min |
-| 4 Human | You and Clara, on Dev, on a real phone and on PC | Before promotion | Feel, pacing, readability, fun; `RELEASE_CHECKLIST.md` | as needed |
+| 3 Studio (Mac) | Self-hosted runner | Opportunistic on PRs (label `needs-playtest`), **mandatory for Release** | Real client playthrough: scripted character walks each chapter, prompts fire, dialogue advances, touch input works under device emulation for a phone and a tablet preset in both orientations; screenshots at chapter cards and key scenes diffed against `docs/screens/` baselines with a tolerance; client frame time, memory and `Stats` texture memory | 5–10 min |
+| 4 Human | You and Clara, on Dev, on PC, a real phone and a real tablet | Before promotion | Feel, pacing, readability, fun; `RELEASE_CHECKLIST.md` | as needed |
 
 Design notes:
 
@@ -473,8 +474,9 @@ Design notes:
 - **Budgets are tests, measured where they can be.** Tier 2 checks instance
   and part counts, triangle counts from the mesh manifest and server
   Heartbeat time. Tier 3 checks client frame time and texture memory on the
-  Mac. The "smooth on a mid-range phone" target is a release-checklist item
-  observed on a real device, because no automated tier can measure it.
+  Mac. The "smooth on a mid-range phone and tablet" target is a
+  release-checklist item observed on real devices, because no automated
+  tier can measure it.
 - **Flake policy.** Open Cloud is beta. Tier 2 retries once on transport
   errors only, never on assertion failures. Outages are reported in the PR.
 
@@ -512,7 +514,7 @@ Kind: logic + perceptual (Mac required for the perceptual part)
 Goal: a new chapter, 10–15 minutes of play, that follows Clara's story
 proposal in docs/story/proposals/chapter-5.md (approved 2026-11-02).
 Must: new scene (night-time paradise), 2 new collectibles, 1 puzzle,
-      Sam companion behaviour, music and SFX, mobile-tested.
+      Sam companion behaviour, music and SFX, tested on PC, phone and tablet.
 Must not: change any canon text; add paid items; exceed budgets.
 Done when: DEFINITION_OF_DONE.md is satisfied and the chapter is
            completable in tier 2 and tier 3 from a Chapter 4 save.
@@ -562,7 +564,7 @@ Done when: DEFINITION_OF_DONE.md is satisfied and the chapter is
 | Scope | Examples | Who proves it |
 |---|---|---|
 | Logic-provable | Quest flow, saves, collectibles, puzzles, reachability, budgets, remote contracts, canon integrity | Tiers 0–2, fully autonomous on Linux |
-| Perceptual | Scene composition, lighting, readability on a phone, animation feel, audio mix, pacing | Tier 3 contact sheets and baselines with the Mac awake, then you and Clara |
+| Perceptual | Scene composition, lighting, readability on a phone and a tablet, animation feel, audio mix, pacing | Tier 3 contact sheets and baselines with the Mac awake, then you and Clara |
 
 A brief that is purely logic-provable can be delivered end to end without
 the Mac. A perceptual brief needs the Mac on during the run and your review
@@ -623,9 +625,11 @@ Outcome: version 1.0 on the Release channel.
 - **Mac runner** set up with the Studio MCP bridge, one end-to-end smoke
   playthrough, screenshots, baselines for the existing scenes.
 - Save system with chapter checkpoints and a "continue" title screen.
-- Mobile and tablet support: touch controls, scaled UI, safe areas,
-  first-minute onboarding (where the thumbstick is, how to talk), tested
-  under device emulation on the Mac and on a real phone.
+- Phone and tablet support as separate device classes: touch controls,
+  per-class UI layouts, safe areas, first-minute onboarding (where the
+  thumbstick is, how to talk), tested under Studio device emulation on the
+  Mac for at least one phone and one tablet preset in both orientations,
+  and on a real phone and a real tablet.
 - Audio: ambient forest, village, paradise; music per chapter; SFX;
   narration of canon lines (see section 7).
 - Visual pass on the existing world: terrain and foliage, lighting and
@@ -680,7 +684,7 @@ Outcome: players return because there is more to discover.
 - Seasonal moments (rainy season, fireflies, a village fair) as content
   packs toggled by date.
 - Monthly quality PR driven by analytics: where players drop off, what is
-  slow on mobile, what is confusing.
+  slow on phone or tablet, what is confusing.
 - Regular upkeep: Roblox engine changes, Open Cloud API updates, Studio
   version drift on the Mac, key rotation.
 
@@ -715,12 +719,12 @@ Outcome: players return because there is more to discover.
 
 | Dimension | Bar | Measured by |
 |---|---|---|
-| Correctness | Every chapter completable from every checkpoint, on PC and mobile | Tiers 1–3 |
+| Correctness | Every chapter completable from every checkpoint, on PC, phone and tablet | Tiers 1–3 |
 | Reachability | Every zone and prompt reachable by an R15 character | Tier 2 pathfinding, tier 3 traversal |
-| Performance | Instance, part, triangle and texture budgets; server Heartbeat under 8 ms; smooth on a mid-range phone | Tiers 2–3 budgets; real device on the release checklist |
+| Performance | Instance, part, triangle and texture budgets; server Heartbeat under 8 ms; smooth on a mid-range phone and tablet | Tiers 2–3 budgets; real device on the release checklist |
 | Visual | Consistent with Clara's palette and illustration style; one baseline screenshot per scene in `docs/screens/`, updated deliberately when a scene changes | Tier 3 diff + your review |
 | Audio | Every interaction has feedback; every scene has ambience and music; canon lines narrated | Manifest test + review |
-| Readability | Minimum dialogue text size on a 6-inch phone; high-contrast option | `feel.md` spec, tier 3 device emulation, real phone |
+| Readability | Minimum dialogue text size on a 6-inch phone, maximum line length on a 13-inch tablet; high-contrast option | `feel.md` spec, tier 3 device emulation for phone and tablet presets, real devices |
 | Story | Canon untouched, new text approved, no dead ends | Tier 1 + proposals |
 | Retention | Chapter completion funnel, median session length, day-7 return rate | Roblox Analytics, reviewed monthly |
 
@@ -782,7 +786,7 @@ in parallel with the characterization test and refactor.
 | Automation auth | Two Open Cloud keys as GitHub secrets; Release key only in the gated environment; agent never holds a key |
 | Audience | Ages 7–12, all-ages rating, no chat required |
 | Monetization | None |
-| Platforms | PC and mobile/tablet; console not targeted |
+| Platforms | PC, phone and tablet as three first-class device classes; console not targeted |
 | Multiplayer | Single player, Max Players = 1; co-op evaluated in Phase 2 as a redesign |
 | Player identity | The player is Amy (forced `HumanoidDescription`) |
 | Gameplay direction | Exploration, animal companions, light puzzles; hub world; saves |
@@ -792,7 +796,7 @@ in parallel with the characterization test and refactor.
 | Assets | Free Creator Store, Clara's illustrations, free-licence or synthesised audio; uploads by CI only |
 | Test runners | Lune-native runner for tier 1; Jest-Lua or TestEZ in-engine for tier 2; shared fixtures |
 | Mac bridge | Roblox Studio built-in MCP server, wrapped; not `run-in-roblox` |
-| Review | Play Dev on PC and a real phone + read PR; release checklist gates promotion; tier 3 mandatory for release |
+| Review | Play Dev on PC, a real phone and a real tablet + read PR; release checklist gates promotion; tier 3 mandatory for release |
 | Task size | One chapter or feature set per PR |
 | Cadence | On demand plus nightly Dev build |
 | Test machines | Linux CI for tiers 0–2; MacBook self-hosted runner for tier 3, opportunistic on PRs |
