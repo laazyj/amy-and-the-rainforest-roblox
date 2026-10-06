@@ -31,7 +31,9 @@ Dev build, and a MacBook self-hosted runner that may not always be on.
 One honest limit, stated up front: **the agent runs on Linux and can
 neither see nor hear the game.** Correctness, reachability, performance
 budgets and story logic can be proven headlessly. Look, feel, pacing and
-audio mix cannot. The plan separates those two kinds of work (section 5.4)
+audio mix cannot, though with the Mac awake the agent can assert a good
+deal about what is on screen, diff frames against baselines, and look at
+the pictures itself before you do. The plan separates those two kinds of work (section 5.4)
 and makes the perceptual loop depend on the Mac being awake and on your
 eyes, rather than pretending it is autonomous.
 
@@ -438,7 +440,7 @@ for a Release promotion**. Tier 4 is you, on a real phone and a real tablet.
 | 0 Static | GitHub runner | Every push | StyLua, Selene, luau-lsp strict types with Roblox definitions, core/content purity, content schema validation (every hook referenced exists, every `rbxassetid://` is in the manifest, no `http` strings in content or UI text) | < 1 min |
 | 1 Unit (Lune) | GitHub runner | Every push | Core and view-model logic: every chapter completable from a fresh save and every checkpoint; dialogue graphs have no dead ends; save migrations round-trip and one-version tolerance; canon text byte-identical; collectible, puzzle and companion logic; dialogue view-model with emoji and `♥` graphemes | < 1 min |
 | 2 Engine (Open Cloud Luau Execution) | Roblox servers | Every PR, after build | Place loads; `SceneBuilder` produces expected zones, NPCs, prompts, spawns; **reachability**: `PathfindingService` finds a path from spawn to every zone and prompt with R15 agent parameters; story walkthrough with a fake player through all chapters via the server adapter; two fake players at different chapters do not cross-talk; `Players.MaxPlayers == 1`; remote payloads validate against the core Net contract; no errors in the log; instance, part and triangle counts within budget; ProfileStore session lock released on `BindToClose` | 2–5 min |
-| 3 Studio (Mac) | Self-hosted runner | Opportunistic on PRs (label `needs-playtest`), **mandatory for Release** | Real client playthrough: scripted character walks each chapter, prompts fire, dialogue advances, touch input works under device emulation for a phone and a tablet preset in both orientations; screenshots at chapter cards and key scenes diffed against `docs/screens/` baselines with a tolerance; client frame time, memory and `Stats` texture memory | 5–10 min |
+| 3 Studio (Mac) | Self-hosted runner | Opportunistic on PRs (label `needs-playtest`), **mandatory for Release** | Real client playthrough: scripted character walks each chapter, prompts fire, dialogue advances, touch input works under device emulation for a phone and a tablet preset in both orientations; on-screen assertions (text fits, safe areas, contrast, visibility, animations playing, nothing floating, lighting range, cues playing); screenshots at every Shot, chapter card and Scene entry per device class, diffed against `docs/screens/` baselines with a tolerance and a palette check; the agent reviews new frames against the `feel.md` rubric; client frame time, memory and `Stats` texture memory | 5–10 min |
 | 4 Human | You and Clara, on Dev, on PC, a real phone and a real tablet | Before promotion | Feel, pacing, readability, fun; `RELEASE_CHECKLIST.md` | as needed |
 
 Design notes:
@@ -496,6 +498,82 @@ Design notes:
   and reports the Studio version; "Studio version drift" is a tracked risk.
 - When the Mac is closed or off, PR jobs queue up to 30 minutes then skip.
 
+### Autonomous visual testing on the Mac
+
+The Mac is the only place a frame gets rendered, so it is where visual
+autonomy lives. There are three levels, from fully deterministic to
+judgement, and the agent can run all three without you when the Mac is
+on. Only the last step, accepting a new look, stays human.
+
+**Level 1: assertions the engine can make about what is on screen.**
+These run as part of the tier 3 playthrough script and fail the job like
+any other test. No images are needed.
+
+| Check | How |
+|---|---|
+| Text fits and is readable | `TextLabel.TextFits` true for every visible Line; text height in physical pixels at the emulated device's DPI meets the `feel.md` minimum; line length on tablet under the maximum |
+| Layout | Every UI element inside the safe area; no two interactive elements overlap; touch targets at least 44 points on phone and tablet |
+| Contrast | Text colour versus dialogue-box colour meets a contrast ratio of at least 4.5:1, computed from the actual colours in the frame |
+| The right things are visible | For each Shot and each Dialogue, a raycast from the camera reaches the speaker's head and the objective target without occlusion; the on-screen objective marker is within the viewport |
+| Characters look alive | Humanoid animation tracks are playing (no T-pose); the speaker faces Amy during Dialogue; Companions are within follow distance |
+| Nothing floats or sinks | For every Prop and Character, a downward raycast finds ground within a tolerance; no Prop intersects another unexpectedly |
+| Lighting sanity | Average frame luminance per Scene within a range (not too dark on a phone in daylight; not blown out); no fully black frames during Beats |
+| Audio present | Each Scene has an ambience and a music Cue playing; `PlaybackLoudness` above zero when a Cue fires |
+| Client performance | Frame time and memory from `Stats` within budget, as a proxy for mobile |
+
+**Level 2: image checks against baselines.** The script captures a
+screenshot at every Shot, chapter card and Scene entry, for each device
+class and orientation, and compares it to the baseline in
+`docs/screens/` with a structural-similarity measure and a tolerance.
+Pixel-exact comparison is useless in Roblox (particles, animation
+phase, cloud movement), so captures freeze time where possible (pause
+particles, fix the animation frame, fixed time of day) and the tolerance
+is tuned per shot. A diff over tolerance fails the job and attaches the
+pair with the changed regions highlighted. This is **regression**
+testing: it proves a change did not alter scenes it was not meant to
+alter, and it is fully autonomous. In addition, a palette check samples
+each frame's dominant colours and asserts they fall within Clara's
+palette, which catches a stray default-grey part or an off-brand model.
+
+**Level 3: the agent looks at the pictures.** The agent can read images.
+When the contact sheet comes back, the agent reviews each new or changed
+frame against a written rubric in `feel.md` (composition: subject in the
+middle third and not cut off; readability: dialogue legible at the
+device's size; style: hand-drawn feel, palette, scribbly grass, round
+canopies like the hero illustration; clutter: nothing distracting behind
+the speaker), scores it, and iterates on the scene until the rubric
+passes. This is judgement, not proof, so it gates the agent's own loop
+and not the release. It is also what makes a perceptual brief finish
+without your involvement: the agent builds, plays, looks, adjusts, and
+repeats, and you see the result once.
+
+**What this gives us**
+
+| Situation | Autonomy |
+|---|---|
+| A change to logic or content that should not alter any scene | Fully autonomous: levels 1 and 2 pass or fail the PR |
+| A new or changed scene, shot or UI screen | Autonomous iteration: levels 1 to 3 run until green, baseline proposed; you accept the new baseline in the PR |
+| Taste: is it fun, is the pacing right, does it feel like Clara's book | Human, on a real phone and tablet |
+| Audio quality and mix | Human; the Mac only proves cues play |
+
+**Mechanics and limits**
+
+- Capture uses macOS `screencapture` of the Studio viewport rectangle
+  driven through the Studio MCP server; in-engine `CaptureService` is
+  not relied on because it is unreliable in Studio.
+- Device classes are emulated with Studio's device emulation; whether it
+  can be switched from a script is a Phase 1 spike. The fallback is
+  resizing the Studio window to each device's aspect ratio by AppleScript,
+  which tests layout but not DPI; DPI-dependent text checks then use the
+  emulated scale factor from `feel.md`.
+- A full visual pass takes 5 to 10 minutes, so the agent batches scene
+  changes and runs it per batch, not per edit.
+- Baselines change deliberately: a PR that changes a baseline shows the
+  before and after in its description and lists the rubric scores.
+- All of it depends on the Mac being awake and on Studio not having
+  auto-updated into a breaking change that week. A perceptual brief
+  states up front that it needs the Mac on for its duration.
+
 ---
 
 ## 5. Agent workflow: from high-level task to proven PR
@@ -534,8 +612,10 @@ Done when: DEFINITION_OF_DONE.md is satisfied and the chapter is
 5. Iterates until every tier is green, then requests a tier 3 playtest by
    label. If the Mac is off, it says so in the PR and continues with what
    can be proven.
-6. For perceptual scope, waits for the contact sheet, compares against the
-   per-scene checklist and baselines, and iterates.
+6. For perceptual scope, runs the Mac visual pass per batch of scene
+   changes, fixes any on-screen assertion or baseline failure, reviews the
+   new frames against the `feel.md` rubric by looking at them, and iterates
+   until the rubric passes; proposes new baselines in the PR.
 7. Produces the PR with: changelog, test report, screenshots or a note that
    none were possible, a "how to play-test this" section with the Dev link
    and a save-state shortcut, and open questions as a short list.
@@ -564,11 +644,13 @@ Done when: DEFINITION_OF_DONE.md is satisfied and the chapter is
 | Scope | Examples | Who proves it |
 |---|---|---|
 | Logic-provable | Quest flow, saves, collectibles, puzzles, reachability, budgets, remote contracts, canon integrity | Tiers 0–2, fully autonomous on Linux |
-| Perceptual | Scene composition, lighting, readability on a phone and a tablet, animation feel, audio mix, pacing | Tier 3 contact sheets and baselines with the Mac awake, then you and Clara |
+| Perceptual | Scene composition, lighting, readability on a phone and a tablet, animation feel, audio mix, pacing | Tier 3 with the Mac awake: on-screen assertions and baseline diffs are automatic, and the agent iterates against the `feel.md` rubric by looking at the frames (see "Autonomous visual testing on the Mac"); you and Clara accept the result |
 
 A brief that is purely logic-provable can be delivered end to end without
-the Mac. A perceptual brief needs the Mac on during the run and your review
-at the end. This is a real constraint, not a wording choice.
+the Mac. A perceptual brief needs the Mac on during the run; with it on,
+the agent can iterate on visuals by itself and you review once at the end.
+Taste and audio mix stay human. This is a real constraint, not a wording
+choice.
 
 ### 5.5 Sourcing free Creator Store assets from Linux
 
