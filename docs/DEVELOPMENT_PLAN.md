@@ -1,6 +1,6 @@
 # Amy and the Rain Forest — Development Plan
 
-**Status:** proposal for review · **Owner:** Jason Duffett · **Last updated:** 2026-10-05 (revision 2, after independent critique; see `docs/plan-review/`)
+**Status:** proposal for review · **Owner:** Jason Duffett · **Last updated:** 2026-10-06 (revision 3: adds the story model and ubiquitous language, section 2.4; revision 2 followed an independent critique, see `docs/plan-review/`)
 
 This plan turns the current proof of concept into a publicly released Roblox
 game that can be continually expanded by an autonomous agent, with every
@@ -154,6 +154,7 @@ Rules that keep this honest, and that the tests enforce:
 │   └── studio-playtest/      Mac runner scripts (Studio MCP wrapper, screencapture)
 ├── docs/
 │   ├── DEVELOPMENT_PLAN.md   This document
+│   ├── GLOSSARY.md           The ubiquitous language (section 2.4); source of the content schema
 │   ├── DEFINITION_OF_DONE.md What every PR must satisfy
 │   ├── RELEASE_CHECKLIST.md  Human promotion checklist, Dev → Release
 │   ├── design/feel.md        Camera, input affordances, text rules, onboarding
@@ -193,6 +194,180 @@ actually needs reactive state; the Phase 1 screens do not.
 | Puzzles | Small declarative puzzle types (order of actions, find and place, follow the animal) in core with engine triggers in adapters. No failure states; hints after a delay. |
 | Camera | Framed shots for the forest-wall reveal, meeting each animal, and the machine finale; a dialogue camera that frames speaker and Amy; default follow camera elsewhere. Specified in `docs/design/feel.md`. |
 | Analytics | Roblox Analytics custom events: chapter start/complete, quest complete, collectible found, session length. |
+
+### 2.4 The story model: one language for the story, the code and the conversation
+
+Everything in this game is a story being told through a world. The code
+should say so. This section defines the **ubiquitous language**: the
+single set of nouns and verbs used by Clara's story, the content files,
+the core modules, the tests, the task briefs, the PR descriptions, the
+analytics events and our conversations. When you say "add a Beat after
+Amy meets the Fox where Sam gets jealous", that sentence names the exact
+type, file, hook and test involved, and the agent needs no translation.
+
+The model is grounded in what the proof of concept already does
+(chapters, quests of kind talk / reach / collect, zones, dialogue,
+objectives, scripted moments keyed by quest id). It gives those things
+proper names and adds the few concepts Phases 1 and 2 need.
+
+#### The nouns
+
+```
+Story
+ └─ Chapter (card, checkpoint)
+     └─ Quest (kind, objective, intro, outro, hooks)
+         ├─ Dialogue ── Line (speaker, text, canon?)
+         └─ Beat (named sequence of World commands)
+
+Scene (look + sound)                     Player
+ ├─ Spot   (named place)                  ├─ Progress (where they are in the Story)
+ ├─ Zone   (named volume)                 ├─ Journal  (what they have found)
+ ├─ Prop   (object with states)           └─ Bonds    (with Companions)
+ ├─ Character (home Spot, kind)
+ │    └─ Companion (follows, helps, bond)
+ ├─ Pickup / Collectible
+ └─ Cue, Shot, Lighting preset
+```
+
+| Term | Meaning | Today's equivalent | Example |
+|---|---|---|---|
+| **Story** | The whole experience: ordered Chapters plus the Ending. There is one. | `StoryData` | Amy and the Rain Forest |
+| **Chapter** | A titled part of the Story with a card (title, subtitle), an ordered list of Quests, and a checkpoint at its start. | `StoryData.Chapters[i]` | `chapter2` "The Unexplored World" |
+| **Quest** | One objective the player must complete. Has a **Kind**, an Objective line, optional intro and outro Dialogue, and Hooks. | quest entries | `chapter1.sneak_out_1` |
+| **Kind** (of Quest) | How the Quest is completed: `talk`, `reach`, `collect` today; `follow`, `place`, `solve` later. Each Kind is one small module in core. | `type` | `reach` |
+| **Dialogue** | An ordered list of Lines shown together. | `intro`, `dialogue`, `onComplete` | the five Lines when Amy asks Dad |
+| **Line** | One thing said: Speaker, text, optional narration audio. **Canon** Lines are Clara's exact words and are locked. | `{ speaker, text }` | Narrator: "She tryed again but Sam brang her back." |
+| **Speaker** | Who says a Line: Amy, the Narrator, or a Character. | `speaker` | `Narrator` |
+| **Beat** | A named, staged moment: a fixed sequence of World commands played at a Hook. Beats are how the story *moves the world*. | `samCatches`, `samGoesToFarm`, `paradiseReveal`, `machineArrives`, `machineStops` | `beat:sam_catches` |
+| **Hook** | A point in a Quest's life where Beats run: `onStart`, `onComplete`. Declared in the chapter's `hooks.luau`. | `questStartedHooks[...]`, `onComplete` | `chapter1.sneak_out_1.onComplete → sam_catches` |
+| **Scene** | A region of the world with its own look and sound: terrain, Props, Spots, Zones, ambience, music. | implicit in `WorldBuilder` | Garden, Village, Field, Forest Wall, Paradise, Heart Glade |
+| **Spot** | A named position and facing inside a Scene. Content never holds raw coordinates; it names Spots. | `position`, `faceZ`, `spawnPoints` | `spot:GardenGateInside` |
+| **Zone** | A named invisible volume the player can enter. Entering one is a Player event. | `zone` | `zone:ForestGap` |
+| **Prop** | A placed object with named states. | the house, the machine | `prop:Machine` states `parked`, `advancing`, `stopped` |
+| **Character** | A named being in the world with a Kind (human, dog, squirrel, fox, lion), a display name and a home Spot. Amy is the **Player Character**. | `NPCs` | `character:Sam` "Sam the Dog" |
+| **Companion** | A Character that can follow Amy, help her, and whose **Bond** with her grows. | Sam (partly) | Sam, later Squirrel, Fox, Lion |
+| **Bond** | A Companion's relationship level with Amy: `stranger` → `curious` → `friend` → `companion`. Persisted. | none | Fox at `friend` |
+| **Pickup** | A quest-bound thing to touch, spawned at Spots for a `collect` Quest and gone when the Quest ends. | pickups | three glowing flowers |
+| **Collectible** | A persistent discoverable with a Journal entry. Found once, remembered forever. | none | `collectible:maroon_acorn` |
+| **Journal** | The player's record of Collectibles found and Characters met, with entries in Clara's voice. | none | |
+| **Cue** | A named sound, music track or effect, resolved to an asset through the manifest. | none | `cue:sam_bark`, `music:paradise_theme` |
+| **Shot** | A named camera framing used by a Beat or a Dialogue. | none | `shot:ForestWallReveal` |
+| **Lighting preset** | A named look for a Scene. | `paradiseReveal` / `ordinaryWorld` | `lighting:paradise` |
+| **Progress** | Where a player is in the Story: current Chapter and Quest, completed Quest ids, Pickup counts, Collectibles, Bonds. This is what gets saved. | `getState(player)` | |
+| **Checkpoint** | The Progress snapshot taken at a Chapter start; where "Continue" resumes. | none | |
+| **World** | The one interface the core uses to act on the engine. Every Beat is written against it. | scattered engine calls | `World.moveCharacter(id, spot)` |
+
+#### The verbs
+
+The core is a pure function of events:
+
+```
+StoryEngine.step(progress, playerEvent) → progress', storyEvents[], worldCommands[]
+```
+
+- **Player events** come *in* from the adapter, in the player's terms:
+  `EnteredZone(zone)`, `TalkedTo(character)`, `TouchedPickup(pickup)`,
+  `DialogueFinished`, `FoundCollectible(collectible)`,
+  `SolvedStep(puzzle, step)`.
+- **Story events** go *out* as facts about the story: `ChapterStarted`,
+  `QuestStarted`, `QuestCompleted`, `ChapterCompleted`, `BeatPlayed`,
+  `CollectibleFound`, `BondChanged`, `StoryEnded`. Their names are also the
+  analytics event names and the names used in test descriptions.
+- **World commands** go *out* as instructions to the engine:
+  `ShowDialogue`, `SetObjective`, `ShowChapterCard`, `MoveCharacter`,
+  `TeleportPlayer`, `SetPropState`, `PlayCue`, `SetLighting`, `FrameShot`,
+  `SpawnPickups`, `ClearPickups`, `SaveCheckpoint`.
+
+A Beat is a list of World commands with optional waits. A Hook maps a
+Quest moment to Beats. The server adapter's only jobs are to turn engine
+signals into Player events, feed them to `step`, and execute the returned
+World commands. The client binder's only jobs are to render the commands
+that reach it and to send `DialogueFinished` back.
+
+This is also what makes the tests readable in the same language. The
+characterization golden file from Phase 0 is literally the sequence of
+World commands for a full playthrough. A unit test reads:
+
+```
+describe("chapter1.sneak_out_1", function()
+  it("plays beat sam_catches and teleports Amy to spot GardenInside on EnteredZone(GardenGate)", ...)
+end)
+```
+
+#### Lifecycles
+
+| Thing | States |
+|---|---|
+| Chapter | `locked` → `active` → `completed` |
+| Quest | `pending` → `active` → `completed` |
+| Bond | `stranger` → `curious` → `friend` → `companion` |
+| Prop | declared per Prop, e.g. Machine: `absent` → `advancing` → `stopped` → `retreating` |
+| Collectible (per player) | `hidden` → `found` |
+
+#### Where each concept lives
+
+| Concept | Content (data) | Core (logic) | Adapter (engine) | Tests |
+|---|---|---|---|---|
+| Chapter, Quest, Dialogue, Line | `content/chapters/<n>/data.luau` | `core/StoryEngine`, `core/quests/<kind>.luau` | `server/StoryHost` | tier 1 walkthroughs, canon test |
+| Beat, Hook | `content/chapters/<n>/hooks.luau` | `core/Beat` (sequencing) | `server/WorldImpl` executes commands | tier 1 (commands emitted), tier 2 (world changed) |
+| Scene, Spot, Zone, Prop | `content/scenes/<scene>.luau` | `core/SceneSchema` | `server/SceneBuilder` | tier 0 schema, tier 2 build + reachability |
+| Character, Companion, Bond | `content/characters.luau` | `core/Companion` | `server/CharacterHost` | tier 1 bond logic, tier 2 follow |
+| Pickup, Collectible, Journal | `content/collectibles.luau` | `core/Journal` | `server/PickupHost`, `client/JournalView` | tier 1 |
+| Cue, Shot, Lighting preset | `assets/manifest.json`, `content/presets.luau` | names only | `client/Audio`, `client/Camera`, `server/Lighting` | tier 0 manifest, tier 3 screenshots |
+| Progress, Checkpoint | | `core/Save` (schema, migrations) | `server/Persist` (ProfileStore) | tier 1 migrations, tier 2 lock release |
+| Player events, Story events, World commands | | `core/Events` (types + payload schemas) | `shared/Net` | tier 2 remote contract |
+
+#### Rules that keep the language ubiquitous
+
+1. **One name per concept, everywhere.** The same word appears in content
+   keys, Luau type names, module names, test descriptions, analytics event
+   names, briefs, PR text and conversation. No synonyms: it is `Character`,
+   not NPC, actor or figure; `Zone`, not trigger or region; `Beat`, not
+   cutscene, sequence or special. The current `npc` field becomes
+   `character` in the Phase 0 refactor.
+2. **Ids read like the language.** `chapter3.meet_fox`, `zone:ForestGap`,
+   `beat:sam_catches`, `cue:sam_bark`, `spot:HeartGladeCentre`. A reference
+   from one concept to another is always by id, never by position or raw
+   coordinate.
+3. **The glossary is the schema.** `docs/GLOSSARY.md` holds this table and
+   is the source for the content schema that tier 0 validates: Quest Kinds,
+   Speakers, Zone names, Cue names and Hook names are enumerations derived
+   from it. A new noun or verb enters the glossary in the same PR that
+   introduces it in code, and the PR description uses it.
+4. **Content is written in the language, not in engine terms.** A chapter
+   file never mentions parts, CFrames, prompts or remotes. If a Beat needs
+   something the World interface cannot do, the interface grows by one
+   named command, and the glossary records it.
+5. **Briefs and reviews use the language.** A brief says "Chapter 5 has four
+   Quests; Quest 2 is a `follow` Quest where Companion Fox leads Amy to
+   Spot FireflyPool; its `onComplete` Hook plays Beat `fireflies_rise` and
+   places Collectible `firefly_jar`." A review comment says "Beat
+   `fireflies_rise` should FrameShot `FireflyPoolWide` before PlayCue."
+6. **Canon is a property of a Line, not a file.** Any Line marked canon is
+   checked byte for byte against `docs/story/canon.md`. New Lines in
+   Clara's voice are not canon until she says so.
+
+#### A worked example
+
+You say: *"When Amy meets the Fox, Sam should be a bit jealous."*
+
+In the language that is: add a Beat to the `onComplete` Hook of Quest
+`chapter3.meet_fox`. The agent then:
+
+- adds `beat:sam_jealous` to `content/chapters/3/hooks.luau`:
+  `MoveCharacter(Sam, spot:FoxGladeEdge)`, `PlayCue(sam_whine)`,
+  `ShowDialogue` with two new non-canon Lines for Sam and Amy;
+- adds `spot:FoxGladeEdge` to `content/scenes/paradise.luau` and
+  `cue:sam_whine` to the asset manifest;
+- adds a tier 1 test: given Progress at `chapter3.meet_fox`, on
+  `TalkedTo(Fox)` then `DialogueFinished`, the World commands include
+  `PlayCue(sam_whine)` and `BeatPlayed(sam_jealous)` is emitted;
+- tier 2 confirms `spot:FoxGladeEdge` is reachable and the cue resolves;
+- the PR description says exactly the sentence above, plus "two new Lines,
+  not canon, for approval".
+
+Nothing in that exchange needed the words part, remote, prompt or script.
+That is the test of whether the language is working.
 
 ---
 
@@ -437,8 +612,9 @@ pipeline. No new gameplay.
    DataStore prefixing and cleanup.
 7. Spikes with written decisions: physics in Luau Execution, asset fetch
    path (5.5), in-engine runner (Jest-Lua vs TestEZ).
-8. `DEFINITION_OF_DONE.md`, `RELEASE_CHECKLIST.md`, `docs/design/feel.md`,
-   first skills.
+8. `GLOSSARY.md` (from section 2.4) with the content schema derived from
+   it; `DEFINITION_OF_DONE.md`, `RELEASE_CHECKLIST.md`,
+   `docs/design/feel.md`, first skills.
 
 ### Phase 1 — Public release candidate (target: 5–6 weeks)
 
