@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Tier 0 static checks: StyLua formatting, Selene lint, luau-lsp type checking.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+mkdir -p build
+
+# Roblox API type definitions, matched to the installed luau-lsp version.
+version="$(luau-lsp --version)"
+defs="build/globalTypes-$version.d.luau"
+if [ ! -f "$defs" ]; then
+	curl -fsSL -o "$defs.tmp" "https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/$version/scripts/globalTypes.d.luau"
+	mv "$defs.tmp" "$defs"
+fi
+
+echo "== StyLua"
+stylua --check src tests
+
+echo "== Selene"
+selene src tests
+
+echo "== luau-lsp: src (Roblox)"
+rojo sourcemap default.project.json -o build/sourcemap.json
+luau-lsp analyze --platform=roblox --sourcemap=build/sourcemap.json --definitions=@roblox="$defs" src
+
+echo "== luau-lsp: tests (Lune)"
+lune setup >/dev/null # writes the @lune type definitions that .luaurc points at
+luau-lsp analyze --platform=standard tests

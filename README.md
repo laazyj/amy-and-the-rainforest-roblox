@@ -68,6 +68,8 @@ and press **E** to talk; click / **E** / **Space** to advance dialogue.
 | `src/StarterPlayer/StarterPlayerScripts/StoryClient.client.lua` | Dialogue box, objective tracker, chapter cards |
 | `default.project.json` | [Rojo](https://rojo.space) project: the only build path |
 | `tools/build.sh` | Builds `build/AmyAndTheRainforest.rbxl` with Rojo |
+| `tools/check.sh`, `tools/test.sh` | Static checks (StyLua, Selene, luau-lsp) and unit tests |
+| `tests/lune/` | Unit tests, run under [Lune](https://lune-org.github.io/docs) |
 
 ## Editing the story
 
@@ -81,8 +83,9 @@ quest types, so chapters are just data:
 ```
 
 Change any `text = "..."` line to rewrite dialogue. Add or remove quests
-and chapters freely. After editing, rebuild the place file with
-`tools/build.sh` (or let `rojo serve` sync it into Studio).
+and chapters freely. After editing, run `tools/test.sh` to check the
+story data, then rebuild the place file with `tools/build.sh` (or let
+`rojo serve` sync it into Studio).
 
 ## First-draft limitations (known, deliberate)
 
