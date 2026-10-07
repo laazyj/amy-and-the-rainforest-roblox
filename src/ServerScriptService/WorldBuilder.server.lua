@@ -447,7 +447,8 @@ local function makeWallTree(x, hasNest)
 		Name = "WallTrunkBark",
 		Shape = Enum.PartType.Cylinder,
 		Size = Vector3.new(height, TRUNK_DIAMETER * 0.55, TRUNK_DIAMETER * 0.55),
-		CFrame = CFrame.new(x, Map.GroundY + height / 2, wallZ - TRUNK_DIAMETER * 0.28) * CFrame.Angles(0, 0, math.rad(90)),
+		CFrame = CFrame.new(x, Map.GroundY + height / 2, wallZ - TRUNK_DIAMETER * 0.28)
+			* CFrame.Angles(0, 0, math.rad(90)),
 		Color = BARK,
 		Material = Enum.Material.Wood,
 		CanCollide = false,
@@ -458,7 +459,11 @@ local function makeWallTree(x, hasNest)
 			Name = "TrunkKnot",
 			Shape = Enum.PartType.Ball,
 			Size = Vector3.new(2.6, 3.4, 1.5),
-			CFrame = CFrame.new(x + rng:NextNumber(-3, 3), Map.GroundY + rng:NextNumber(10, 24), wallZ - TRUNK_DIAMETER * 0.52),
+			CFrame = CFrame.new(
+				x + rng:NextNumber(-3, 3),
+				Map.GroundY + rng:NextNumber(10, 24),
+				wallZ - TRUNK_DIAMETER * 0.52
+			),
 			Color = Color3.fromRGB(92, 62, 38),
 			Material = Enum.Material.Wood,
 			CanCollide = false,

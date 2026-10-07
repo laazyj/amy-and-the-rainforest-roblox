@@ -215,9 +215,11 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if not dialogueActive then
 		return
 	end
-	if input.KeyCode == Enum.KeyCode.E
+	if
+		input.KeyCode == Enum.KeyCode.E
 		or input.KeyCode == Enum.KeyCode.Space
-		or input.KeyCode == Enum.KeyCode.Return then
+		or input.KeyCode == Enum.KeyCode.Return
+	then
 		requestAdvance()
 	end
 end)
