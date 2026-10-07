@@ -1,0 +1,7 @@
+std = "roblox"
+
+[lints]
+# Style-only suggestion (UDim2.new -> UDim2.fromScale / fromOffset) that fires
+# 14 times in the existing UI code. Allowed rather than rewritten so the
+# toolchain change leaves game code untouched; revisit in Checkpoint B.
+roblox_manual_fromscale_or_fromoffset = "allow"

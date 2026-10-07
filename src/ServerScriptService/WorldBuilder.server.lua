@@ -1,3 +1,8 @@
+--!nonstrict
+-- Legacy untyped code from the proof of concept. The project default is strict
+-- (.luaurc); this file opts out until the Checkpoint B restructure gives it
+-- types. Under strict mode luau-lsp reports only type-inference errors here,
+-- no real bugs; non-strict mode reports nothing.
 --[[
 	WorldBuilder
 	============
