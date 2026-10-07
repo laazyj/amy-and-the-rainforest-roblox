@@ -41,8 +41,9 @@ documented at the top of `tests/lune/runner.luau`.
   interface. Single player is an invariant (Max Players = 1).
 - **One ubiquitous language.** Use the nouns and verbs of plan section 2.4
   in code, tests, briefs and PR text. One name per concept, no synonyms
-  (`Character`, not NPC; `Zone`, not trigger; `Beat`, not cutscene). Ids read like the language (`chapter3.meet_fox`,
-  `zone:ForestGap`). A new term enters `docs/GLOSSARY.md` in the same PR.
+  (`Character`, not NPC; `Zone`, not trigger; `Beat`, not cutscene). Ids
+  read like the language (`chapter3.meet_fox`, `zone:ForestGap`). A new
+  term enters `docs/GLOSSARY.md` in the same PR.
 - Canon Lines are Clara's exact words, spelling included, and are never
   changed.
 
