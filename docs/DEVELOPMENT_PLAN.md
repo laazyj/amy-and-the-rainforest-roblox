@@ -246,7 +246,7 @@ Scene (look + sound)                     Player
 | **Scene** | A region of the world with its own look and sound: terrain, Props, Spots, Zones, ambience, music. | implicit in `WorldBuilder` | Garden, Village, Field, Forest Wall, Paradise, Heart Glade |
 | **Spot** | A named position and facing inside a Scene. Content never holds raw coordinates; it names Spots. | `position`, `faceZ`, `spawnPoints` | `spot:GardenGateInside` |
 | **Zone** | A named invisible volume the player can enter. Entering one is a Player event. | `zone` | `zone:ForestGap` |
-| **Prop** | A placed object with named states. | the house, the machine | `prop:Machine` states `parked`, `advancing`, `stopped` |
+| **Prop** | A placed object with named states. | the house, the machine | `prop:Machine` states `absent`, `advancing`, `stopped`, `retreating` |
 | **Character** | A named being in the world with a Kind (human, dog, squirrel, fox, lion), a display name and a home Spot. Amy is the **Player Character**. | `NPCs` | `character:Sam` "Sam the Dog" |
 | **Companion** | A Character that can follow Amy, help her, and whose **Bond** with her grows. | Sam (partly) | Sam, later Squirrel, Fox, Lion |
 | **Bond** | A Companion's relationship level with Amy: `stranger` → `curious` → `friend` → `companion`. Persisted. | none | Fox at `friend` |
