@@ -23,9 +23,13 @@ local ROBLOX_GLOBALS = {
 
 local bootstrap = {}
 
--- `path` is relative to the repository root.
+-- Paths are relative to the repository root.
+function bootstrap.readSource(path: string): string
+	return fs.readFile(`{REPO_ROOT}/{path}`)
+end
+
 function bootstrap.loadSource(path: string): any
-	local chunk = luau.load(fs.readFile(`{REPO_ROOT}/{path}`), {
+	local chunk = luau.load(bootstrap.readSource(path), {
 		debugName = path,
 		environment = ROBLOX_GLOBALS,
 	})

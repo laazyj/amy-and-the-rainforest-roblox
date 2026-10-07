@@ -5,12 +5,13 @@
 	contains some text with `tools/test.sh <text>`.
 
 	Discovers every tests/lune/**/*.spec.luau, runs it, prints one line per
-	test and exits non-zero if any test fails (or if no tests are found).
+	test and exits non-zero if any test fails, if no tests are found, or
+	(without a filter) if a spec registers no tests.
 	No dependencies.
 
 	A spec module returns a function that receives the test API:
 
-		return function(t)
+		return function(t: any) -- untyped: specs cannot require the runner
 			t.describe("chapter1", function()
 				t.it("has quests", function()
 					t.expect(#chapter.quests > 0).toBe(true)
@@ -113,7 +114,7 @@ local function expect(actual: any)
 				check(typeof(actual) == typeName, `to be a {typeName}`)
 			end,
 			toThrow = function()
-				check(not pcall(actual), "to throw")
+				check(type(actual) == "function" and not pcall(actual), "to be a function that throws")
 			end,
 		}
 	end
@@ -172,6 +173,11 @@ for _, specPath in specs do
 		failed += 1
 		print(`  ✗ failed to load: {testsOrError}`)
 		continue
+	end
+	-- Without a filter, an empty spec means its data loops found nothing to test.
+	if not filter and #testsOrError == 0 then
+		failed += 1
+		print("  ✗ no tests registered")
 	end
 	for _, test in testsOrError do
 		local testOk, message = pcall(test.fn)

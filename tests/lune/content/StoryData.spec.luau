@@ -33,7 +33,7 @@ for _, chapter in StoryData.Chapters do
 	end
 end
 
-return function(t)
+return function(t: any)
 	local describe, it, expect = t.describe, t.it, t.expect
 
 	local function expectUnique(list: { any }, key: string)
@@ -93,10 +93,20 @@ return function(t)
 		it("gives every ending line a speaker and text", function()
 			expectLines(StoryData.Ending.lines)
 		end)
+
+		it("gives the ending card a title and subtitle", function()
+			expect(isNonEmptyString(StoryData.Ending.title)).toBe(true)
+			expect(isNonEmptyString(StoryData.Ending.subtitle)).toBe(true)
+		end)
 	end)
 
 	for _, chapter in StoryData.Chapters do
 		describe(chapter.id, function()
+			it("has a card title and subtitle", function()
+				expect(isNonEmptyString(chapter.title)).toBe(true)
+				expect(isNonEmptyString(chapter.subtitle)).toBe(true)
+			end)
+
 			it("has at least one quest", function()
 				expect(chapter.quests).toBeA("table")
 				expect(#chapter.quests > 0).toBe(true)
