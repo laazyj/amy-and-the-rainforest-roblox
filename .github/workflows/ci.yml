@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Cache tool downloads
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.rokit
@@ -59,7 +59,7 @@ jobs:
         run: tools/build.sh
 
       - name: Upload place file
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: place
           path: build/AmyAndTheRainforest.rbxl

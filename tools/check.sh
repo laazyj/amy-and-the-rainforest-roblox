@@ -23,5 +23,10 @@ rojo sourcemap default.project.json -o build/sourcemap.json
 luau-lsp analyze --platform=roblox --sourcemap=build/sourcemap.json --definitions=@roblox="$defs" src
 
 echo "== luau-lsp: tests (Lune)"
+lune_version="$(lune --version | cut -d' ' -f2)"
+if ! grep -q "typedefs/$lune_version/" .luaurc; then
+	echo "error: the @lune alias in .luaurc must point at the typedefs of lune $lune_version" >&2
+	exit 1
+fi
 lune setup >/dev/null # writes the @lune type definitions that .luaurc points at
 luau-lsp analyze --platform=standard tests
