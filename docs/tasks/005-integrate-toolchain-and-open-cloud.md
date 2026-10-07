@@ -41,7 +41,12 @@ matches what was built.
    becomes `RELEASE_JOB=1`, and section 4 states the DataStore guarantee
    as PR #9's docs now state it. Add the tool commands to `CLAUDE.md`'s
    command table.
-7. **Brief 004 prerequisite.** Add to `docs/OPEN_CLOUD.md` that deleting
+7. **MemoryStore in the lint.** `checkDataStoreUse` flags DataStore call
+   forms but not `GetQueue` / `GetSortedMap` / `GetHashMap`; the runtime
+   proxy in the prelude already guards them. Extend the lint to the same
+   three methods so a script that would be refused at run time is refused
+   before submission, and add the unit tests.
+8. **Brief 004 prerequisite.** Add to `docs/OPEN_CLOUD.md` that deleting
    `test-<RUN_ID>-*` keys after an engine run needs a DataStore permission
    on the Dev key, so the owner adds it before brief 004.
 
