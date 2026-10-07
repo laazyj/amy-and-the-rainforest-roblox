@@ -39,13 +39,21 @@ release with Dev/Release channels, an automated test harness and
 agent-driven feature development is in
 [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md).
 
-## How to play it (easiest way)
+## How to play it
 
 1. Install [Roblox Studio](https://create.roblox.com/) (free).
-2. Download **`AmyAndTheRainforest.rbxlx`** from this repo.
+2. Download the place file: open the latest successful
+   [CI run](https://github.com/laazyj/amy-and-the-rainforest-roblox/actions/workflows/ci.yml)
+   on `main` (or the latest release) and download the **`place`** artifact.
+   Unzip it to get `AmyAndTheRainforest.rbxl`.
 3. In Roblox Studio: **File → Open from File…** and pick it.
 4. Press **Play** (F5). The whole world is built by script when the
    game starts — no assets to install.
+
+Or build it yourself from source with [Rojo](https://rojo.space): install
+[Rokit](https://github.com/rojo-rbx/rokit), run `rokit install`, then
+`tools/build.sh`, which writes `build/AmyAndTheRainforest.rbxl`. To edit
+live, run `rojo serve` and connect from the Rojo plugin in Studio.
 
 Controls: normal Roblox movement (WASD + Space). Walk up to characters
 and press **E** to talk; click / **E** / **Space** to advance dialogue.
@@ -54,13 +62,12 @@ and press **E** to talk; click / **E** / **Space** to advance dialogue.
 
 | Path | What it is |
 |---|---|
-| `AmyAndTheRainforest.rbxlx` | Ready-to-open Roblox place file (generated) |
 | `src/ReplicatedStorage/StoryData.lua` | **The story**: chapters, quests, dialogue, positions |
 | `src/ServerScriptService/WorldBuilder.server.lua` | Builds the map: village, field, forest wall, paradise |
 | `src/ServerScriptService/StoryServer.server.lua` | Quest engine: characters, prompts, zones, Sam, the machine |
 | `src/StarterPlayer/StarterPlayerScripts/StoryClient.client.lua` | Dialogue box, objective tracker, chapter cards |
-| `tools/build_rbxlx.py` | Regenerates the `.rbxlx` from `src/` |
-| `default.project.json` | [Rojo](https://rojo.space) project, if you prefer syncing |
+| `default.project.json` | [Rojo](https://rojo.space) project: the only build path |
+| `tools/build.sh` | Builds `build/AmyAndTheRainforest.rbxl` with Rojo |
 
 ## Editing the story
 
@@ -74,12 +81,8 @@ quest types, so chapters are just data:
 ```
 
 Change any `text = "..."` line to rewrite dialogue. Add or remove quests
-and chapters freely. After editing, either paste the new module source
-into the ModuleScript in Studio, or rebuild the place file:
-
-```sh
-python3 tools/build_rbxlx.py
-```
+and chapters freely. After editing, rebuild the place file with
+`tools/build.sh` (or let `rojo serve` sync it into Studio).
 
 ## First-draft limitations (known, deliberate)
 
