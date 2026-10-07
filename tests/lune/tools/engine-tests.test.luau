@@ -278,19 +278,52 @@ H.test("dry run makes no request and prints the request it would make", function
 	H.notContains(m:stderr(), H.KEY, "dry run output")
 end)
 
-H.test("rejects scripts that open an unprefixed DataStore", function()
-	local cases = {
-		'DataStoreService:GetDataStore("PlayerSaves")',
-		'DataStoreService:GetOrderedDataStore( "Scores" )',
-		"DataStoreService:GetGlobalDataStore()",
-	}
-	for _, source in cases do
-		local ok, err = pcall(EngineTests.checkDataStoreUse, "t.luau", source)
-		H.eq(ok, false, source)
-		H.contains(tostring(err), "t.luau")
-	end
-	EngineTests.checkDataStoreUse("t.luau", 'DataStoreService:GetDataStore( storeName("PlayerSaves") )')
-	EngineTests.checkDataStoreUse("t.luau", 'DataStoreService:GetOrderedDataStore(storeName("Scores"), "scope")')
+print("run-engine-tests: DataStore lint")
+
+local function lint(source: string): string?
+	local ok, err = pcall(EngineTests.checkDataStoreUse, "t.luau", source)
+	return if ok then nil else tostring(err)
+end
+
+local LINT_REFUSES = {
+	["a plain name"] = 'D:GetDataStore("PlayerData")',
+	["string-call syntax"] = 'D:GetDataStore"PlayerData"',
+	["single-quoted string-call syntax"] = "D:GetDataStore'PlayerData'",
+	["long-string call syntax"] = "D:GetDataStore[[PlayerData]]",
+	["table-call syntax"] = "D:GetDataStore{}",
+	["indexing by name"] = 'D["GetDataStore"](D, "PlayerData")',
+	["indexing by a long-string name"] = "D[ [[GetOrderedDataStore]] ](D, 'x')",
+	["the method taken as a value"] = 'local f = D.GetDataStore; f(D, "PlayerData")',
+	["an expression around storeName"] = 'D:GetDataStore(storeName("x") and "PlayerData")',
+	["GetGlobalDataStore"] = "D:GetGlobalDataStore()",
+	["a call inside an interpolated string"] = '`{D:GetDataStore("PlayerData")}`',
+	["GetOrderedDataStore with a plain name"] = 'D:GetOrderedDataStore( "Scores" )',
+}
+for label, source in LINT_REFUSES do
+	H.test(`refuses {label}`, function()
+		H.contains(lint(source) or "", "t.luau:1:", "error")
+	end)
+end
+
+local LINT_ALLOWS = {
+	["a line comment"] = '-- never call GetGlobalDataStore or D:GetDataStore("x") here',
+	["a block comment"] = '--[==[ D:GetDataStore("x") ]==]',
+	["a string mentioning a call"] = 'local s = "GetDataStore(x)"',
+	["a string mentioning GetGlobalDataStore"] = 'print("use GetGlobalDataStore")',
+	["a storeName call"] = 'D:GetDataStore( storeName("PlayerData") )',
+	["a storeName call with a scope"] = 'D:GetOrderedDataStore(storeName("Scores"), "scope")',
+	["a storeName call with an interpolated base"] = "D:GetDataStore(storeName(`run-{i}`))",
+	["a longer identifier"] = "local MyGetDataStoreHelper = 1",
+}
+for label, source in LINT_ALLOWS do
+	H.test(`allows {label}`, function()
+		H.eq(lint(source), nil, "error")
+	end)
+end
+
+H.test("reports the source line, counting lines inside comments and strings", function()
+	local source = '--[[ one\ntwo ]]\nlocal s = [[a\nb]]\nD:GetDataStore("x")'
+	H.contains(lint(source) or "", "t.luau:5:", "error")
 end)
 
 H.test("refuses to submit a script that opens an unprefixed DataStore", function()
@@ -298,8 +331,86 @@ H.test("refuses to submit a script that opens an unprefixed DataStore", function
 		behaviours = { ["a.luau"] = { logs = PASSING } },
 		files = { ["engine/a.luau"] = 'game:GetService("DataStoreService"):GetDataStore("Saves")' },
 	})
-	H.contains(err or "", "must name its store with storeName")
+	H.contains(err or "", "engine/a.luau:1: GetDataStore must be called as :GetDataStore(storeName(...), ...)")
 	H.eq(#m.calls, 0, "requests")
+end)
+
+print("run-engine-tests: pool and transport")
+
+H.test("a worker that raises counts as failed and the pool still finishes", function()
+	local reported = {}
+	local results = EngineTests.runPool({ "a", "b", "c" }, 2, function(item: string): boolean
+		if item == "b" then
+			error("worker blew up")
+		end
+		return true
+	end, function(item: string, err: string)
+		table.insert(reported, `{item}: {err}`)
+	end, os.clock, math.huge)
+	H.eq(results[1], true, "a")
+	H.eq(results[2], false, "b")
+	H.eq(results[3], true, "c")
+	H.eq(#reported, 1, "errors reported")
+	H.contains(reported[1], "worker blew up")
+end)
+
+H.test("gives up when the run passes its wall-clock deadline", function()
+	local now = 0
+	local ok, err = pcall(EngineTests.runPool, { "hangs" }, 1, function(): boolean
+		coroutine.yield() -- a request that never returns
+		return true
+	end, function() end, function()
+		now += 100
+		return now
+	end, 1000)
+	H.eq(ok, false, "raised")
+	H.contains(tostring(err), "run deadline")
+end)
+
+H.test("retries a 5xx on GET once", function()
+	local failedOnce = false
+	local err = run({
+		behaviours = { ["a.luau"] = { polls = 2, logs = PASSING } },
+		intercept = function(request)
+			if request.method == "GET" and not failedOnce then
+				failedOnce = true
+				return H.response(503, "unavailable")
+			end
+			return nil
+		end,
+	})
+	H.eq(failedOnce, true, "a 503 was returned")
+	H.eq(err, nil, "error")
+end)
+
+H.test("never retries a 5xx when creating a task", function()
+	local err, m = run({
+		behaviours = { ["a.luau"] = { logs = PASSING } },
+		intercept = function(request)
+			return if request.method == "POST" then H.response(500, "oops") else nil
+		end,
+	})
+	H.contains(err or "", "1 engine test script(s) failed")
+	H.contains(m:stdout(), "HTTP 500")
+	H.eq(#m.calls, 1, "requests")
+end)
+
+H.test("URL-encodes the logs page token", function()
+	local urls = {}
+	local err = run({
+		behaviours = { ["a.luau"] = { logs = PASSING } },
+		intercept = function(request)
+			if string.find(request.url, "/logs?", 1, true) then
+				table.insert(urls, request.url)
+				if #urls == 1 then
+					return H.response(200, '{"luauExecutionSessionTaskLogs":[{"messages":[]}],"nextPageToken":"a+b/c="}')
+				end
+			end
+			return nil
+		end,
+	})
+	H.eq(err, nil, "error")
+	H.contains(urls[2] or "", "pageToken=a%2Bb%2Fc%3D", "second page url")
 end)
 
 return nil

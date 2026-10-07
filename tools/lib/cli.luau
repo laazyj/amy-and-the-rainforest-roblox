@@ -9,6 +9,7 @@ export type Context = {
 	env: { [string]: string? },
 	http: OpenCloud.Http,
 	sleep: OpenCloud.Sleep,
+	clock: () -> number, -- wall-clock seconds
 	out: (string) -> (), -- stdout: results
 	log: (string) -> (), -- stderr: progress, warnings, dry-run output
 	readFile: (path: string) -> string?,
@@ -76,26 +77,39 @@ function Cli.numericId(values: { [string]: string }, name: string): string
 	return normaliseId(Cli.required(values, name)) or error(`--{name} must be a numeric id`, 0)
 end
 
+-- Reads a Release id from the environment: nil when unset or empty (GitHub
+-- passes a missing variable as ""), an error when set but not numeric.
+local function releaseIdFromEnv(ctx: Context, name: string): string?
+	local raw = ctx.env[name]
+	if raw == nil or raw == "" then
+		return nil
+	end
+	return normaliseId(raw) or error(`{name} is set but is not a numeric id; refusing to run`, 0)
+end
+
 -- The Release refusal. Nothing except the release job may target the Release
--- universe, and outside --dry-run the guard must be armed (RELEASE_UNIVERSE_ID
--- set) so a misconfigured job cannot disable it by omission.
-local function assertNotRelease(ctx: Context, universeId: string, dryRun: boolean)
-	local raw = ctx.env.RELEASE_UNIVERSE_ID
-	if raw == "" then
-		raw = nil
-	end
-	local releaseId = if raw then normaliseId(raw) else nil
-	if raw and not releaseId then
-		error("RELEASE_UNIVERSE_ID is set but is not a numeric id; refusing to run", 0)
-	end
-	if not releaseId then
+-- universe or place, and outside --dry-run the guard must be armed
+-- (RELEASE_UNIVERSE_ID set) so a misconfigured job cannot disable it by
+-- omission. RELEASE_PLACE_ID is checked too when it is set.
+local function assertNotRelease(ctx: Context, universeId: string, placeId: string, dryRun: boolean)
+	local releaseUniverse = releaseIdFromEnv(ctx, "RELEASE_UNIVERSE_ID")
+	local releasePlace = releaseIdFromEnv(ctx, "RELEASE_PLACE_ID")
+	if not releaseUniverse then
 		if not dryRun then
 			error("RELEASE_UNIVERSE_ID is not set; refusing to run without the Release guard armed", 0)
 		end
 		ctx.log("warning: RELEASE_UNIVERSE_ID is not set; the Release guard is not armed")
-	elseif universeId == releaseId and ctx.env.RELEASE_JOB ~= "1" then
+	end
+	if ctx.env.RELEASE_JOB == "1" then
+		return
+	end
+	local target = if universeId == releaseUniverse
+		then `universe ({universeId})`
+		elseif placeId == releasePlace then `place ({placeId})`
+		else nil
+	if target then
 		error(
-			`refusing to target the Release universe ({universeId}): only the release job may do that (it sets RELEASE_JOB=1)`,
+			`refusing to target the Release {target}: only the release job may do that (it sets RELEASE_JOB=1)`,
 			0
 		)
 	end
@@ -112,7 +126,7 @@ function Cli.target(ctx: Context, usage: string, ownOptions: { string }): Target
 	local universeId = Cli.numericId(values, "universe")
 	local placeId = Cli.numericId(values, "place")
 
-	assertNotRelease(ctx, universeId, dryRun)
+	assertNotRelease(ctx, universeId, placeId, dryRun)
 
 	local keyEnv = values["key-env"] or "ROBLOX_DEV_API_KEY"
 	local apiKey = ctx.env[keyEnv]
@@ -139,6 +153,7 @@ function Cli.liveContext(): Context
 		sleep = function(seconds)
 			task.wait(seconds)
 		end,
+		clock = os.time,
 		out = function(line)
 			stdio.write(line .. "\n")
 		end,

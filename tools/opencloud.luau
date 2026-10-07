@@ -43,7 +43,7 @@ local OpenCloud = {}
 
 OpenCloud.BASE_URL = "https://apis.roblox.com"
 OpenCloud.API_KEY_HEADER = "x-api-key"
--- Seconds to wait before the single retry of a transport error or 5xx.
+-- Seconds to wait before the single retry (see `send`).
 OpenCloud.RETRY_DELAY = 2
 
 -- Longest a Luau Execution task may run, and the server default.
@@ -58,6 +58,13 @@ OpenCloud.TERMINAL_STATES = table.freeze({
 
 local function cloudV2(path: string): string
 	return `{OpenCloud.BASE_URL}/cloud/v2/{path}`
+end
+
+-- Percent-encodes everything but RFC 3986 unreserved characters.
+local function urlEncode(value: string): string
+	return (string.gsub(value, "[^%w%-%._~]", function(char)
+		return string.format("%%%02X", string.byte(char))
+	end))
 end
 
 local function headers(apiKey: string, contentType: string): { [string]: string }
@@ -135,7 +142,7 @@ end
 function OpenCloud.listLogsRequest(apiKey: string, taskPath: string, pageToken: string?): Request
 	local url = cloudV2(`{taskPath}/logs?maxPageSize=10000`)
 	if pageToken then
-		url ..= `&pageToken={pageToken}`
+		url ..= `&pageToken={urlEncode(pageToken)}`
 	end
 	return { method = "GET", url = url, headers = headers(apiKey, "application/json") }
 end
@@ -180,15 +187,17 @@ function OpenCloud.describeTaskPolling(): string
 	return `then GET {cloudV2(path)} until state is one of {table.concat(states, ", ")}, then GET {cloudV2(path .. "/logs")}`
 end
 
--- Sends a request with the retry policy from the plan: a transport error or a
--- 5xx is retried once; a 4xx never is. Returns the response, or raises.
+-- Sends a request with the retry policy from the plan: a transport error is
+-- retried once; a 4xx never is. A 5xx is retried once only for GET, because a
+-- POST that failed with a 5xx may still have been accepted (a second publish
+-- or a duplicate task). Returns the response, or raises.
 function OpenCloud.send(http: Http, sleep: Sleep, request: Request): Response
 	local lastError = ""
 	for attempt = 1, 2 do
 		local ok, result = pcall(http, request)
 		if ok then
 			local response = result :: Response
-			if response.statusCode < 500 then
+			if response.statusCode < 500 or request.method ~= "GET" then
 				return response
 			end
 			lastError = `HTTP {response.statusCode}: {response.body}`

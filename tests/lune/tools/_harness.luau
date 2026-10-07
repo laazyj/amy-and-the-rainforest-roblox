@@ -98,6 +98,7 @@ function H.mock(options: {
 	files: { [string]: string }?,
 	handler: ((OpenCloud.Request) -> OpenCloud.Response)?,
 	sleep: OpenCloud.Sleep?,
+	clock: (() -> number)?,
 }): Mock
 	local files = options.files or {}
 	local mock = setmetatable({ calls = {}, out = {}, log = {} }, Mock) :: any
@@ -110,6 +111,9 @@ function H.mock(options: {
 			return options.handler(request)
 		end,
 		sleep = options.sleep or function() end,
+		clock = options.clock or function()
+			return 0
+		end,
 		out = function(line)
 			table.insert(mock.out, line)
 		end,

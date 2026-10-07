@@ -38,16 +38,100 @@ function EngineTests.resolveRunId(explicit: string?, env: { [string]: string? })
 	return runId
 end
 
--- Engine tests touch live DataStores, so every store they open must go through
--- storeName(), which prefixes it with the run id. This is a lint, not a sandbox.
-function EngineTests.checkDataStoreUse(name: string, source: string)
-	if string.find(source, "GetGlobalDataStore", 1, true) then
-		error(`{name}: GetGlobalDataStore is not allowed in engine tests; use GetDataStore(storeName(...))`, 0)
-	end
-	for method, rest in string.gmatch(source, "(Get%a*DataStore)%s*(%b())") do
-		if not string.match(rest, "^%(%s*storeName%(") then
-			error(`{name}: {method}{rest} must name its store with storeName(...)`, 0)
+-- Replaces comments with spaces and string literals with "", so the lint
+-- below sees only code. A string that is exactly a DataStore method name is
+-- kept, so indexing by name (D["GetDataStore"]) stays visible. Interpolated
+-- strings keep their {expressions}, which are code.
+-- Store-opening methods on DataStoreService. MemoryStore methods are guarded
+-- at run time only, by the prelude's `game` proxy.
+local DATASTORE_METHOD = "Get%a*DataStore"
+
+local function blankLines(text: string): string
+	local _, count = string.gsub(text, "\n", "")
+	return string.rep("\n", count)
+end
+
+local function stripCommentsAndStrings(source: string): string
+	local out = {}
+	local i = 1
+	local function longBracketEnd(at: number): number?
+		local equals = string.match(source, "^%[(=*)%[", at)
+		if not equals then
+			return nil
 		end
+		local _, close = string.find(source, `]{equals}]`, at, true)
+		return close or #source
+	end
+	local function keepOrBlank(content: string)
+		local kept = if string.match(content, `^{DATASTORE_METHOD}$`) then `"{content}"` else '""'
+		table.insert(out, kept .. blankLines(content))
+	end
+	while i <= #source do
+		local char = string.sub(source, i, i)
+		local bracketClose = if char == "[" then longBracketEnd(i) else nil
+		if string.sub(source, i, i + 1) == "--" then
+			local close = longBracketEnd(i + 2)
+			local after = if close then close + 1 else (string.find(source, "\n", i, true) or #source + 1)
+			-- Keep the comment's newlines, so line numbers still match.
+			table.insert(out, " " .. blankLines(string.sub(source, i, after - 1)))
+			i = after
+		elseif bracketClose then
+			keepOrBlank(string.match(string.sub(source, i, bracketClose), "^%[=*%[(.-)%]=*%]$") or "")
+			i = bracketClose + 1
+		elseif char == '"' or char == "'" or char == "`" then
+			local content = {}
+			local j = i + 1
+			while j <= #source do
+				local c = string.sub(source, j, j)
+				if c == "\\" then
+					j += 2
+				elseif c == char or (c == "\n" and char ~= "`") then
+					break
+				elseif char == "`" and c == "{" then
+					local _, close = string.find(source, "^%b{}", j)
+					close = close or #source
+					table.insert(out, " " .. string.sub(source, j + 1, close - 1) .. " ")
+					j = close + 1
+				else
+					table.insert(content, c)
+					j += 1
+				end
+			end
+			keepOrBlank(table.concat(content))
+			i = if string.sub(source, j, j) == char then j + 1 else j
+		else
+			table.insert(out, char)
+			i += 1
+		end
+	end
+	return table.concat(out)
+end
+
+-- Engine tests touch live DataStores, so every store a script opens must be
+-- named by storeName(), which prefixes it with the run id. Every mention of a
+-- DataStore method must be a call of the form :GetDataStore(storeName(...), ...);
+-- anything else (indexing by name, taking the method as a value, string or
+-- table call syntax, an expression around storeName) is refused, and
+-- GetGlobalDataStore always is. The prelude's `game` proxy is the runtime
+-- check behind this lint (see docs/OPEN_CLOUD.md for what neither covers).
+function EngineTests.checkDataStoreUse(name: string, source: string)
+	local code = stripCommentsAndStrings(source)
+	local at = 1
+	while true do
+		local first, last, method = string.find(code, `%f[%w_]({DATASTORE_METHOD})%f[^%w_]`, at)
+		if not first then
+			return
+		end
+		local where = `{name}:{#blankLines(string.sub(code, 1, first)) + 1}`
+		if method == "GetGlobalDataStore" then
+			error(`{where}: GetGlobalDataStore is not allowed in engine tests; use GetDataStore(storeName(...))`, 0)
+		end
+		local called = string.match(string.sub(code, 1, first - 1), ":%s*$")
+			and string.match(code, "^%s*%(%s*storeName%s*%b()%s*[,%)]", last + 1)
+		if not called then
+			error(`{where}: {method} must be called as :{method}(storeName(...), ...)`, 0)
+		end
+		at = last + 1
 	end
 end
 
@@ -119,10 +203,27 @@ local function runOne(ctx: Cli.Context, target: Cli.Target, createRequest: OpenC
 	return taskResource, logs
 end
 
--- Runs `worker` over `items` with at most `limit` running at once.
-local function runPool<T, R>(items: { T }, limit: number, worker: (T) -> R): { R }
+-- Wall-clock seconds the whole run may take: each wave of CONCURRENCY scripts
+-- gets its timeout plus the queue allowance, and a minute of slack. Guards
+-- against a request that never returns (net.request has no timeout).
+function EngineTests.runBudget(scripts: number, timeout: number): number
+	local waves = math.ceil(scripts / EngineTests.CONCURRENCY)
+	return waves * (timeout + EngineTests.QUEUE_ALLOWANCE) + 60
+end
+
+-- Runs `worker` over `items` with at most `limit` running at once and returns
+-- each verdict. A worker that raises counts as failed and is reported through
+-- `onError`. Raises if the run is still going when `clock()` passes `deadline`.
+function EngineTests.runPool<T>(
+	items: { T },
+	limit: number,
+	worker: (T) -> boolean,
+	onError: (T, string) -> (),
+	clock: () -> number,
+	deadline: number
+): { boolean }
 	local task = require("@lune/task")
-	local results: { R } = {}
+	local results: { boolean } = table.create(#items, false)
 	local nextIndex = 1
 	local finished = 0
 	local workers = math.min(limit, #items)
@@ -131,13 +232,20 @@ local function runPool<T, R>(items: { T }, limit: number, worker: (T) -> R): { R
 			while nextIndex <= #items do
 				local index = nextIndex
 				nextIndex += 1
-				results[index] = worker(items[index])
+				local ok, passed = pcall(worker, items[index])
+				if not ok then
+					pcall(onError, items[index], tostring(passed))
+				end
+				results[index] = ok and passed == true
 			end
 			finished += 1
 		end)
 	end
 	while finished < workers do
-		task.wait()
+		if clock() > deadline then
+			error(`engine tests still running after the run deadline; giving up`, 0)
+		end
+		task.wait(0.1)
 	end
 	return results
 end
@@ -201,8 +309,10 @@ function EngineTests.main(ctx: Cli.Context)
 		return
 	end
 
-	local results = runPool(scripts, EngineTests.CONCURRENCY, function(script: Script): boolean
-		local ok, taskResource, logs = pcall(runOne, ctx, target, createRequest(script), timeout)
+	local results = EngineTests.runPool(scripts, EngineTests.CONCURRENCY, function(script: Script): boolean
+		local ok, taskResource, logs = pcall(function()
+			return runOne(ctx, target, createRequest(script), timeout)
+		end)
 		local passed, reason = false, tostring(taskResource)
 		if ok then
 			passed, reason = EngineTests.verdict(taskResource, logs)
@@ -214,7 +324,9 @@ function EngineTests.main(ctx: Cli.Context)
 		end
 		ctx.out(if passed then `PASS {script.name}` else `FAIL {script.name}: {reason}`)
 		return passed
-	end)
+	end, function(script: Script, err: string)
+		ctx.out(`FAIL {script.name}: {err}`)
+	end, ctx.clock, ctx.clock() + EngineTests.runBudget(#scripts, timeout))
 
 	local failed = 0
 	for _, passed in results do

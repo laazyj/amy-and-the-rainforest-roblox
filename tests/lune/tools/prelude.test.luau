@@ -1,6 +1,7 @@
 --!strict
 -- Runs tests/engine/_prelude.luau under Lune, assembled by the same wrap()
--- tools/run-engine-tests uses, to prove finish() and storeName() behave before any engine time.
+-- tools/run-engine-tests uses, to prove finish(), storeName() and the `game`
+-- proxy behave before any engine time.
 local H = require("./_harness")
 local EngineTests = require("../../../tools/lib/engine-tests")
 local fs = require("@lune/fs")
@@ -8,19 +9,58 @@ local luau = require("@lune/luau")
 
 local PRELUDE = fs.readFile(EngineTests.DEFAULT_PRELUDE)
 
--- Runs `body` wrapped exactly as tools/run-engine-tests submits it; returns
--- the printed lines and any error.
-local function execute(body: string, runId: string?): ({ string }, string?)
-	local printed = {}
+-- A stand-in for the engine's `game`: services whose store methods record
+-- what they opened, and assert they were called on the real service rather
+-- than on the prelude's proxy.
+local STORE_METHODS =
+	{ "GetDataStore", "GetOrderedDataStore", "GetGlobalDataStore", "GetQueue", "GetSortedMap", "GetHashMap" }
+
+local function fakeGame(opened: { string }): any
+	local services = {}
+	for _, serviceName in { "DataStoreService", "MemoryStoreService", "Workspace" } do
+		local service = { Name = serviceName }
+		for _, method in STORE_METHODS do
+			service[method] = function(self, name)
+				assert(rawequal(self, service), `{method} was called on the proxy, not the real service`)
+				table.insert(opened, `{method}:{name}`)
+				return { Name = name }
+			end
+		end
+		services[serviceName] = service
+	end
+	local game
+	game = {
+		PlaceId = 7,
+		GetService = function(self, serviceName)
+			assert(rawequal(self, game), "GetService was called on the proxy, not the real game")
+			return services[serviceName]
+		end,
+		FindService = function(self, serviceName)
+			assert(rawequal(self, game), "FindService was called on the proxy, not the real game")
+			return services[serviceName]
+		end,
+	}
+	return game
+end
+
+-- Runs `body` wrapped exactly as tools/run-engine-tests submits it, against a
+-- fake `game`; returns the printed lines, any error, and the stores opened.
+local function execute(body: string, runId: string?): ({ string }, string?, { string })
+	local printed, opened = {}, {}
 	local env = setmetatable({
+		game = fakeGame(opened),
 		print = function(...)
-			table.insert(printed, table.concat({ ... }, " "))
+			local parts = table.pack(...)
+			for i = 1, parts.n do
+				parts[i] = tostring(parts[i])
+			end
+			table.insert(printed, table.concat(parts, " "))
 		end,
 	}, { __index = getfenv() })
 	local source = EngineTests.wrap(runId or "", PRELUDE, { name = "test.luau", source = body })
 	local chunk = luau.load(source, { debugName = "prelude", environment = env :: any })
 	local ok, err = pcall(chunk)
-	return printed, if ok then nil else tostring(err)
+	return printed, if ok then nil else tostring(err), opened
 end
 
 print("engine prelude")
@@ -70,8 +110,70 @@ H.test("storeName refuses names over the 50-character DataStore limit", function
 end)
 
 H.test("storeName refuses to run without RUN_ID", function()
-	local _, err = execute('storeName("Saves")')
+	local _, err = execute('storeName("Saves")', "")
 	H.contains(err or "", "RUN_ID is not set")
+end)
+
+print("engine prelude: game proxy")
+
+local DS = 'local D = game:GetService("DataStoreService")\n'
+local MS = 'local M = game:GetService("MemoryStoreService")\n'
+
+H.test("opens stores named by storeName, on the real service", function()
+	local _, err, opened = execute(
+		DS
+			.. MS
+			.. [[
+		D:GetDataStore(storeName("Saves"))
+		D:GetOrderedDataStore(storeName("Scores"), "scope")
+		M:GetQueue(storeName("Q"))
+		M:GetSortedMap(storeName("Map"))
+		M:GetHashMap(storeName("Hash"))
+	]],
+		"42-1"
+	)
+	H.eq(err, nil, "error")
+	H.eq(
+		table.concat(opened, ","),
+		"GetDataStore:test-42-1-Saves,GetOrderedDataStore:test-42-1-Scores,GetQueue:test-42-1-Q,"
+			.. "GetSortedMap:test-42-1-Map,GetHashMap:test-42-1-Hash",
+		"opened"
+	)
+end)
+
+-- Every way the lint can be dodged still reaches the proxy at run time.
+local REFUSED = {
+	["a plain name"] = DS .. 'D:GetDataStore("PlayerData")',
+	["string-call syntax"] = DS .. 'D:GetDataStore"PlayerData"',
+	["indexing by name"] = DS .. 'D["GetDataStore"](D, "PlayerData")',
+	["the method taken as a value"] = DS .. 'local f = D.GetDataStore; f(D, "PlayerData")',
+	["an expression around storeName"] = DS .. 'D:GetDataStore(storeName("x") and "PlayerData")',
+	["another run's prefix"] = DS .. 'D:GetDataStore("test-42-10-Saves")',
+	["a non-string name"] = DS .. "D:GetDataStore(nil)",
+	["GetOrderedDataStore"] = DS .. 'D:GetOrderedDataStore("Scores")',
+	["GetGlobalDataStore"] = DS .. "D:GetGlobalDataStore()",
+	["game.DataStoreService"] = 'game.DataStoreService:GetDataStore("PlayerData")',
+	["game:FindService"] = 'game:FindService("DataStoreService"):GetDataStore("PlayerData")',
+	["MemoryStore GetQueue"] = MS .. 'M:GetQueue("Q")',
+	["MemoryStore GetSortedMap"] = MS .. 'M:GetSortedMap("Map")',
+	["MemoryStore GetHashMap"] = MS .. 'M:GetHashMap("Hash")',
+	["a function handed the proxied service"] = DS .. [[
+		local function openSaves(service) return service:GetDataStore("PlayerData") end
+		openSaves(D)
+	]],
+}
+for label, body in REFUSED do
+	H.test(`refuses {label}`, function()
+		local _, err, opened = execute(body, "42-1")
+		H.contains(err or "", "engine tests", "error")
+		H.eq(#opened, 0, "stores opened")
+	end)
+end
+
+H.test("passes everything else through to the real game", function()
+	local printed, err = execute('print(game.PlaceId, game:GetService("Workspace").Name, tostring(game) ~= nil)', "42-1")
+	H.eq(err, nil, "error")
+	H.eq(printed[1], "7 Workspace true", "printed")
 end)
 
 return nil

@@ -36,6 +36,21 @@ H.test("allows the Release universe with RELEASE_JOB=1", function()
 	H.eq(result and result.universeId, H.RELEASE, "universe")
 end)
 
+H.test("refuses the Release place when RELEASE_PLACE_ID is set", function()
+	local _, err = target(H.DEV, H.env({ RELEASE_PLACE_ID = H.PLACE }))
+	H.contains(err or "", `refusing to target the Release place ({H.PLACE})`)
+end)
+
+H.test("allows the Release place with RELEASE_JOB=1", function()
+	local _, err = target(H.DEV, H.env({ RELEASE_PLACE_ID = H.PLACE, RELEASE_JOB = "1" }))
+	H.eq(err, nil, "error")
+end)
+
+H.test("refuses a non-numeric RELEASE_PLACE_ID", function()
+	local _, err = target(H.DEV, H.env({ RELEASE_PLACE_ID = "release" }))
+	H.contains(err or "", "RELEASE_PLACE_ID is set but is not a numeric id")
+end)
+
 H.test("refuses a real run when RELEASE_UNIVERSE_ID is unset", function()
 	local _, err = target(H.DEV, { ROBLOX_DEV_API_KEY = H.KEY })
 	H.contains(err or "", "RELEASE_UNIVERSE_ID is not set")

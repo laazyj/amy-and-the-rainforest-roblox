@@ -106,6 +106,17 @@ H.test("gives up after a second transport error", function()
 	H.eq(#m.calls, 2, "requests")
 end)
 
+H.test("never retries a 5xx, as the publish may have been accepted", function()
+	local m = mock({
+		args = args("Saved"),
+		handler = function()
+			return H.response(502, "Bad gateway")
+		end,
+	})
+	H.fails(m, Publish.main, "HTTP 502")
+	H.eq(#m.calls, 1, "requests")
+end)
+
 H.test("never retries a 4xx", function()
 	local m = mock({
 		args = args("Saved"),
