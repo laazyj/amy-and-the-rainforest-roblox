@@ -1,0 +1,81 @@
+# Tier 2: build the place, publish it to Dev as a Saved version (not visible
+# to players), then run tests/engine/ against that exact version through Open
+# Cloud Luau Execution. See docs/OPEN_CLOUD.md.
+#
+# Without ROBLOX_DEV_API_KEY (before setup, or on a PR from a fork, which
+# gets no secrets) the job skips cleanly with a notice instead of failing.
+#
+# The Rokit and Rojo steps duplicate ci.yml (brief 001); share them once both exist.
+name: Engine tests
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engine-tests-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # A job-level `if:` cannot read secrets, so a tiny job checks for the key.
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+    steps:
+      - id: gate
+        env:
+          HAS_KEY: ${{ secrets.ROBLOX_DEV_API_KEY != '' }}
+        run: |
+          if [ "$HAS_KEY" = "true" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=Engine tests skipped, no key::ROBLOX_DEV_API_KEY is not available to this run (not set up yet, or a PR from a fork). Nothing was published or run."
+            echo "Engine tests skipped, no key: ROBLOX_DEV_API_KEY is not available to this run (not set up yet, or a PR from a fork). Nothing was published or run." >> "$GITHUB_STEP_SUMMARY"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  engine-tests:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DEV_UNIVERSE_ID: ${{ vars.DEV_UNIVERSE_ID }}
+      DEV_PLACE_ID: ${{ vars.DEV_PLACE_ID }}
+      RELEASE_UNIVERSE_ID: ${{ vars.RELEASE_UNIVERSE_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rokit and the pinned tools
+        run: |
+          test -f rokit.toml || { echo "::error::rokit.toml is missing; brief 001 provides it."; exit 1; }
+          curl -sSf https://raw.githubusercontent.com/rojo-rbx/rokit/main/scripts/install.sh | bash
+          echo "$HOME/.rokit/bin" >> "$GITHUB_PATH"
+          "$HOME/.rokit/bin/rokit" install --no-trust-check
+        env:
+          GITHUB_PAT: ${{ github.token }}
+
+      - name: Build the place
+        run: rojo build default.project.json -o build/AmyAndTheRainforest.rbxl
+
+      - name: Publish to Dev as a Saved version
+        id: publish
+        env:
+          ROBLOX_DEV_API_KEY: ${{ secrets.ROBLOX_DEV_API_KEY }}
+        run: |
+          version=$(lune run tools/publish --universe "$DEV_UNIVERSE_ID" --place "$DEV_PLACE_ID" \
+            --file build/AmyAndTheRainforest.rbxl --version-type Saved)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Saved Dev version $version" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run engine tests against that version
+        env:
+          ROBLOX_DEV_API_KEY: ${{ secrets.ROBLOX_DEV_API_KEY }}
+          VERSION: ${{ steps.publish.outputs.version }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          lune run tools/run-engine-tests --universe "$DEV_UNIVERSE_ID" --place "$DEV_PLACE_ID" \
+            --version "$VERSION" --dir tests/engine --run-id "pr${PR}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
