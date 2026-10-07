@@ -24,4 +24,5 @@ Rules every build session follows, regardless of brief:
 | 001 Toolchain and CI | A | open |
 | 002 Foundation documents | A | open |
 | 003 Open Cloud tooling | A | open |
-| 004 Golden walkthrough on Dev | A | waiting on Roblox setup |
+| 004 Golden walkthrough on Dev | A | waiting on Roblox setup and 005 |
+| 005 Integrate toolchain and Open Cloud tooling | A | after 001 and 003 merge |
