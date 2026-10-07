@@ -1,6 +1,7 @@
-# Publishes main to the Dev experience (manual runs too: only from main) as a Published version, so the latest
-# merge is what you play on Dev. Never touches Release: that is release.yml,
-# behind the gated `release` environment. See docs/OPEN_CLOUD.md.
+# Publishes main to the Dev experience as a Published version, so the latest
+# merge is what you play on Dev. Manual runs are accepted from main only.
+# Never touches Release: that will be release.yml, behind the gated
+# `release` environment. See docs/OPEN_CLOUD.md.
 #
 # Inert until ROBLOX_DEV_API_KEY exists: without it the job skips with a notice.
 #
