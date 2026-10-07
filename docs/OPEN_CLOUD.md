@@ -12,7 +12,7 @@ a real key are for the owner, when debugging a CI failure. Everyone else uses
 
 | File | What it does |
 |---|---|
-| `tools/opencloud.luau` | Builds every Open Cloud request and parses every response. HTTP is injected, so tests mock it. Retry policy: a transport error or 5xx is retried once; a 4xx never is. |
+| `tools/opencloud.luau` | Builds every Open Cloud request and parses every response. HTTP is injected, so tests mock it. Retry policy: a transport error is retried once; a 5xx is retried once for GET only, never for a POST (publish, create task) that may already have been accepted; a 4xx never is. |
 | `tools/publish.luau` | Publishes a `.rbxl` as a `Saved` or `Published` version and prints the version number on stdout. |
 | `tools/run-engine-tests.luau` | Runs engine test scripts as Luau Execution tasks, up to 4 at once, and fails unless every one passes. |
 | `tools/lib/` | Shared argument parsing and the Release guard (`cli.luau`), and the logic behind the two tools. |
@@ -89,6 +89,10 @@ Luau Execution limits: create allows 5 per minute per key owner, and a place
 may have at most 10 incomplete tasks. Both answer HTTP 429. Each script gets
 `timeout + 300` seconds of waiting in total, polls and 429s included. A 429
 waits for `Retry-After`, or 15 seconds if that header is absent.
+The whole run also has a wall-clock deadline: `(timeout + 300)` seconds for
+each wave of 4 scripts, plus a minute. That catches a request that never
+returns, because Lune's HTTP client has no timeout of its own. A script whose
+worker raises counts as failed; it cannot stall the run.
 
 ## Writing an engine test
 
@@ -104,23 +108,60 @@ finish()
 ```
 
 - Per the API spec, physics does not run in a task, and server and client
-  scripts do not start on their own. The DataModel is a fresh copy of the place version, and
-  changes are not saved.
-- **DataStores are live** (as are MemoryStore and Messaging). Always name stores with
-  `DataStoreService:GetDataStore(storeName("Saves"))`, which gives
-  `test-<RUN_ID>-Saves`. The runner refuses to submit a script that calls
-  `GetDataStore` or `GetOrderedDataStore` without `storeName(...)`, or that
-  calls `GetGlobalDataStore` at all. This is a lint, not a sandbox.
-  Deleting test keys after a run is not built yet; plan section 4 assigns it
-  to a cleanup step.
+  scripts do not start on their own. The DataModel is a fresh copy of the
+  place version, and changes are not saved.
+- **DataStores are live**, as are MemoryStore and Messaging. Always name
+  stores with `storeName`, as in
+  `game:GetService("DataStoreService"):GetDataStore(storeName("Saves"))`,
+  which opens `test-<RUN_ID>-Saves`. Deleting test keys after a run is not
+  built yet: plan section 4 assigns it to a cleanup step, which will need a
+  DataStore permission on the Dev key.
+
+### What protects real DataStores, and what does not
+
+Two checks apply to every engine test:
+
+1. **A lint, before submitting.** The runner strips comments and string
+   literals, then refuses any mention of `GetDataStore`,
+   `GetOrderedDataStore` or `GetGlobalDataStore` that is not a call of the
+   form `:GetDataStore(storeName(...), ...)`. That catches string-call and
+   table-call syntax (`D:GetDataStore"x"`), indexing by name
+   (`D["GetDataStore"]`), taking the method as a value
+   (`local f = D.GetDataStore`), and expressions around `storeName`
+   (`storeName("x") and "Real"`). Errors name the script and line.
+2. **A proxy, at run time.** In the prelude, `game` is a proxy. Its
+   `DataStoreService` and `MemoryStoreService` (reached through
+   `GetService`, `FindService` or `game.X`) open only names that start with
+   `test-<RUN_ID>-` (`GetDataStore`, `GetOrderedDataStore`, `GetQueue`,
+   `GetSortedMap`, `GetHashMap`), and `GetGlobalDataStore` always errors.
+   Everything else passes through to the real object.
+
+The real guarantee is narrower than "engine tests cannot write to real
+DataStores". The lint and the proxy cover test scripts, and any module that
+reaches these services through the `game` the test hands it. **A module that
+gets the real `DataStoreService` some other way** (its own `game`, which every
+`require`d ModuleScript has, or a reference captured earlier) **is not
+covered.** The rule that closes that gap belongs to Checkpoint B: the
+`Persist` module takes its store prefix from config, as plan 2.3 already
+says, and the engine harness sets that prefix to `test-<RUN_ID>-`. Until
+then, engine tests must not exercise game code that opens stores.
+
+- Line numbers in errors are counted from the start of the submitted task,
+  which includes the prelude.
 - Line numbers in errors are counted from the start of the submitted task,
   which includes the prelude.
 
 ## CI
 
 Both workflows read the repository secret `ROBLOX_DEV_API_KEY` and the
-repository variables `DEV_UNIVERSE_ID`, `DEV_PLACE_ID` and
-`RELEASE_UNIVERSE_ID`. The last arms the Release refusal.
+repository variables `DEV_UNIVERSE_ID`, `DEV_PLACE_ID`,
+`RELEASE_UNIVERSE_ID` and `RELEASE_PLACE_ID`. The last two arm the Release
+refusal. Docs-only PRs (`docs/**`, `**/*.md`) skip the engine-tests
+workflow.
+
+Rokit is installed from a pinned release (`ROKIT_VERSION`), authenticated
+with the job token, and cached, exactly as in brief 001's `ci.yml`. The
+token is removed before any step that receives the key.
 
 Until the key exists, a small `gate` job posts a notice ("skipped, no key")
 and the real job is skipped, so nothing fails. PRs from forks get no secrets
@@ -141,13 +182,15 @@ Create keys at create.roblox.com/credentials. Set the IP restriction to
 | Release (`ROBLOX_RELEASE_API_KEY`, `release` environment) | The Release experience only | **universe-places**: Write | `universe-places:write` |
 
 Asset upload permissions for the Dev key come with the asset-upload brief.
-Neither key needs DataStore permissions for these tools.
+These tools need no DataStore permission. The planned cleanup of test keys
+will need one, scoped to the Dev experience.
 
 ## Safety rules
 
 1. **The Release refusal.** Both tools refuse to run when `--universe`
-   equals `RELEASE_UNIVERSE_ID`, unless `RELEASE_JOB=1` is also set. Ids are
-   compared as numbers, so `0123` matches `123`. The release workflow (not
+   equals `RELEASE_UNIVERSE_ID`, or `--place` equals `RELEASE_PLACE_ID` when
+   that is set, unless `RELEASE_JOB=1` is also set. Ids are compared as
+   numbers, so `0123` matches `123`. The release workflow (not
    written yet) will be the only job that sets `RELEASE_JOB=1`; the Dev
    workflows never do. The refusal applies in dry runs too.
 2. **The guard must be armed.** A real (non-dry) run refuses to start when
@@ -162,8 +205,24 @@ Neither key needs DataStore permissions for these tools.
 5. **One place builds URLs.** Nothing outside `tools/opencloud.luau`
    constructs an Open Cloud URL. When an endpoint changes, that is the only
    file to fix.
-6. **Engine tests use run-prefixed DataStores and never target Release.**
-   Store names go through `storeName()` (see above).
+6. **Engine tests use run-prefixed stores and never target Release.**
+   See "What protects real DataStores" above for exactly what is covered.
+7. **A POST is never retried after a 5xx.** A publish or task creation that
+   failed with a 5xx may still have been accepted, so retrying could publish
+   twice or start a duplicate task. Only a transport error is retried once,
+   as the plan and brief require. A transport error can, rarely, also follow
+   an accepted request. The worst case is one extra Saved version, or one
+   extra task under the same `RUN_ID`.
+
+### What the guard is, and what it is not
+
+The guard lives in code a pull request can change. A same-repository PR,
+including one from an agent, can edit `tools/` or the workflows, so against
+a malicious PR the guard is not a security boundary. It prevents mistakes,
+which is its job. **The security boundary is key scoping.** The Dev key is
+restricted to the Dev experience, so nothing that runs on a PR can publish
+to Release. The Release key exists only in the `release` environment,
+behind a required reviewer.
 
 ## What was verified against Roblox's documentation
 
