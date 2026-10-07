@@ -226,16 +226,15 @@ Home Spot ids are named in the Phase 0 refactor and added here then.
 
 ### Shots
 
-Specified in [`design/feel.md`](design/feel.md#2-shots).
+Framing and where each is used are specified in
+[`design/feel.md`](design/feel.md#2-shots).
 
-| Shot | Used by |
+| Shot | Argument |
 |---|---|
-| `shot:Dialogue` | Every Dialogue with a Speaker in the world |
-| `shot:ForestWallReveal` | `chapter2.walk_to_forest.onComplete` |
-| `shot:MeetSquirrel` | `chapter3.meet_squirrel` |
-| `shot:MeetFox` | `chapter3.meet_fox` |
-| `shot:MeetLion` | `chapter3.meet_lion` |
-| `shot:MachineFinale` | `chapter4.explain.onComplete` and the Ending |
+| `shot:Dialogue` | none |
+| `shot:ForestWallReveal` | none |
+| `shot:MeetCharacter` | the Character being met |
+| `shot:MachineFinale` | none |
 
 ### Cues
 

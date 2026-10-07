@@ -116,7 +116,7 @@ from her text, keep her spelling, and change only with her say-so.
 ## Clara's story as published
 
 For reference: the full text of the story as published on Clara's story
-page (linked from the [README](../README.md)), retrieved 2026-10-07, with
+page (linked from the [README](../../README.md)), retrieved 2026-10-07, with
 its paragraph breaks. Two of its sentences are not in the game yet:
 
 - "She decided to Explore the unexplored world." (Amy paraphrases it in
