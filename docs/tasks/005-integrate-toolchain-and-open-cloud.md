@@ -79,7 +79,19 @@ matches what was built.
      setting "Require actions to be pinned to a full-length commit SHA"
      under Settings → Actions → General, and to make the CI check a
      required status check on `main`.
-10. **Brief 004 prerequisite.** Add to `docs/OPEN_CLOUD.md` that deleting
+10. **Lighting technology set in the project file.** Studio shows
+    "Migration from Compatibility to Voxel Lighting" on every open because
+    the Rojo project does not set `Lighting.Technology`, so the built place
+    carries the sunset legacy default. That property is place-level and
+    cannot be set by a script at run time. Add a `Lighting` service entry
+    to `default.project.json` with `$properties` setting `Technology` to
+    `ShadowMap` (good quality at mobile cost; the Phase 1 visual pass
+    re-evaluates `Future` against the frame-time budget), and keep any
+    other Lighting defaults the engine needs explicit there too. Extend
+    `tests/engine/smoke.luau` to assert `Lighting.Technology` equals the
+    configured value so a regression is caught in tier 2. Confirm the
+    Studio message no longer appears on the next published version.
+11. **Brief 004 prerequisite.** Add to `docs/OPEN_CLOUD.md` that deleting
    `test-<RUN_ID>-*` keys after an engine run needs a DataStore permission
    on the Dev key, so the owner adds it before brief 004.
 

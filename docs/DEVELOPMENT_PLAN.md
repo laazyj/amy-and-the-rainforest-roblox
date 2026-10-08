@@ -721,7 +721,9 @@ Outcome: version 1.0 on the Release channel.
   narration of canon lines (see section 7).
 - Visual pass on the existing world: terrain and foliage, lighting and
   atmosphere, Clara's palette; chapter cards from her illustrations; the
-  camera shots in `feel.md`.
+  camera shots in `feel.md`. Choose the lighting technology (`ShadowMap`
+  or `Future`) against the mobile frame-time budget; it is set in the Rojo
+  project file, never left to the engine default.
 - Characters via `HumanoidDescription` and built-in animations; Sam's
   catch becomes a short chase; animals from free rigs with animations.
 - Settings (volume, text size, high-contrast dialogue box), pause,
