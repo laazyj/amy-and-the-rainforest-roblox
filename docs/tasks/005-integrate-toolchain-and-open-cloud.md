@@ -60,7 +60,26 @@ matches what was built.
    `docs/OPEN_CLOUD.md`'s neighbour `docs/MAINTENANCE.md` (new): what is
    automated, what Studio drift on the Mac still needs by hand, and the
    key-rotation dates.
-9. **Brief 004 prerequisite.** Add to `docs/OPEN_CLOUD.md` that deleting
+9. **Harden the workflows.**
+   - Pin every `uses:` in every workflow and in the composite action to a
+     full-length commit SHA, with the version as a trailing comment
+     (`uses: actions/checkout@<sha> # v5.0.0`). Dependabot updates SHA
+     pins and keeps the comment current.
+   - Verify the Rokit release zip against its published SHA-256 checksum
+     before extracting it, and fail the job on mismatch. The expected
+     checksum lives next to the version pin in the composite action.
+   - Set the minimum `permissions:` block on every workflow and job
+     (`contents: read` unless a job needs more; `pull-requests: write`
+     only for the toolchain-update job).
+   - Add `zizmor` (GitHub Actions security linter) and `actionlint` to
+     `tools/check.sh` and CI, and fix what they report. A finding that
+     cannot be fixed is documented with a reason, never suppressed
+     silently.
+   - In `docs/MAINTENANCE.md`, tell the owner to enable the repository
+     setting "Require actions to be pinned to a full-length commit SHA"
+     under Settings → Actions → General, and to make the CI check a
+     required status check on `main`.
+10. **Brief 004 prerequisite.** Add to `docs/OPEN_CLOUD.md` that deleting
    `test-<RUN_ID>-*` keys after an engine run needs a DataStore permission
    on the Dev key, so the owner adds it before brief 004.
 
@@ -73,11 +92,13 @@ matches what was built.
 
 - `tools/check.sh`, `tools/test.sh` and `tools/build.sh` pass locally and
   in CI, with every former `*.test.luau` test present as a spec.
-- `actionlint` passes on all workflows.
+- `actionlint` and `zizmor` pass on all workflows; no `uses:` is pinned
+  by tag or branch.
 - The PR lists the test count before and after the port.
 
 ## Proof the coordinator checks
 
 The coordinator runs `tools/test.sh` and compares the test count to the
-sum of PR #10's and PR #9's suites, and greps the workflows for `curl`
-piped to `bash`.
+sum of PR #10's and PR #9's suites, greps the workflows for `curl` piped
+to `bash` and for any `uses:` not followed by a 40-character SHA, and
+checks the Rokit checksum step fails on a wrong hash.
