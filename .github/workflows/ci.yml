@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ROKIT_VERSION: 1.2.0
+
+jobs:
+  ci:
+    name: Check, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Cache tool downloads
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.rokit
+            build/globalTypes-*.d.luau
+          key: tools-${{ runner.os }}-rokit-${{ env.ROKIT_VERSION }}-${{ hashFiles('rokit.toml') }}
+
+      - name: Install Rokit and the pinned tools
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if [ ! -x ~/.rokit/bin/rokit ]; then
+            curl -fsSL -o "$RUNNER_TEMP/rokit.zip" \
+              "https://github.com/rojo-rbx/rokit/releases/download/v$ROKIT_VERSION/rokit-$ROKIT_VERSION-linux-x86_64.zip"
+            unzip -q "$RUNNER_TEMP/rokit.zip" -d "$RUNNER_TEMP/rokit"
+            "$RUNNER_TEMP/rokit/rokit" self-install
+          fi
+          echo "$HOME/.rokit/bin" >> "$GITHUB_PATH"
+          # Authenticated GitHub API calls avoid the shared-runner rate limit.
+          ~/.rokit/bin/rokit authenticate github --token "$GITHUB_TOKEN"
+          ~/.rokit/bin/rokit install --no-trust-check
+
+      - name: Remove the GitHub token from the cached Rokit directory
+        run: rokit authenticate github --remove
+
+      - name: Static checks
+        run: tools/check.sh
+
+      - name: Unit tests
+        run: tools/test.sh
+
+      - name: Build
+        run: tools/build.sh
+
+      - name: Upload place file
+        uses: actions/upload-artifact@v7
+        with:
+          name: place
+          path: build/AmyAndTheRainforest.rbxl
+          if-no-files-found: error

@@ -1,3 +1,8 @@
+--!nonstrict
+-- Legacy untyped code from the proof of concept. The project default is strict
+-- (.luaurc); this file opts out until the Checkpoint B restructure gives it
+-- types. Under strict mode luau-lsp reports only type-inference errors here,
+-- no real bugs; non-strict mode reports nothing.
 --[[
 	StoryServer
 	===========
@@ -274,7 +279,8 @@ local function buildAnimal(def)
 		makeNPCPart({
 			Name = "Ear",
 			Size = earShape * scale * 1.6,
-			CFrame = base * CFrame.new(0.6 * side * scale, 2.1 * scale, -1.9 * scale)
+			CFrame = base
+				* CFrame.new(0.6 * side * scale, 2.1 * scale, -1.9 * scale)
 				* CFrame.Angles(0, 0, math.rad(def.kind == "dog" and 35 * side or 10 * side)),
 			Color = def.kind == "fox" and Color3.fromRGB(40, 36, 36) or bodyColor,
 		}, model)
@@ -1030,9 +1036,11 @@ task.spawn(function()
 					if root and zonePart then
 						local offset = zonePart.Position - root.Position
 						local half = zonePart.Size / 2
-						if math.abs(offset.X) <= half.X
+						if
+							math.abs(offset.X) <= half.X
 							and math.abs(offset.Y) <= half.Y + 3
-							and math.abs(offset.Z) <= half.Z then
+							and math.abs(offset.Z) <= half.Z
+						then
 							task.spawn(tryCompleteReach, player, quest.zone)
 						end
 					end

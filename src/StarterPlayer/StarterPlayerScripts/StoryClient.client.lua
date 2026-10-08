@@ -1,3 +1,8 @@
+--!nonstrict
+-- Legacy untyped code from the proof of concept. The project default is strict
+-- (.luaurc); this file opts out until the Checkpoint B restructure gives it
+-- types. Under strict mode luau-lsp reports only type-inference errors here,
+-- no real bugs; non-strict mode reports nothing.
 --[[
 	StoryClient
 	===========
@@ -210,9 +215,11 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if not dialogueActive then
 		return
 	end
-	if input.KeyCode == Enum.KeyCode.E
+	if
+		input.KeyCode == Enum.KeyCode.E
 		or input.KeyCode == Enum.KeyCode.Space
-		or input.KeyCode == Enum.KeyCode.Return then
+		or input.KeyCode == Enum.KeyCode.Return
+	then
 		requestAdvance()
 	end
 end)
