@@ -19,7 +19,7 @@ a real key are for the owner, when debugging a CI failure. Everyone else uses
 | `tests/engine/_prelude.luau` | `describe` / `it` / `expect`, `storeName`, `finish` for engine test scripts. |
 | `tests/engine/*.luau` | Engine tests. Files starting with `_` are helpers and are not run. |
 | `tests/lune/tools/` | Unit tests for all of the above, against a mocked HTTP function. |
-| `.github/workflows/publish-dev.yml` | Push to `main` (or a manual run from `main`): build, publish to Dev as `Published`. |
+| `.github/workflows/publish-dev.yml` | After CI succeeds on a push to `main` (or a manual run from `main`): build the commit CI tested, publish it to Dev as `Published`. |
 | `.github/workflows/engine-tests.yml` | Every PR: build, publish to Dev as `Saved`, run `tests/engine/` against that exact version. |
 
 ## Running locally
@@ -161,16 +161,28 @@ repository variables `DEV_UNIVERSE_ID`, `DEV_PLACE_ID`,
 refusal. Docs-only PRs (`docs/**`, `**/*.md`) skip the engine-tests
 workflow.
 
-Rokit is installed from a pinned release (`ROKIT_VERSION`), authenticated
-with the job token, and cached, exactly as in brief 001's `ci.yml`. The
-token is removed before any step that receives the key.
+The toolchain comes from the shared composite action
+`.github/actions/setup-tools` (as in `ci.yml`): Rokit from a release pinned
+by version and SHA-256, authenticated with the job token, and cached. The
+token is removed before any step that receives the key. Both workflows build
+with `tools/build.sh`, the same entry point CI uses.
+
+`publish-dev.yml` runs on `workflow_run`, so it checks out the exact commit
+the successful CI run tested and never publishes a newer, untested `main`.
+CI cancels superseded runs on `main`, so an older commit cannot be published
+after a newer one. (GitHub reads `workflow_run` triggers from the default
+branch only.)
+
+**Owner setup for `main`'s branch protection** (Settings → Branches, or a
+ruleset): make the CI check (`Check, test, build`) a required status
+check, and enable "Require branches to be up to date before merging". Then
+what CI tests on a PR is what lands on `main`, and what lands is what Dev
+gets.
 
 Until the key exists, a small `gate` job posts a notice ("skipped, no key")
 and the real job is skipped, so nothing fails. PRs from forks get no secrets
 and skip the same way. The key is passed only to the steps that call Open
 Cloud. Neither workflow uses `pull_request_target`.
-
-The build steps need `rokit.toml` from brief 001.
 
 ## API key permissions
 

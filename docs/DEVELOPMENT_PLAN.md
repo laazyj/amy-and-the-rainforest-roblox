@@ -403,7 +403,7 @@ PR opened/updated ──► branch must be up to date with main (merge queue or 
                   ──► publish build to Dev as a *Saved* version (not visible to players)
                   ──► engine tests via Luau Execution against that exact version
                   ──► (Mac awake?) Studio playthrough + screenshots attached to PR
-Merge to main     ──► publish to Dev as *Published*  → you play it
+Merge to main     ──► CI green on main ──► publish that commit to Dev as *Published*  → you play it
 Promote           ──► tag vX.Y.Z → release workflow downloads the artifact built at that tag by SHA,
                       verifies its checksum; GitHub "release" environment requires your approval;
                       tier 3 must have run on this build; checklist ticked

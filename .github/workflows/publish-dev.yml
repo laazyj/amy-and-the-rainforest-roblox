@@ -1,5 +1,6 @@
 # Publishes main to the Dev experience as a Published version, so the latest
-# merge is what you play on Dev. Manual runs are accepted from main only.
+# merge is what you play on Dev. Runs after CI succeeds on a push to main and
+# publishes the commit CI tested; a manual run is accepted from main only.
 # Never touches Release: that will be release.yml, behind the gated
 # `release` environment. See docs/OPEN_CLOUD.md.
 #
@@ -7,7 +8,9 @@
 name: Publish to Dev
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -22,7 +25,13 @@ jobs:
   # A job-level `if:` cannot read secrets, so a tiny job checks for the key.
   gate:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    # Only a successful CI run for a push to this repository counts
+    # (`branches: [main]` alone would also match a fork's branch named main).
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+      || (github.event.workflow_run.conclusion == 'success'
+          && github.event.workflow_run.event == 'push'
+          && github.event.workflow_run.head_repository.full_name == github.repository)
     outputs:
       run: ${{ steps.gate.outputs.run }}
     steps:
@@ -48,8 +57,12 @@ jobs:
       DEV_PLACE_ID: ${{ vars.DEV_PLACE_ID }}
       RELEASE_UNIVERSE_ID: ${{ vars.RELEASE_UNIVERSE_ID }}
       RELEASE_PLACE_ID: ${{ vars.RELEASE_PLACE_ID }}
+      # The commit CI tested; on a manual run, main's head.
+      PUBLISH_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.PUBLISH_SHA }}
 
       - name: Install the pinned toolchain
         uses: ./.github/actions/setup-tools
@@ -63,4 +76,4 @@ jobs:
         run: |
           version=$(lune run tools/publish --universe "$DEV_UNIVERSE_ID" --place "$DEV_PLACE_ID" \
             --file build/AmyAndTheRainforest.rbxl --version-type Published)
-          echo "Published Dev version $version from ${GITHUB_SHA}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Published Dev version $version from $PUBLISH_SHA" >> "$GITHUB_STEP_SUMMARY"
