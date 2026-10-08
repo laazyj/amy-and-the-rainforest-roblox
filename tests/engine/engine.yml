@@ -3,7 +3,7 @@
 # tools/lib/engine-tests.luau, which defines these names before the script:
 # RUN_ID and PASS_MARKER as globals, and the prelude's exports
 # (EngineTests.PRELUDE_EXPORTS) as locals, except `game`, which Roblox's std
-# already declares. A unit test (tests/lune/tools/prelude.test.luau) checks
+# already declares. A unit test (tests/lune/tools/prelude.spec.luau) checks
 # this list against PRELUDE_EXPORTS.
 ---
 name: engine-tests

@@ -28,12 +28,11 @@ variable is `RELEASE_JOB=1`, not `RELEASE=1`.
 
 ## Running locally
 
-Run from the repository root, with Lune installed (`rokit install` once
-brief 001's `rokit.toml` exists).
+Run from the repository root, with the toolchain installed (`rokit install`).
 
 ```sh
-# Unit tests (no network)
-lune run tests/lune/tools/run
+# Unit tests (no network); they run with every other tier 1 spec
+tools/test.sh
 
 # Show the request a publish would make, without sending anything
 lune run tools/publish --universe 1234 --place 5678 \

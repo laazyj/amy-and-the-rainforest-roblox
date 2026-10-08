@@ -1,51 +1,20 @@
 --!strict
--- Minimal test harness for the Open Cloud tool tests, plus mocks for the
--- tool context. Temporary: to be ported to tests/lune/runner.luau (brief 001).
+-- Fixtures for the Open Cloud tool specs (tests/lune/tools/): made-up ids, a
+-- canned HTTP response, and a mock tool context whose HTTP, clock, output and
+-- filesystem are in memory, so no spec reaches the network.
 
 local OpenCloud = require("../../../tools/opencloud")
 local Cli = require("../../../tools/lib/cli")
 
-local H = {}
+local Fixtures = {}
 
--- Made-up ids and key used by every test. Never real ones.
-H.DEV = "1001"
-H.RELEASE = "2002"
-H.PLACE = "3003"
-H.KEY = "dev-key-not-real"
+-- Made-up ids and key used by every spec. Never real ones.
+Fixtures.DEV = "1001"
+Fixtures.RELEASE = "2002"
+Fixtures.PLACE = "3003"
+Fixtures.KEY = "dev-key-not-real"
 
-H.passed = 0
-H.failures = {} :: { string }
-
-function H.test(name: string, fn: () -> ())
-	local ok, err = pcall(fn :: any)
-	if ok then
-		H.passed += 1
-		print(`  ok   {name}`)
-	else
-		table.insert(H.failures, `{name}: {err}`)
-		print(`  FAIL {name}: {err}`)
-	end
-end
-
-function H.eq(actual: any, expected: any, label: string?)
-	if actual ~= expected then
-		error(`{label or "value"}: expected {expected}, got {actual}`, 2)
-	end
-end
-
-function H.contains(haystack: string, needle: string, label: string?)
-	if not string.find(haystack, needle, 1, true) then
-		error(`{label or "text"}: expected to contain '{needle}' in:\n{haystack}`, 2)
-	end
-end
-
-function H.notContains(haystack: string, needle: string, label: string?)
-	if string.find(haystack, needle, 1, true) then
-		error(`{label or "text"}: expected not to contain '{needle}' in:\n{haystack}`, 2)
-	end
-end
-
-function H.response(statusCode: number, body: string?, headers: { [string]: string }?): OpenCloud.Response
+function Fixtures.response(statusCode: number, body: string?, headers: { [string]: string }?): OpenCloud.Response
 	return {
 		ok = statusCode >= 200 and statusCode < 300,
 		statusCode = statusCode,
@@ -55,8 +24,8 @@ function H.response(statusCode: number, body: string?, headers: { [string]: stri
 end
 
 -- The environment a Dev job has: a Dev key and the Release guard armed.
-function H.env(overrides: { [string]: string }?): { [string]: string }
-	local env = { ROBLOX_DEV_API_KEY = H.KEY, RELEASE_UNIVERSE_ID = H.RELEASE }
+function Fixtures.env(overrides: { [string]: string }?): { [string]: string }
+	local env = { ROBLOX_DEV_API_KEY = Fixtures.KEY, RELEASE_UNIVERSE_ID = Fixtures.RELEASE }
 	for name, value in (overrides or {}) :: { [string]: string } do
 		env[name] = value
 	end
@@ -92,26 +61,25 @@ end
 
 -- A context whose HTTP is `handler` (records every request), whose sleep does
 -- not wait (unless `sleep` is given), and whose filesystem is `files`.
-function H.mock(options: {
+function Fixtures.mock(options: {
 	args: { string },
 	env: { [string]: string }?,
 	files: { [string]: string }?,
 	handler: ((OpenCloud.Request) -> OpenCloud.Response)?,
 	sleep: OpenCloud.Sleep?,
-	clock: (() -> number)?,
 }): Mock
 	local files: { [string]: string } = options.files or {}
 	local mock = setmetatable({ calls = {}, out = {}, log = {} }, Mock) :: any
 	mock.ctx = {
 		args = options.args,
-		env = options.env or H.env(),
+		env = options.env or Fixtures.env(),
 		http = function(request)
 			table.insert(mock.calls, request)
 			assert(options.handler, `unexpected request: {request.method} {request.url}`)
 			return options.handler(request)
 		end,
 		sleep = options.sleep or function() end,
-		clock = options.clock or function()
+		clock = function()
 			return 0
 		end,
 		out = function(line)
@@ -138,22 +106,4 @@ function H.mock(options: {
 	return mock
 end
 
--- Asserts `main` succeeds against `mock`.
-function H.passes(mock: Mock, main: (Cli.Context) -> ())
-	local err = mock:run(main)
-	if err then
-		error(`expected success, got error: {err}`, 2)
-	end
-end
-
--- Asserts `main` fails against `mock` with an error containing `needle`.
-function H.fails(mock: Mock, main: (Cli.Context) -> (), needle: string)
-	local err = mock:run(main)
-	if not err then
-		error(`expected an error containing '{needle}', got success`, 2)
-	elseif not string.find(err, needle, 1, true) then
-		error(`expected an error containing '{needle}', got: {err}`, 2)
-	end
-end
-
-return H
+return Fixtures
