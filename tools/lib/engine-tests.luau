@@ -276,8 +276,13 @@ local function loadScripts(ctx: Cli.Context, values: { [string]: string }): { Sc
 		local entries = ctx.listDir(dir) or error(`not a directory: {dir}`, 0)
 		table.sort(entries)
 		for _, entry in entries do
-			-- Files starting with "_" are helpers (the prelude), not tests.
-			if string.match(entry, "%.luau$") and string.sub(entry, 1, 1) ~= "_" then
+			-- Files starting with "_" are helpers (the prelude), and ".d.luau"
+			-- files are type declarations for the linters; neither is a test.
+			if
+				string.match(entry, "%.luau$")
+				and not string.match(entry, "%.d%.luau$")
+				and string.sub(entry, 1, 1) ~= "_"
+			then
 				table.insert(paths, `{dir}/{entry}`)
 			end
 		end

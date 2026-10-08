@@ -212,6 +212,15 @@ H.test("skips helper files that start with an underscore", function()
 	H.notContains(server.created[1].body.script, "-- helper")
 end)
 
+H.test("skips .d.luau type declaration files", function()
+	local _, _, server = run({
+		behaviours = { ["a.luau"] = { logs = PASSING } },
+		files = { ["engine/globals.d.luau"] = "declare RUN_ID: string" },
+	})
+	H.eq(#server.created, 1, "tasks created")
+	H.notContains(server.created[1].body.script, "declare RUN_ID")
+end)
+
 H.test(`runs at most {EngineTests.CONCURRENCY} tasks at once`, function()
 	local behaviours = {}
 	for i = 1, EngineTests.CONCURRENCY + 3 do
