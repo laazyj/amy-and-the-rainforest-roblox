@@ -1,0 +1,55 @@
+# Weekly: compares each pin in rokit.toml (and any Wally dependency) with the
+# latest release and opens or updates one "Toolchain updates" PR with the new
+# pins, so CI runs the full check, test and build against them. Nothing
+# merges automatically. Dependabot covers the `uses:` lines (dependabot.yml).
+# See docs/MAINTENANCE.md.
+name: Toolchain check
+
+on:
+  schedule:
+    - cron: "17 6 * * 1" # Mondays 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: toolchain-check
+  cancel-in-progress: false
+
+jobs:
+  toolchain-check:
+    name: Check the toolchain pins
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # push the toolchain-updates branch
+      pull-requests: write # open or update the PR
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install the pinned toolchain
+        uses: ./.github/actions/setup-tools
+
+      - name: Compare the pins with the latest releases
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: lune run tools/toolchain-check > "$RUNNER_TEMP/toolchain-pr.md"
+
+      # A PR opened with the job token does not trigger CI, so the
+      # TOOLCHAIN_PR_TOKEN secret (a fine-grained token, see
+      # docs/MAINTENANCE.md) is used when it exists.
+      - name: Open or update the Toolchain updates PR
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.TOOLCHAIN_PR_TOKEN || github.token }}
+          branch: toolchain-updates
+          title: Toolchain updates
+          commit-message: Update the toolchain pins
+          body-path: ${{ runner.temp }}/toolchain-pr.md
+          labels: dependencies
+          add-paths: |
+            rokit.toml
+            wally.toml
+            .luaurc
+          delete-branch: true

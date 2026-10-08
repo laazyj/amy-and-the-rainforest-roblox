@@ -1,0 +1,16 @@
+# Keeps every `uses:` in the workflows and the composite action current, as
+# one grouped weekly PR; CI proves each bump. Nothing merges automatically.
+# rokit.toml and wally.toml are covered by .github/workflows/toolchain-check.yml.
+# See docs/MAINTENANCE.md.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /.github/actions/setup-tools
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+    labels: [dependencies]
