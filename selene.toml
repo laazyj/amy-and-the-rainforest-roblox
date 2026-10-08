@@ -1,4 +1,6 @@
 std = "roblox"
+# tests/engine has its own config (tests/engine/selene.toml).
+exclude = ["tests/engine/*"]
 
 [lints]
 # Style-only suggestion (UDim2.new -> UDim2.fromScale / fromOffset) that fires

@@ -30,8 +30,9 @@ type Script = { name: string, source: string }
 -- RUN_ID ends up inside DataStore names (limit 50 characters), so keep it short and plain.
 function EngineTests.resolveRunId(explicit: string?, env: { [string]: string? }): string
 	local runId = explicit
-		or if env.GITHUB_RUN_ID then `{env.GITHUB_RUN_ID}-{env.GITHUB_RUN_ATTEMPT or "1"}` else nil
-		or `local-{os.time()}-{math.random(1000, 9999)}`
+		or if env.GITHUB_RUN_ID
+			then `{env.GITHUB_RUN_ID}-{env.GITHUB_RUN_ATTEMPT or "1"}`
+			else nil or `local-{os.time()}-{math.random(1000, 9999)}`
 	if not string.match(runId, "^[%w%-]+$") or #runId > 32 then
 		error(`run id '{runId}' must be at most 32 letters, digits or hyphens`, 0)
 	end
@@ -88,8 +89,8 @@ local function stripCommentsAndStrings(source: string): string
 				elseif c == char or (c == "\n" and char ~= "`") then
 					break
 				elseif char == "`" and c == "{" then
-					local _, close = string.find(source, "^%b{}", j)
-					close = close or #source
+					local _, found = string.find(source, "^%b{}", j)
+					local close = found or #source
 					table.insert(out, " " .. string.sub(source, j + 1, close - 1) .. " ")
 					j = close + 1
 				else
@@ -119,7 +120,7 @@ function EngineTests.checkDataStoreUse(name: string, source: string)
 	local at = 1
 	while true do
 		local first, last, method = string.find(code, `%f[%w_]({DATASTORE_METHOD})%f[^%w_]`, at)
-		if not first then
+		if not (first and last) then
 			return
 		end
 		local where = `{name}:{#blankLines(string.sub(code, 1, first)) + 1}`
@@ -135,12 +136,24 @@ function EngineTests.checkDataStoreUse(name: string, source: string)
 	end
 end
 
+-- What tests/engine/_prelude.luau returns, bound as locals for the script.
+EngineTests.PRELUDE_EXPORTS = table.freeze({ "describe", "it", "expect", "storeName", "finish", "game" })
+
+-- The task script: the injected globals, the prelude run as a function whose
+-- exports become locals, then the test script.
 function EngineTests.wrap(runId: string, prelude: string, script: Script): string
+	local values = {}
+	for i, name in EngineTests.PRELUDE_EXPORTS do
+		values[i] = `__prelude.{name}`
+	end
 	return table.concat({
 		`-- {script.name} (submitted by tools/run-engine-tests)`,
 		`RUN_ID = "{runId}"`,
 		`PASS_MARKER = "{EngineTests.PASS_MARKER}"`,
+		"local __prelude = (function()",
 		prelude,
+		"end)()",
+		`local {table.concat(EngineTests.PRELUDE_EXPORTS, ", ")} = {table.concat(values, ", ")}`,
 		`-- {script.name} begins here`,
 		script.source,
 	}, "\n")
@@ -149,8 +162,8 @@ end
 -- The verdict for a finished task and its log messages.
 function EngineTests.verdict(taskResource: OpenCloud.Task, logs: { string }): (boolean, string?)
 	if taskResource.state ~= "COMPLETE" then
-		local err = taskResource.error or {}
-		return false, `task {taskResource.state or "?"}: {err.code or "?"} {err.message or ""}`
+		local err = taskResource.error
+		return false, `task {taskResource.state or "?"}: {err and err.code or "?"} {err and err.message or ""}`
 	end
 	for i = #logs, 1, -1 do
 		local line = string.match(logs[i], "^%s*(.-)%s*$") :: string
@@ -204,11 +217,12 @@ local function runOne(ctx: Cli.Context, target: Cli.Target, createRequest: OpenC
 end
 
 -- Wall-clock seconds the whole run may take: each wave of CONCURRENCY scripts
--- gets its timeout plus the queue allowance, and a minute of slack. Guards
+-- gets its timeout, the queue allowance and the longest "server busy" wait,
+-- plus a minute of slack. Guards
 -- against a request that never returns (net.request has no timeout).
 function EngineTests.runBudget(scripts: number, timeout: number): number
 	local waves = math.ceil(scripts / EngineTests.CONCURRENCY)
-	return waves * (timeout + EngineTests.QUEUE_ALLOWANCE) + 60
+	return waves * (timeout + EngineTests.QUEUE_ALLOWANCE + OpenCloud.BUSY_WAIT_TOTAL) + 60
 end
 
 -- Runs `worker` over `items` with at most `limit` running at once and returns
@@ -262,8 +276,13 @@ local function loadScripts(ctx: Cli.Context, values: { [string]: string }): { Sc
 		local entries = ctx.listDir(dir) or error(`not a directory: {dir}`, 0)
 		table.sort(entries)
 		for _, entry in entries do
-			-- Files starting with "_" are helpers (the prelude), not tests.
-			if string.match(entry, "%.luau$") and string.sub(entry, 1, 1) ~= "_" then
+			-- Files starting with "_" are helpers (the prelude), and ".d.luau"
+			-- files are type declarations for the linters; neither is a test.
+			if
+				string.match(entry, "%.luau$")
+				and not string.match(entry, "%.d%.luau$")
+				and string.sub(entry, 1, 1) ~= "_"
+			then
 				table.insert(paths, `{dir}/{entry}`)
 			end
 		end
@@ -313,13 +332,13 @@ function EngineTests.main(ctx: Cli.Context)
 		local ok, taskResource, logs = pcall(function()
 			return runOne(ctx, target, createRequest(script), timeout)
 		end)
-		local passed, reason = false, tostring(taskResource)
+		local passed: boolean, reason: string? = false, tostring(taskResource)
 		if ok then
 			passed, reason = EngineTests.verdict(taskResource, logs)
 		end
 		-- Printed as each script finishes; no yield inside, so blocks never interleave.
 		ctx.out(`--- {script.name}`)
-		for _, line in (if ok then logs else {}) do
+		for _, line in (if ok then logs else {}) :: { string } do
 			ctx.out(line)
 		end
 		ctx.out(if passed then `PASS {script.name}` else `FAIL {script.name}: {reason}`)
