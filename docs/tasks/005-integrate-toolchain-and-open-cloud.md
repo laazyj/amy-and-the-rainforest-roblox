@@ -46,7 +46,21 @@ matches what was built.
    proxy in the prelude already guards them. Extend the lint to the same
    three methods so a script that would be refused at run time is refused
    before submission, and add the unit tests.
-8. **Brief 004 prerequisite.** Add to `docs/OPEN_CLOUD.md` that deleting
+8. **Dependency maintenance.** Add `.github/dependabot.yml` for the
+   `github-actions` ecosystem (weekly, grouped into one PR, labelled
+   `dependencies`) so every `uses:` line in the workflows and the
+   composite action is kept current and CI proves each bump. Dependabot
+   does not understand `rokit.toml` or `wally.toml`, so add
+   `.github/workflows/toolchain-check.yml`: a weekly `schedule` job that
+   compares each pin in `rokit.toml` (and any Wally dependency) with the
+   latest release on GitHub and opens or updates a single PR titled
+   "Toolchain updates" with the new pins, using `peter-evans/create-pull-request`
+   or equivalent, so CI runs the full check, test and build against the
+   new versions. Nothing auto-merges; the owner reviews. Document both in
+   `docs/OPEN_CLOUD.md`'s neighbour `docs/MAINTENANCE.md` (new): what is
+   automated, what Studio drift on the Mac still needs by hand, and the
+   key-rotation dates.
+9. **Brief 004 prerequisite.** Add to `docs/OPEN_CLOUD.md` that deleting
    `test-<RUN_ID>-*` keys after an engine run needs a DataStore permission
    on the Dev key, so the owner adds it before brief 004.
 

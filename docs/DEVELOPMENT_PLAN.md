@@ -773,7 +773,10 @@ Outcome: players return because there is more to discover.
 - Monthly quality PR driven by analytics: where players drop off, what is
   slow on phone or tablet, what is confusing.
 - Regular upkeep: Roblox engine changes, Open Cloud API updates, Studio
-  version drift on the Mac, key rotation.
+  version drift on the Mac, key rotation. Dependencies are kept current
+  automatically: Dependabot for GitHub Actions, and a weekly toolchain
+  job that opens a pinned-version bump PR for Rokit and Wally (which
+  Dependabot does not support). CI proves each bump; the owner merges.
 
 ---
 
