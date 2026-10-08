@@ -158,10 +158,10 @@ Rules that keep this honest, and that the tests enforce:
 │   └── images|audio|meshes/  Sources (Clara's illustrations, SFX, music, .rbxm models)
 ├── tools/
 │   ├── build.sh              rojo build → build/AmyAndTheRainforest.rbxl
-│   ├── publish.lune          Open Cloud place publish (Saved or Published); refuses Release IDs unless RELEASE=1
-│   ├── run-engine-tests.lune Open Cloud Luau Execution runner
-│   ├── upload-assets.lune    Assets API uploader, run only by CI (workflow_dispatch)
-│   ├── fetch-model.lune      Creator Store model → assets/meshes/*.rbxm (see 5.5)
+│   ├── publish.luau          Open Cloud place publish (Saved or Published); refuses Release IDs unless RELEASE_JOB=1
+│   ├── run-engine-tests.luau Open Cloud Luau Execution runner
+│   ├── upload-assets.luau    Assets API uploader, run only by CI (workflow_dispatch)
+│   ├── fetch-model.luau      Creator Store model → assets/meshes/*.rbxm (see 5.5)
 │   └── studio-playtest/      Mac runner scripts (Studio MCP wrapper, screencapture)
 ├── docs/
 │   ├── DEVELOPMENT_PLAN.md   This document
@@ -434,8 +434,10 @@ a Studio publish would silently overwrite CI's version. This goes in
   do not get secrets.
 - Keys are created at create.roblox.com/credentials with IP restriction
   "allow all", because GitHub-hosted runners have no fixed IP.
-- `publish.lune` and `run-engine-tests.lune` refuse to run if the target
-  universe equals `RELEASE_UNIVERSE_ID` unless invoked by the release job.
+- `publish.luau` and `run-engine-tests.luau` refuse to run if the target
+  universe equals `RELEASE_UNIVERSE_ID` (or the place equals
+  `RELEASE_PLACE_ID`) unless invoked by the release job, which sets
+  `RELEASE_JOB=1`.
 
 ---
 
@@ -473,9 +475,13 @@ Design notes:
   only. The answer gets written into this document.
 - **Engine tests have real side effects on DataStores.** The DataModel is
   not persisted, but `DataStoreService`, `MemoryStoreService` and
-  `MessagingService` are live. Tier 2 uses stores prefixed `test-<runId>`
-  and deletes its keys at the end (Open Cloud DataStore API in a cleanup
-  step). Never against Release.
+  `MessagingService` are live. Tier 2 names every store with `storeName`
+  (prefix `test-<RUN_ID>-`) and deletes those keys at the end, in a cleanup
+  step through the Open Cloud DataStore API. Never against Release. The
+  prefix is enforced only for test scripts and the `game` they hand to
+  modules; Checkpoint B closes the gap through `Persist`'s configured prefix
+  (2.3). `docs/OPEN_CLOUD.md` states the exact guarantee and the key
+  permission the cleanup needs.
 - **Tier 3 is never on the critical path for PRs**, but it is for releases.
   On PRs the Studio job uses `continue-on-error`, a 30-minute queue timeout,
   and reports "skipped: runner offline". The release workflow refuses to

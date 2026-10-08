@@ -19,8 +19,11 @@ rokit install
 | Unit tests (tier 1) | `tools/test.sh [name filter]` | Lune runner, `tests/lune/**/*.spec.luau` |
 | Build | `tools/build.sh` | Writes `build/AmyAndTheRainforest.rbxl` |
 | Format | `stylua src tests tools` | Run before committing |
+| Publish (dry run) | `lune run tools/publish --universe <id> --place <id> --file build/AmyAndTheRainforest.rbxl --version-type Saved --dry-run` | Prints the request; a real publish runs only in CI |
+| Engine tests (dry run) | `lune run tools/run-engine-tests --universe <id> --place <id> --dir tests/engine --dry-run` | Prints the tasks; real runs are CI's `engine-tests.yml` |
 
-CI (`.github/workflows/ci.yml`) runs all three scripts on every PR and push
+The Open Cloud tools are documented in `docs/OPEN_CLOUD.md`.
+CI (`.github/workflows/ci.yml`) runs the check, test and build scripts on every PR and push
 to `main` and uploads the place file as the `place` artifact. Run them
 locally before pushing; a red CI costs a review cycle.
 
