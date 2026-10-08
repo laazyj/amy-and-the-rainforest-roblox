@@ -18,6 +18,7 @@ a real key are for the owner, when debugging a CI failure. Everyone else uses
 | `tools/lib/` | Shared argument parsing and the Release guard (`cli.luau`), and the logic behind the two tools. |
 | `tests/engine/_prelude.luau` | `describe` / `it` / `expect`, `storeName`, `finish` for engine test scripts. |
 | `tests/engine/*.luau` | Engine tests. Files starting with `_` are helpers and are not run. |
+| `tests/fixtures/` | Files engine tests read through `fixture()`, such as the golden file of the walkthrough. |
 | `tests/lune/tools/` | Unit tests for all of the above, against a mocked HTTP function. |
 | `.github/workflows/publish-dev.yml` | After CI succeeds on a push to `main` (or a manual run from `main`): build the commit CI tested, publish it to Dev as `Published`. |
 | `.github/workflows/engine-tests.yml` | Every PR: build, publish to Dev as `Saved`, run `tests/engine/` against that exact version. |
@@ -105,7 +106,19 @@ finish()
 
 - Per the API spec, physics does not run in a task, and server and client
   scripts do not start on their own. The DataModel is a fresh copy of the
-  place version, and changes are not saved.
+  place version, and changes are not saved. So `Touched` never fires, and
+  game code a test needs must be a ModuleScript it can `require` (the
+  StoryServer Script only requires its `Server` module for this reason).
+- A task cannot read the repository. A script names the files it needs with
+  string literals, and the runner embeds them in the task
+  (`EngineTests.EMBED_FUNCTIONS`):
+  - `include("tests/engine/_fakeplayer.luau")` runs a helper once and
+    returns its value. A helper sees the prelude's locals, including the
+    guarded `game`, and may name files of its own.
+  - `fixture("tests/fixtures/golden/walkthrough.json")` returns a file's text.
+
+  Helpers are linted like scripts, and a path that is not a string literal is
+  refused before any task is created.
 - `describe`, `it`, `expect`, `storeName` and `finish` are the prelude's
   exports, which the runner binds as locals before your script
   (`EngineTests.PRELUDE_EXPORTS`); `RUN_ID` and `PASS_MARKER` are globals.
@@ -113,14 +126,16 @@ finish()
   (`tests/engine/selene.toml`, scoped to this folder) and
   `tests/engine/globals.d.luau` declares them to luau-lsp, which analyzes
   `tests/engine` on the Roblox platform. A unit test checks the prelude,
-  `engine.yml` and `globals.d.luau` against `PRELUDE_EXPORTS`.
+  `engine.yml` and `globals.d.luau` against `PRELUDE_EXPORTS` and
+  `EMBED_FUNCTIONS`.
 - Line numbers in errors are counted from the start of the submitted task,
   which includes the prelude.
 - **DataStores are live**, as are MemoryStore and Messaging. Always name
   stores with `storeName`, as in
   `game:GetService("DataStoreService"):GetDataStore(storeName("Saves"))`,
   which opens `test-<RUN_ID>-Saves`. Deleting test keys after a run is not
-  built yet: brief 004 adds the cleanup step, which needs the DataStore
+  built yet. No engine test opens a store today, so the
+  cleanup step comes with the first test that does, and needs the DataStore
   permission described under [API key permissions](#api-key-permissions).
 
 ### What protects real DataStores, and what does not
@@ -193,14 +208,14 @@ Create keys at create.roblox.com/credentials. Set the IP restriction to
 |---|---|---|---|
 | Dev (`ROBLOX_DEV_API_KEY`) | The Dev experience only | **universe-places**: Write | `universe-places:write` |
 | | | **universe.place.luau-execution-session**: Read, Write | `universe.place.luau-execution-session:read`, `…:write` (create needs write; get and logs accept either) |
-| | | **universe-datastores** (for brief 004's cleanup): list stores, list entries, read, delete | `universe-datastores.control:list`, `universe-datastores.objects:list`, `…:read`, `…:delete` |
+| | | **universe-datastores** (for the test-store cleanup): list stores, list entries, read, delete | `universe-datastores.control:list`, `universe-datastores.objects:list`, `…:read`, `…:delete` |
 | Release (`ROBLOX_RELEASE_API_KEY`, `release` environment) | The Release experience only | **universe-places**: Write | `universe-places:write` |
 
 Asset upload permissions for the Dev key come with the asset-upload brief.
 The publish and engine-test tools use no DataStore permission.
 
-**Before brief 004, confirm the Dev key can list.** It already has DataStore
-read and delete for the Dev experience; brief 004's cleanup must also find
+**Before the test-store cleanup is built, confirm the Dev key can list.** It
+already has DataStore read and delete for the Dev experience; the cleanup must also find
 the `test-<RUN_ID>-*` keys, which needs the two `:list` scopes in the table.
 Never add DataStore permissions to the Release key.
 
@@ -287,22 +302,18 @@ Verified:
   10000), `pageToken` and `nextPageToken`.
 - **Stability.** The spec marks Luau Execution `STABLE` and place publishing `BETA`.
 
+Proven against Dev (brief 004, engine-tests on PR #15):
+
+- **Polling by the returned `path`.** Tasks created on the versioned endpoint
+  were polled with `GET /cloud/v2/{task.path}` and their logs read from
+  `{task.path}/logs`, to completion.
+- **The place name in the smoke test.** `GetProductInfoAsync(game.PlaceId)`
+  returns "Amy and the Rain Forest (Dev)" for the Dev place.
+
 Not verified:
 
-- **Polling by the returned `path`.** The tools poll `GET /cloud/v2/{task.path}`
-  and read `{task.path}/logs`. The spec lists the task's resource patterns,
-  including the short `…/luau-execution-session-tasks/{id}` forms a create
-  can return. Its explicit GET operations, however, are written only for the
-  `…/versions/{v}/luau-execution-sessions/{s}/tasks/{t}` form. Brief 004
-  proves this against Dev. If it is wrong, the fix belongs in
-  `OpenCloud.getTaskRequest`, `OpenCloud.listLogsRequest` and
-  `OpenCloud.parseTaskResponse`, which checks the returned path.
 - **The 429 `Retry-After` header.** Whether Open Cloud sends it is unknown.
   The tool falls back to 15 seconds.
-- **The place name in the smoke test.** `tests/engine/smoke.luau` reads it
-  with `MarketplaceService:GetProductInfo(game.PlaceId)` and expects it to
-  start with "Amy and the Rain Forest", as named in plan section 10. Brief
-  004 confirms this against the real Dev experience.
 - **The API key UI.** The labels on the Creator Dashboard key page come from
   the place-publishing guide ("universe-places", operation "Write"). The
   Luau Execution label is taken from its scope name.

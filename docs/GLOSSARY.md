@@ -73,6 +73,9 @@ Scene (look + sound)                     Player
 | **Resume** | Rebuilding the world for a returning player from Progress alone: `StoryEngine.resume(progress)` returns the World commands that put every Character, Prop, Lighting preset and Pickup where the current Quest expects them, then shows the Objective. "Continue" on the title screen is a Resume. | |
 | **World** | The one interface the core uses to act on the engine. Every Beat is written against it, one method per World command. | `World.moveCharacter(id, spot)` |
 | **Device class** | One of the three first-class targets, each with its own layout and touch rules: `PC`, `Phone`, `Tablet`. Defined in [`design/feel.md`](design/feel.md). | `Tablet` |
+| **Walkthrough** | A test that plays the Story, or one Chapter, from start to end by sending Player events, and checks what the server sends back. | `tests/engine/walkthrough.luau` |
+| **Fake player** | A stand-in for a Player in a test, where there is no client: a Character to move and nothing else a real Player would need. | `tests/engine/_fakeplayer.luau` |
+| **Golden file** | The recorded, deterministic output of a Walkthrough: every message the server sends, in order, with the active Quest. A behaviour change shows as a diff to it. | `tests/fixtures/golden/walkthrough.json` |
 
 ## 3. The verbs
 
