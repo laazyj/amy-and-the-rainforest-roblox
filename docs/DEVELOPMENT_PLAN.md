@@ -489,6 +489,22 @@ Design notes:
   Mac. The "smooth on a mid-range phone and tablet" target is a
   release-checklist item observed on real devices, because no automated
   tier can measure it.
+- **Coverage guards, not a coverage percentage.** There is no mature
+  line-coverage tool for Luau in this toolchain (Lune does not expose the
+  VM's coverage hooks and the in-engine runner has none), so the harness
+  enforces coverage structurally in tier 0 rather than by a number:
+  every module under `src/core` has a matching spec; every Quest kind,
+  Hook, World command and Player event in the glossary appears in at
+  least one spec by name; every chapter in content has a walkthrough
+  spec; and a PR that changes `src/core` without changing `tests/` fails,
+  with an explicit opt-out label and a written reason for the rare
+  justified case. A nightly **mutation check** applies a dozen canned
+  faults (rename a quest, drop a hook, break a migration, blank a canon
+  line) and asserts the suite fails for each, so the tests are proven to
+  bite. A non-blocking spike looks at exposing Luau VM coverage through
+  Lune for the pure core tests; if it stabilises, the number is reported
+  in PRs and only then considered as a gate. These guards arrive with the
+  Checkpoint B refactor, when `src/core` comes into being.
 - **Flake policy.** Open Cloud is beta. Tier 2 retries once on transport
   errors only, never on assertion failures. Outages are reported in the PR.
 
@@ -706,8 +722,11 @@ pipeline. No new gameplay.
    walkthrough, two-player isolation, MaxPlayers, remote contracts, budgets,
    DataStore prefixing and cleanup.
 7. Spikes with written decisions: physics in Luau Execution, asset fetch
-   path (5.5), in-engine runner (Jest-Lua vs TestEZ).
-8. `GLOSSARY.md` (from section 2.4) with the content schema derived from
+   path (5.5), in-engine runner (Jest-Lua vs TestEZ), Luau VM coverage
+   through Lune (non-blocking).
+8. Coverage guards in tier 0 and the nightly mutation check, as defined
+   in section 4, landing with the refactor.
+9. `GLOSSARY.md` (from section 2.4) with the content schema derived from
    it; `DEFINITION_OF_DONE.md`, `RELEASE_CHECKLIST.md`,
    `docs/design/feel.md`, first skills.
 
