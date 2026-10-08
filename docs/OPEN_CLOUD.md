@@ -12,7 +12,7 @@ a real key are for the owner, when debugging a CI failure. Everyone else uses
 
 | File | What it does |
 |---|---|
-| `tools/opencloud.luau` | Builds every Open Cloud request and parses every response. HTTP is injected, so tests mock it. Retry policy: a transport error is retried once; a 5xx is retried once for GET only, never for a POST (publish, create task) that may already have been accepted; a 4xx never is. |
+| `tools/opencloud.luau` | Builds every Open Cloud request and parses every response. HTTP is injected, so tests mock it. Retry policy: a transport error is retried once; a 5xx is retried once for GET only, never for a POST (publish, create task) that may already have been accepted; Roblox's "server busy" 409 is retried with backoff (safety rule 8); any other 4xx is never retried. |
 | `tools/publish.luau` | Publishes a `.rbxl` as a `Saved` or `Published` version and prints the version number on stdout. |
 | `tools/run-engine-tests.luau` | Runs engine test scripts as Luau Execution tasks, up to 4 at once, and fails unless every one passes. |
 | `tools/lib/` | Shared argument parsing and the Release guard (`cli.luau`), and the logic behind the two tools. |
@@ -89,8 +89,9 @@ Luau Execution limits: create allows 5 per minute per key owner, and a place
 may have at most 10 incomplete tasks. Both answer HTTP 429. Each script gets
 `timeout + 300` seconds of waiting in total, polls and 429s included. A 429
 waits for `Retry-After`, or 15 seconds if that header is absent.
-The whole run also has a wall-clock deadline: `(timeout + 300)` seconds for
-each wave of 4 scripts, plus a minute. That catches a request that never
+The whole run also has a wall-clock deadline: `timeout + 300` seconds, plus
+the longest "server busy" wait (`OpenCloud.BUSY_WAIT_TOTAL`, safety rule 8), for each wave of
+4 scripts, plus a minute. That catches a request that never
 returns, because Lune's HTTP client has no timeout of its own. A script whose
 worker raises counts as failed; it cannot stall the run.
 
@@ -110,6 +111,16 @@ finish()
 - Per the API spec, physics does not run in a task, and server and client
   scripts do not start on their own. The DataModel is a fresh copy of the
   place version, and changes are not saved.
+- `describe`, `it`, `expect`, `storeName` and `finish` are the prelude's
+  exports, which the runner binds as locals before your script
+  (`EngineTests.PRELUDE_EXPORTS`); `RUN_ID` and `PASS_MARKER` are globals.
+  For the static checks, `tests/engine/engine.yml` declares them to Selene
+  (`tests/engine/selene.toml`, scoped to this folder) and
+  `tests/engine/globals.d.luau` declares them to luau-lsp, which analyzes
+  `tests/engine` on the Roblox platform. A unit test checks the prelude,
+  `engine.yml` and `globals.d.luau` against `PRELUDE_EXPORTS`.
+- Line numbers in errors are counted from the start of the submitted task,
+  which includes the prelude.
 - **DataStores are live**, as are MemoryStore and Messaging. Always name
   stores with `storeName`, as in
   `game:GetService("DataStoreService"):GetDataStore(storeName("Saves"))`,
@@ -145,11 +156,6 @@ covered.** The rule that closes that gap belongs to Checkpoint B: the
 `Persist` module takes its store prefix from config, as plan 2.3 already
 says, and the engine harness sets that prefix to `test-<RUN_ID>-`. Until
 then, engine tests must not exercise game code that opens stores.
-
-- Line numbers in errors are counted from the start of the submitted task,
-  which includes the prelude.
-- Line numbers in errors are counted from the start of the submitted task,
-  which includes the prelude.
 
 ## CI
 
@@ -213,6 +219,15 @@ will need one, scoped to the Dev experience.
    as the plan and brief require. A transport error can, rarely, also follow
    an accepted request. The worst case is one extra Saved version, or one
    extra task under the same `RUN_ID`.
+8. **"Server busy" is the one 4xx that is retried.** Roblox sometimes answers
+   a publish with HTTP 409 `{"code":"Conflict","message":"Save failed. Server
+   is busy ... Please try again in a couple minutes."}`. That is a request to
+   retry, not a rejection. A 409 whose code is `Conflict` and whose message
+   contains "try again" is retried after each wait in
+   `OpenCloud.BUSY_BACKOFF` (30, 60, 120 and 240 seconds today), for any
+   request, then reported as a failure. Every
+   other 4xx, including any other 409, fails at once. The engine-test run
+   deadline allows for this wait.
 
 ### What the guard is, and what it is not
 
