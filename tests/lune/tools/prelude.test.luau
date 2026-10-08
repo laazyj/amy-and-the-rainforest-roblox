@@ -114,6 +114,42 @@ H.test("storeName refuses to run without RUN_ID", function()
 	H.contains(err or "", "RUN_ID is not set")
 end)
 
+H.test("returns exactly the helpers the runner binds", function()
+	local env = setmetatable({ game = fakeGame({}) }, { __index = getfenv() })
+	local exports = luau.load(PRELUDE, { debugName = "prelude", environment = env :: any })()
+	local names = {}
+	for name in exports do
+		table.insert(names, name)
+	end
+	table.sort(names)
+	local expected = table.clone(EngineTests.PRELUDE_EXPORTS)
+	table.sort(expected)
+	H.eq(table.concat(names, ","), table.concat(expected, ","), "exports")
+end)
+
+H.test("the static-check declarations match the helpers the runner binds", function()
+	local expected = {}
+	for _, name in EngineTests.PRELUDE_EXPORTS do
+		if name ~= "game" then -- declared by Roblox's own std and definitions
+			table.insert(expected, name)
+		end
+	end
+	table.sort(expected)
+	local function declared(path: string, pattern: string): string
+		local names = {}
+		for name in string.gmatch(fs.readFile(path), pattern) do
+			if name ~= "RUN_ID" and name ~= "PASS_MARKER" then
+				table.insert(names, name)
+			end
+		end
+		table.sort(names)
+		return table.concat(names, ",")
+	end
+	local want = table.concat(expected, ",")
+	H.eq(declared("tests/engine/engine.yml", "\n  (%w+):\n"), want, "engine.yml")
+	H.eq(declared("tests/engine/globals.d.luau", "declare function (%w+)"), want, "globals.d.luau")
+end)
+
 print("engine prelude: game proxy")
 
 local DS = 'local D = game:GetService("DataStoreService")\n'
@@ -137,7 +173,7 @@ H.test("opens stores named by storeName, on the real service", function()
 end)
 
 -- Every way the lint can be dodged still reaches the proxy at run time.
-local REFUSED = {
+local REFUSED: { [string]: string } = {
 	["a plain name"] = DS .. 'D:GetDataStore("PlayerData")',
 	["string-call syntax"] = DS .. 'D:GetDataStore"PlayerData"',
 	["indexing by name"] = DS .. 'D["GetDataStore"](D, "PlayerData")',

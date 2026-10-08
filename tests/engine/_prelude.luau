@@ -1,9 +1,10 @@
---!nocheck
+--!nonstrict
 -- Engine test prelude. tools/run-engine-tests submits every script in
 -- tests/engine/ as one Luau Execution task: the RUN_ID and PASS_MARKER
--- globals, then this file, then the script. Luau Execution has no require for
--- repository files, so the helpers below are plain locals visible to the
--- script that follows.
+-- globals, then this file run as a function, then the script. Luau Execution
+-- has no require for repository files, so the table this file returns is
+-- unpacked into locals the script sees (EngineTests.PRELUDE_EXPORTS); Selene
+-- and luau-lsp learn them from tests/engine/engine.yml and globals.d.luau.
 --
 --   describe(name, fn)  groups tests; nests
 --   it(name, fn)        one test; an error inside fails it and the rest still run
@@ -157,7 +158,7 @@ local function _guardService(serviceName, real)
 	return _proxy(real, overrides)
 end
 
-local game = (function(realGame)
+local guardedGame = (function(realGame)
 	local overrides = {}
 	for serviceName in _GUARDED do
 		overrides[serviceName] = _guardService(serviceName, realGame:GetService(serviceName))
@@ -169,7 +170,6 @@ local game = (function(realGame)
 	end
 	return _proxy(realGame, overrides)
 end)(game)
-local Game = game
 
 local function finish()
 	if _passed == 0 and #_failures == 0 then
@@ -185,3 +185,12 @@ local function finish()
 	print(_passed .. " passed")
 	print(PASS_MARKER)
 end
+
+return {
+	describe = describe,
+	it = it,
+	expect = expect,
+	storeName = storeName,
+	finish = finish,
+	game = guardedGame,
+}

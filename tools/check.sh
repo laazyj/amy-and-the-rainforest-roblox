@@ -16,17 +16,22 @@ echo "== StyLua"
 stylua --check src tests
 
 echo "== Selene"
-selene src tests
+selene src tests # selene.toml excludes tests/engine, which has its own config
+(cd tests/engine && selene .) # engine.yml declares the names the runner injects
 
 echo "== luau-lsp: src (Roblox)"
 rojo sourcemap default.project.json -o build/sourcemap.json
 luau-lsp analyze --platform=roblox --sourcemap=build/sourcemap.json --definitions=@roblox="$defs" src
 
-echo "== luau-lsp: tests (Lune)"
+echo "== luau-lsp: tests/engine (Roblox, with the names the runner injects)"
+luau-lsp analyze --platform=roblox --definitions=@roblox="$defs" \
+	--definitions=@engine=tests/engine/globals.d.luau --ignore="**/*.d.luau" tests/engine
+
+echo "== luau-lsp: tests/lune (Lune)"
 lune_version="$(lune --version | cut -d' ' -f2)"
 if ! grep -q "typedefs/$lune_version/" .luaurc; then
 	echo "error: the @lune alias in .luaurc must point at the typedefs of lune $lune_version" >&2
 	exit 1
 fi
 lune setup >/dev/null # writes the @lune type definitions that .luaurc points at
-luau-lsp analyze --platform=standard tests
+luau-lsp analyze --platform=standard tests/lune

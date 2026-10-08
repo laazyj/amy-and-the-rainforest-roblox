@@ -95,7 +95,7 @@ local function run(options: {
 			"--prelude",
 			"engine/_prelude.luau",
 		}
-	for _, arg in options.extra or {} do
+	for _, arg in (options.extra or {}) :: { string } do
 		table.insert(args, arg)
 	end
 	local server = fakeServer(options.behaviours)
@@ -255,6 +255,30 @@ H.test("waits out a 429 when creating a task, honouring Retry-After", function()
 	H.eq(#server.created, 1, "tasks created")
 end)
 
+H.test("retries Roblox's 'server busy' 409 when creating a task", function()
+	local waited = {}
+	local err, _, server = run({
+		behaviours = { ["a.luau"] = { logs = PASSING } },
+		args = table.clone(SINGLE_LATEST),
+		intercept = (function()
+			local busy = true
+			return function(request: OpenCloud.Request): OpenCloud.Response?
+				if request.method == "POST" and busy then
+					busy = false
+					return H.response(409, '{"code":"Conflict","message":"Server is busy. Please try again later."}')
+				end
+				return nil
+			end
+		end)(),
+		sleep = function(seconds)
+			table.insert(waited, seconds)
+		end,
+	})
+	H.eq(err, nil, "error")
+	H.eq(waited[1], OpenCloud.BUSY_BACKOFF[1], "backoff")
+	H.eq(#server.created, 1, "tasks created")
+end)
+
 H.test("waits out a 429 while polling", function()
 	local waited = {}
 	local err = run({
@@ -292,11 +316,11 @@ end)
 print("run-engine-tests: DataStore lint")
 
 local function lint(source: string): string?
-	local ok, err = pcall(EngineTests.checkDataStoreUse, "t.luau", source)
+	local ok, err = pcall(EngineTests.checkDataStoreUse :: any, "t.luau", source)
 	return if ok then nil else tostring(err)
 end
 
-local LINT_REFUSES = {
+local LINT_REFUSES: { [string]: string } = {
 	["a plain name"] = 'D:GetDataStore("PlayerData")',
 	["string-call syntax"] = 'D:GetDataStore"PlayerData"',
 	["single-quoted string-call syntax"] = "D:GetDataStore'PlayerData'",
@@ -316,7 +340,7 @@ for label, source in LINT_REFUSES do
 	end)
 end
 
-local LINT_ALLOWS = {
+local LINT_ALLOWS: { [string]: string } = {
 	["a line comment"] = '-- never call GetGlobalDataStore or D:GetDataStore("x") here',
 	["a block comment"] = '--[==[ D:GetDataStore("x") ]==]',
 	["a string mentioning a call"] = 'local s = "GetDataStore(x)"',

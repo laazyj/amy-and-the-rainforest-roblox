@@ -17,7 +17,7 @@ H.passed = 0
 H.failures = {} :: { string }
 
 function H.test(name: string, fn: () -> ())
-	local ok, err = pcall(fn)
+	local ok, err = pcall(fn :: any)
 	if ok then
 		H.passed += 1
 		print(`  ok   {name}`)
@@ -57,7 +57,7 @@ end
 -- The environment a Dev job has: a Dev key and the Release guard armed.
 function H.env(overrides: { [string]: string }?): { [string]: string }
 	local env = { ROBLOX_DEV_API_KEY = H.KEY, RELEASE_UNIVERSE_ID = H.RELEASE }
-	for name, value in overrides or {} do
+	for name, value in (overrides or {}) :: { [string]: string } do
 		env[name] = value
 	end
 	return env
@@ -78,7 +78,7 @@ local Mock = {}
 Mock.__index = Mock
 
 function Mock.run(self: Mock, main: (Cli.Context) -> ()): string?
-	local ok, err = pcall(main, self.ctx)
+	local ok, err = pcall(main :: any, self.ctx)
 	return if ok then nil else tostring(err)
 end
 
@@ -100,7 +100,7 @@ function H.mock(options: {
 	sleep: OpenCloud.Sleep?,
 	clock: (() -> number)?,
 }): Mock
-	local files = options.files or {}
+	local files: { [string]: string } = options.files or {}
 	local mock = setmetatable({ calls = {}, out = {}, log = {} }, Mock) :: any
 	mock.ctx = {
 		args = options.args,

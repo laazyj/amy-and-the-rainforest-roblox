@@ -189,28 +189,62 @@ function OpenCloud.describeTaskPolling(): string
 	)}`
 end
 
--- Sends a request with the retry policy from the plan: a transport error is
--- retried once; a 4xx never is. A 5xx is retried once only for GET, because a
--- POST that failed with a 5xx may still have been accepted (a second publish
--- or a duplicate task). Returns the response, or raises.
+-- Waits before each retry of a "server busy" 409 (see `isBusy`): about 7.5
+-- minutes in all, then the 409 is returned.
+OpenCloud.BUSY_BACKOFF = table.freeze({ 30, 60, 120, 240 })
+OpenCloud.BUSY_WAIT_TOTAL = 0
+for _, seconds in OpenCloud.BUSY_BACKOFF do
+	OpenCloud.BUSY_WAIT_TOTAL += seconds
+end
+
+-- Roblox answers a busy save with 409 {"code":"Conflict","message":"... Please
+-- try again in a couple minutes."}. That one 4xx is a request to retry.
+local function isBusy(response: Response): boolean
+	if response.statusCode ~= 409 then
+		return false
+	end
+	local ok, body = pcall(function()
+		return serde.decode("json", response.body)
+	end)
+	return ok
+		and type(body) == "table"
+		and body.code == "Conflict"
+		and type(body.message) == "string"
+		and string.find(string.lower(body.message), "try again", 1, true) ~= nil
+end
+
+-- Sends a request with the retry policy from the plan:
+-- - a transport error is retried once;
+-- - a 5xx is retried once only for GET, because a POST that failed with a 5xx
+--   may still have been accepted (a second publish or a duplicate task);
+-- - a "server busy" 409 is retried with BUSY_BACKOFF, then returned;
+-- - any other 4xx is returned at once.
+-- Returns the response, or raises.
 function OpenCloud.send(http: Http, sleep: Sleep, request: Request): Response
-	local lastError = ""
-	for attempt = 1, 2 do
+	local retried = false
+	local busyRetries = 0
+	while true do
 		local ok, result = pcall(http, request)
-		if ok then
+		local failure
+		if not ok then
+			failure = `transport error: {result}`
+		else
 			local response = result :: Response
-			if response.statusCode < 500 or request.method ~= "GET" then
+			if isBusy(response) and busyRetries < #OpenCloud.BUSY_BACKOFF then
+				busyRetries += 1
+				sleep(OpenCloud.BUSY_BACKOFF[busyRetries])
+				continue
+			elseif response.statusCode < 500 or request.method ~= "GET" then
 				return response
 			end
-			lastError = `HTTP {response.statusCode}: {response.body}`
-		else
-			lastError = `transport error: {result}`
+			failure = `HTTP {response.statusCode}: {response.body}`
 		end
-		if attempt == 1 then
-			sleep(OpenCloud.RETRY_DELAY)
+		if retried then
+			error(`{request.method} {request.url} failed after one retry ({failure})`, 0)
 		end
+		retried = true
+		sleep(OpenCloud.RETRY_DELAY)
 	end
-	error(`{request.method} {request.url} failed after one retry ({lastError})`, 0)
 end
 
 -- Raises a readable error for any non-2xx response.

@@ -5,7 +5,7 @@ local Cli = require("../../../tools/lib/cli")
 
 local function target(universe: string, env: { [string]: string }, extra: { string }?): (Cli.Target?, string?)
 	local args = { "--universe", universe, "--place", H.PLACE }
-	for _, arg in extra or {} do
+	for _, arg in (extra or {}) :: { string } do
 		table.insert(args, arg)
 	end
 	local mock = H.mock({ args = args, env = env })

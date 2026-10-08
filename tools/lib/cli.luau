@@ -170,7 +170,7 @@ end
 -- reports failures the same way.
 function Cli.main(main: (Context) -> ())
 	local ctx = Cli.liveContext()
-	local ok, err = pcall(main, ctx)
+	local ok, err = pcall(main :: any, ctx)
 	if not ok then
 		ctx.log(`error: {err}`)
 	end

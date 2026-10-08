@@ -1,4 +1,4 @@
---!nocheck
+--!strict
 -- Smoke test: the published place loads in Luau Execution and is this game.
 -- Runs after _prelude.luau (see tools/run-engine-tests).
 
@@ -10,9 +10,10 @@ describe("place", function()
 	it("is named after the game", function()
 		-- The name set on the Creator Dashboard (plan section 10): "Amy and the
 		-- Rain Forest" for Release, "Amy and the Rain Forest (Dev)" for Dev.
-		local info = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId)
+		local prefix = "Amy and the Rain Forest"
+		local info = game:GetService("MarketplaceService"):GetProductInfoAsync(game.PlaceId)
 		print("  place name: " .. tostring(info.Name))
-		expect(string.find(info.Name, "Amy and the Rain Forest", 1, true)).toBe(1)
+		expect(string.sub(info.Name, 1, #prefix)).toBe(prefix)
 	end)
 
 	it("contains the story scripts built from src/", function()

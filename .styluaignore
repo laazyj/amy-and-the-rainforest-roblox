@@ -1,0 +1,2 @@
+# Type declaration files (luau-lsp only); StyLua cannot parse `declare`.
+*.d.luau
