@@ -22,10 +22,19 @@ approve new Lines in her voice is in the [style guide](style-guide.md).
    the "Canon Line" column below, and every row must appear in content as
    a Line marked `canon`. In every table here the Line is the only
    backticked text in its row. Until the refactor the source is
-   `src/ReplicatedStorage/StoryData.lua`.
+   `src/ReplicatedStorage/StoryData.lua`, which still reads "vilage"
+   where this file reads "village"; the Checkpoint B refactor applies
+   that respelling in StoryData, and the tier 1 canon test then matches
+   this file exactly.
 4. **Never "corrected".** Spell checkers, formatters and translation must
    not touch canon Lines, which is why automatic translation stays off
    (see the [release checklist](../RELEASE_CHECKLIST.md)).
+
+## Decisions
+
+| Date | Decision |
+|---|---|
+| 2026-10-08 | The owner corrected Clara's "vilage" to "village" throughout the game, in canon and game Lines alike. Every other spelling of Clara's stays exactly as written. The published text quoted at the end of this file is unchanged, because it records her page as it is. |
 
 ## Canon Lines
 
@@ -46,8 +55,8 @@ they are.
 | 8 | chapter2.enter_forest | outro | Narrator | `It was a bautyfull paradise!` | Exact. |
 | 9 | chapter3.meet_squirrel | intro | Narrator | `Amy discoverd so many animals! Something maroon was hopping between the roots...` | Mixed: only "Amy discoverd so many animals!" is Clara's; "Something maroon was hopping between the roots..." was written for the game. The Phase 0 refactor splits it (rule 2). |
 | 10 | chapter3.rush_home | intro | Narrator | `She rushed Home...` | Adapted: the start of her sentence, ending in "..."; it continues in the next canon Line. |
-| 11 | chapter3.tell_mum | dialogue | Narrator | `...and told her mum who told her dad who told the vilage.` | Adapted: continues "She rushed Home"; her sentence goes on "— who made", the Line ends with a full stop. |
-| 12 | chapter4.stand_in_front | intro | Narrator | `The vilage made a giant tree-chopping machine and they decided to chop down the forest because they thought it was a thret to humankind.` | Adapted: her text reads "who made"; the Line starts "The vilage made". |
+| 11 | chapter3.tell_mum | dialogue | Narrator | `...and told her mum who told her dad who told the village.` | Adapted: continues "She rushed Home"; her sentence goes on "— who made", the Line ends with a full stop. |
+| 12 | chapter4.stand_in_front | intro | Narrator | `The village made a giant tree-chopping machine and they decided to chop down the forest because they thought it was a thret to humankind.` | Adapted: her text reads "who made"; the Line starts "The village made". |
 | 13 | chapter4.explain | dialogue | Narrator | `Lukily Amy managed to stop them by staying in front of it just long enugh to explain to them that they should be proud of it and take care of it.` | Exact. |
 | 14 | chapter4.explain | dialogue | Narrator | `They took her seriously and stoped.` | Exact. |
 
@@ -87,7 +96,7 @@ checked against Clara's text.
 | 25 | chapter3.meet_lion | dialogue | Amy | `I will. I promise. Mum is NOT going to believe this!` |  |
 | 26 | chapter3.tell_mum | dialogue | Amy | `MUM! The rain forest isn't dangerous, it's a paradise! There's a maroon squirrel and an orange fox and a golden lion and they TALK!` |  |
 | 27 | chapter3.tell_mum | dialogue | Mum | `A golden... lion? That talks? Oh Amy. WAIT until your father hears about this.` |  |
-| 28 | chapter3.tell_mum | dialogue | Narrator | `But the vilage did not hear 'paradise'. The vilage heard 'LION'.` | Not in Clara's text, but copies her spelling "vilage". Breaks the style guide's spelling rule; owner to decide whether to respell it "village" or ask Clara to adopt it. |
+| 28 | chapter3.tell_mum | dialogue | Narrator | `But the village did not hear 'paradise'. The village heard 'LION'.` |  |
 | 29 | chapter4.stand_in_front | intro | Amy | `No no no no NO. Not my paradise. Not my friends. MOVE, legs!` |  |
 | 30 | chapter4.stand_in_front | outro | Narrator | `Amy planted her feet in the grass, right between the whirring blade and the giant trees, and did not move.` |  |
 | 31 | chapter4.stand_in_front | outro | Amy | `STOP! Everybody just... STOP!` |  |

@@ -217,7 +217,7 @@ and canopy greens.
 
 Roblox can translate an experience's text automatically. It stays
 **off** on both Dev and Release. Automatic translation treats Clara's
-deliberate spellings ("beautyfull", "tryed", "brang", "vilage") as
+deliberate spellings ("beautyfull", "tryed", "brang", "thier") as
 mistakes and would "correct" or mistranslate them, which breaks the
 [canon rule](../story/canon.md#the-rule) for every player who sees the
 game in another language. Translations, if they ever come, are written

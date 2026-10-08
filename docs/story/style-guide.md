@@ -21,7 +21,7 @@ description for its own sake; the forest is just "a dark forest" that
 **Long sentences only for a chain of events.** When things tumble
 forward, she joins them with "and", "who" and "but" instead of starting
 new sentences: "She rushed Home and told her mum who told her dad who told
-the vilage." Use this for a rush of consequences, at most once in a scene.
+the village." Use this for a rush of consequences, at most once in a scene.
 
 **Amy does; the story tells.** The Narrator reports what Amy did, in the
 past tense, in the third person: "Amy managed to get outside." Feelings
@@ -65,7 +65,6 @@ book's charm and are locked with the canon Lines:
 | wos | was |
 | orch | orange |
 | Home (capital) | home |
-| vilage | village |
 | thret | threat |
 | Lukily | Luckily |
 | enugh | enough |
@@ -74,9 +73,8 @@ book's charm and are locked with the canon Lines:
 **The rule for new text:** use standard British English spelling (the
 game already says "colour", "Mum", "favourite") unless Clara herself wrote
 the words. Do not imitate her spellings in new Lines: it reads as mocking
-her rather than honouring her, and it blurs which words are hers. One
-existing game Line breaks this rule; it is flagged in
-[`canon.md`](canon.md#game-lines-not-canon).
+her rather than honouring her, and it blurs which words are hers.
+("vilage" is no longer kept: see [`canon.md`](canon.md#decisions).)
 
 ## 3. Reading level: ages 7 to 12
 
@@ -136,8 +134,7 @@ for the game.
 3. **Narrator:** "Amy told Mum, and Mum told Dad, and Dad told the whole
    village."
    A chain of events joined by "and", in the rhythm of her "who told her
-   dad who told the vilage", but in standard spelling because it is new
-   text.
+   dad who told the village", in plain words.
 
 ### Lines that do not fit
 
