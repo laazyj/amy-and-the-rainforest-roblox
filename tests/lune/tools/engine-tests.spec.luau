@@ -242,10 +242,10 @@ return function(t: any)
 			local err, _, server = run({
 				behaviours = { ["a.luau"] = { logs = PASSING } },
 				files = {
-					["engine/a.luau"] = 'local h = include("engine/_h.luau")\n'
-						.. 'local g, g2 = fixture("golden/a.json"), fixture( "golden/a.json" )\nfinish()\n',
-					["engine/_h.luau"] = "return 'helper body'",
-					["golden/a.json"] = '["golden text"]',
+					["engine/a.luau"] = 'local h = include("tests/_h.luau")\n'
+						.. 'local g, g2 = fixture("tests/golden/a.json"), fixture( "tests/golden/a.json" )\nfinish()\n',
+					["tests/_h.luau"] = "return 'helper body'",
+					["tests/golden/a.json"] = '["golden text"]',
 				},
 			})
 			expect(err).toBeNil()
@@ -265,9 +265,9 @@ return function(t: any)
 			local err, _, server = run({
 				behaviours = { ["a.luau"] = { logs = PASSING } },
 				files = {
-					["engine/a.luau"] = 'include("engine/_h.luau")',
-					["engine/_h.luau"] = 'return fixture("golden/b.json")',
-					["golden/b.json"] = "nested fixture text",
+					["engine/a.luau"] = 'include("tests/_h.luau")',
+					["tests/_h.luau"] = 'return fixture("tests/golden/b.json")',
+					["tests/golden/b.json"] = "nested fixture text",
 				},
 			})
 			expect(err).toBeNil()
@@ -278,19 +278,80 @@ return function(t: any)
 			local err, m = run({
 				behaviours = { ["a.luau"] = { logs = PASSING } },
 				files = {
-					["engine/a.luau"] = 'local p = "golden/a.json"\nfixture(p) -- fixture() in a comment is fine',
+					["engine/a.luau"] = 'local p = "tests/golden/a.json"\nfixture(p) -- fixture() in a comment is fine',
 				},
 			})
-			expect(err).toContain("engine/a.luau: fixture() takes a path in double quotes")
+			expect(err).toContain("engine/a.luau: fixture() must be called with a path in double quotes")
+			expect(#m.calls).toBe(0)
+		end)
+
+		it("refuses any use of include or fixture other than a literal call, sending nothing", function()
+			for _, call in
+				{
+					'fixture"tests/a.json"',
+					"fixture[[tests/a.json]]",
+					"include'tests/h.luau'",
+					"local f = fixture\nf('tests/a.json')",
+					'pcall(fixture, "tests/a.json")',
+				}
+			do
+				local err, m =
+					run({ behaviours = { ["a.luau"] = { logs = PASSING } }, files = { ["engine/a.luau"] = call } })
+				expect(err).toContain("must be called with a path in double quotes")
+				expect(#m.calls).toBe(0)
+			end
+		end)
+
+		it("refuses to embed a file outside tests/, sending nothing", function()
+			for _, path in
+				{ "/proc/self/environ", "tests/../tools/x.luau", "tools/opencloud.luau", "tests", "tests//x" }
+			do
+				local err, m = run({
+					behaviours = { ["a.luau"] = { logs = PASSING } },
+					files = { ["engine/a.luau"] = `fixture("{path}")`, [path] = "secret" },
+				})
+				expect(err).toContain("only files under tests/ can be embedded")
+				expect(#m.calls).toBe(0)
+			end
+		end)
+
+		it("allows dots inside a file name under tests/", function()
+			local err = run({
+				behaviours = { ["a.luau"] = { logs = PASSING } },
+				files = { ["engine/a.luau"] = 'fixture("tests/a..b.json")', ["tests/a..b.json"] = "ok" },
+			})
+			expect(err).toBeNil()
+		end)
+
+		it("ignores include and fixture calls inside comments", function()
+			local err, _, server = run({
+				behaviours = { ["a.luau"] = { logs = PASSING } },
+				files = {
+					["engine/a.luau"] = '-- see fixture("tests/missing.json")\n--[[ include("tests/gone.luau") ]]\nfinish()',
+				},
+			})
+			expect(err).toBeNil()
+			expect(#server.created).toBe(1)
+		end)
+
+		it("refuses a task script over Luau Execution's size limit, sending nothing", function()
+			local err, m = run({
+				behaviours = { ["a.luau"] = { logs = PASSING } },
+				files = {
+					["engine/a.luau"] = 'fixture("tests/big.json")',
+					["tests/big.json"] = string.rep("x", OpenCloud.MAX_TASK_SCRIPT_BYTES),
+				},
+			})
+			expect(err).toContain("engine/a.luau: the task script is")
 			expect(#m.calls).toBe(0)
 		end)
 
 		it("refuses a script whose included or fixture file is missing, sending nothing", function()
 			local err, m = run({
 				behaviours = { ["a.luau"] = { logs = PASSING } },
-				files = { ["engine/a.luau"] = 'fixture("golden/missing.json")' },
+				files = { ["engine/a.luau"] = 'fixture("tests/golden/missing.json")' },
 			})
-			expect(err).toContain('engine/a.luau: fixture("golden/missing.json"): file not found')
+			expect(err).toContain('engine/a.luau: fixture("tests/golden/missing.json"): file not found')
 			expect(#m.calls).toBe(0)
 		end)
 
@@ -450,11 +511,11 @@ return function(t: any)
 				local err, m = run({
 					behaviours = { ["a.luau"] = { logs = PASSING } },
 					files = {
-						["engine/a.luau"] = 'include("engine/_h.luau")',
-						["engine/_h.luau"] = 'return game:GetService("DataStoreService"):GetDataStore("Saves")',
+						["engine/a.luau"] = 'include("tests/_h.luau")',
+						["tests/_h.luau"] = 'return game:GetService("DataStoreService"):GetDataStore("Saves")',
 					},
 				})
-				expect(err).toContain("engine/_h.luau:1: GetDataStore must be called")
+				expect(err).toContain("tests/_h.luau:1: GetDataStore must be called")
 				expect(#m.calls).toBe(0)
 			end)
 

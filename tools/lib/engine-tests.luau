@@ -59,9 +59,10 @@ end
 -- Replaces comments with spaces and string literals with "", so the lint
 -- below sees only code. A string that is exactly a store method name is
 -- kept, so indexing by name (D["GetDataStore"]) stays visible. Interpolated
--- strings keep their {expressions}, which are code.
-local function stripCommentsAndStrings(source: string): string
-	local out = {}
+-- strings keep their {expressions}, which are code. The second result is the
+-- source with only its comments replaced, every string kept as written.
+local function stripCommentsAndStrings(source: string): (string, string)
+	local out, commentless = {}, {}
 	local i = 1
 	local function longBracketEnd(at: number): number?
 		local equals = string.match(source, "^%[(=*)%[", at)
@@ -71,9 +72,14 @@ local function stripCommentsAndStrings(source: string): string
 		local _, close = string.find(source, `]{equals}]`, at, true)
 		return close or #source
 	end
-	local function keepOrBlank(content: string)
+	local function both(text: string)
+		table.insert(out, text)
+		table.insert(commentless, text)
+	end
+	local function keepOrBlank(content: string, literal: string)
 		local kept = if isStoreMethod(content) then `"{content}"` else '""'
 		table.insert(out, kept .. blankLines(content))
+		table.insert(commentless, literal)
 	end
 	while i <= #source do
 		local char = string.sub(source, i, i)
@@ -82,10 +88,11 @@ local function stripCommentsAndStrings(source: string): string
 			local close = longBracketEnd(i + 2)
 			local after = if close then close + 1 else (string.find(source, "\n", i, true) or #source + 1)
 			-- Keep the comment's newlines, so line numbers still match.
-			table.insert(out, " " .. blankLines(string.sub(source, i, after - 1)))
+			both(" " .. blankLines(string.sub(source, i, after - 1)))
 			i = after
 		elseif bracketClose then
-			keepOrBlank(string.match(string.sub(source, i, bracketClose), "^%[=*%[(.-)%]=*%]$") or "")
+			local literal = string.sub(source, i, bracketClose)
+			keepOrBlank(string.match(literal, "^%[=*%[(.-)%]=*%]$") or "", literal)
 			i = bracketClose + 1
 		elseif char == '"' or char == "'" or char == "`" then
 			local content = {}
@@ -106,14 +113,15 @@ local function stripCommentsAndStrings(source: string): string
 					j += 1
 				end
 			end
-			keepOrBlank(table.concat(content))
-			i = if string.sub(source, j, j) == char then j + 1 else j
+			local after = if string.sub(source, j, j) == char then j + 1 else j
+			keepOrBlank(table.concat(content), string.sub(source, i, after - 1))
+			i = after
 		else
-			table.insert(out, char)
+			both(char)
 			i += 1
 		end
 	end
-	return table.concat(out)
+	return table.concat(out), table.concat(commentless)
 end
 
 -- Engine tests touch live DataStores and MemoryStores, so every store a
@@ -157,23 +165,48 @@ EngineTests.PRELUDE_EXPORTS = table.freeze({ "describe", "it", "expect", "storeN
 --   include("tests/engine/_helper.luau")  runs that helper once, returns its value
 --   fixture("tests/fixtures/x.json")      returns that file's text
 EngineTests.EMBED_FUNCTIONS = table.freeze({ "include", "fixture" })
+-- Embedded files must be under this directory (relative, no ".."), so a
+-- script cannot embed anything else on the runner, such as its environment.
+EngineTests.EMBED_ROOT = "tests"
 
--- The paths `source` passes to `call` ("include" or "fixture"). Only a
--- string literal can be embedded, so any other argument is refused here,
--- before a task is spent.
-local function embedPaths(name: string, source: string, call: string): { string }
+-- The paths `source` passes to `call` ("include" or "fixture"), outside
+-- comments. `code` and `commentless` are the two results of
+-- stripCommentsAndStrings. Only a double-quoted string literal can be
+-- embedded, so every other mention of `call` (another argument, a paren-less
+-- call, an alias, passing it as a value) is refused here, before a task is
+-- spent.
+local function embedPaths(name: string, code: string, commentless: string, call: string): { string }
 	local paths = {}
-	for path in string.gmatch(source, `%f[%w_]{call}%s*%(%s*"([^"]+)"%s*%)`) do
+	for path in string.gmatch(commentless, `%f[%w_]{call}%s*%(%s*"([^"]+)"%s*%)`) do
 		table.insert(paths, path)
 	end
-	-- In code with comments removed and strings emptied, a literal call reads call("").
-	local code = stripCommentsAndStrings(source)
-	local _, calls = string.gsub(code, `%f[%w_]{call}%s*%(`, "")
+	-- With comments removed and strings emptied, a literal call reads call("").
+	local mentions = 0
+	for at in string.gmatch(code, `()%f[%w_]{call}%f[^%w_]`) do
+		local before = string.match(string.sub(code, 1, (at :: any) - 1), "(%S)%s*$")
+		if before ~= "." and before ~= ":" then
+			mentions += 1
+		end
+	end
 	local _, literals = string.gsub(code, `%f[%w_]{call}%s*%(%s*""%s*%)`, "")
-	if calls ~= literals then
-		error(`{name}: {call}() takes a path in double quotes, which the runner embeds`, 0)
+	if mentions ~= literals then
+		error(`{name}: {call}() must be called with a path in double quotes, which the runner embeds`, 0)
 	end
 	return paths
+end
+
+-- Embedded files must be relative paths under EMBED_ROOT with no empty, "."
+-- or ".." segment, so a script cannot embed anything else from the runner,
+-- such as its environment.
+local function checkEmbedPath(name: string, call: string, path: string)
+	local segments = string.split(path, "/")
+	local ok = segments[1] == EngineTests.EMBED_ROOT and #segments > 1
+	for _, segment in segments do
+		ok = ok and segment ~= "" and segment ~= "." and segment ~= ".."
+	end
+	if not ok then
+		error(`{name}: {call}("{path}"): only files under {EngineTests.EMBED_ROOT}/ can be embedded`, 0)
+	end
 end
 
 -- Every file `source` names with include() or fixture(), and every file those
@@ -186,9 +219,11 @@ local function collectEmbeds(ctx: Cli.Context, name: string, source: string): Em
 	local queue = { { name = name, source = source } }
 	while #queue > 0 do
 		local item = table.remove(queue) :: { name: string, source: string }
+		local code, commentless = stripCommentsAndStrings(item.source)
 		for _, call in EngineTests.EMBED_FUNCTIONS do
-			for _, file in embedPaths(item.name, item.source, call) do
+			for _, file in embedPaths(item.name, code, commentless, call) do
 				if embedded[call][file] == nil then
+					checkEmbedPath(item.name, call, file)
 					local text = ctx.readFile(file) or error(`{item.name}: {call}("{file}"): file not found`, 0)
 					embedded[call][file] = text
 					if call == "include" then
@@ -416,10 +451,24 @@ function EngineTests.main(ctx: Cli.Context)
 	local preludePath = values.prelude or EngineTests.DEFAULT_PRELUDE
 	local prelude = ctx.readFile(preludePath) or error(`prelude not found: {preludePath}`, 0)
 	local scripts = loadScripts(ctx, values)
-
-	local function createRequest(script: Script): OpenCloud.Request
+	-- Every request is built before any is sent, so a script that cannot be
+	-- submitted (too large) stops the run before a task is spent.
+	local requests: { [Script]: OpenCloud.Request } = {}
+	for _, script in scripts do
 		local source = EngineTests.wrap(runId, prelude, script)
-		return OpenCloud.createTaskRequest(target.apiKey, target.universeId, target.placeId, versionId, source, timeout)
+		local ok, request = pcall(
+			OpenCloud.createTaskRequest,
+			target.apiKey,
+			target.universeId,
+			target.placeId,
+			versionId,
+			source,
+			timeout
+		)
+		requests[script] = if ok then request else error(`{script.name}: {request}`, 0)
+	end
+	local function createRequest(script: Script): OpenCloud.Request
+		return requests[script]
 	end
 
 	ctx.log(`engine tests: {#scripts} script(s), RUN_ID {runId}`)

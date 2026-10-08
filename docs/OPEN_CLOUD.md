@@ -117,8 +117,13 @@ finish()
     guarded `game`, and may name files of its own.
   - `fixture("tests/fixtures/golden/walkthrough.json")` returns a file's text.
 
-  Helpers are linted like scripts, and a path that is not a string literal is
-  refused before any task is created.
+  Only files under `tests/` can be embedded (a relative path with no empty,
+  `.` or `..` segment), so a script cannot ship anything else from the runner,
+  such as its environment. Calls inside comments are ignored, and helpers are
+  linted like scripts. Any other use of `include` or `fixture` (another
+  argument, a paren-less call, an alias), and a task script over Luau
+  Execution's 4 MB limit (`OpenCloud.createTaskRequest` refuses it), stop the
+  run before any task is created.
 - `describe`, `it`, `expect`, `storeName` and `finish` are the prelude's
   exports, which the runner binds as locals before your script
   (`EngineTests.PRELUDE_EXPORTS`); `RUN_ID` and `PASS_MARKER` are globals.
