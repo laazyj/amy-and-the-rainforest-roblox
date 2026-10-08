@@ -52,6 +52,8 @@ Check these on the **Release** experience's settings page, not on Dev.
       Clara's deliberate spellings (see [canon](story/canon.md#the-rule)).
 - [ ] No in-game purchases, paid items or Robux prompts.
 - [ ] Icon, thumbnails and description pass a moderation pre-check.
+- [ ] **Amy's face is never shown** in the icon, thumbnails, chapter
+      cards or any illustration used in game.
 
 ## Play it (tier 4)
 

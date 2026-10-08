@@ -17,6 +17,25 @@ one pixel, about 1/96 inch, on a PC at 100% scaling. Tier 3 converts with
 the emulated device's scale factor; a Phase 1 check on the real phone and
 tablet confirms these ratios, and this file is corrected if they are off.
 
+## Invariants
+
+**Amy's face is never seen.** This is a quirk of Clara's story: we always
+see Amy from behind. It holds from the first release onwards, on every
+device class, in free play, at spawn and respawn, during Dialogue and in
+every Shot. Future chapters may play with it (a mirror that still does
+not show her face) but never break it.
+
+- **The camera rule.** The camera stays within **60° of directly
+  behind Amy**: unit(camera − Amy) · (−facing) ≥ 0.5. This is 30° inside
+  her rear hemisphere, so her profile is not shown either. Tier 3 asserts
+  it at every Shot keyframe and at least every 0.5 s of play.
+- **The follow camera.** In free play the camera follows from behind on
+  every device class. The player may turn the view, and Amy turns with
+  it, as with Roblox's shift-lock, under touch as well as mouse and
+  keyboard. No free-look orbits round to her front.
+- **Art.** No chapter card, illustration, icon, thumbnail or reflective
+  surface shows her face.
+
 ## 1. Device classes
 
 The client binder picks the class when it starts and again whenever the
@@ -58,7 +77,10 @@ The same rules apply to every class; only the numbers differ.
 ## 2. Shots
 
 A Shot takes the camera from the follow camera, frames something, and
-hands it back over 0.5 seconds. Shots move slowly (no cuts faster than
+hands it back over 0.5 seconds. Every Shot is framed from behind Amy or
+over her shoulder and obeys the [camera rule](#invariants) at every
+frame of its move; a Shot that would show her face is not a valid Shot.
+Shots move slowly (no cuts faster than
 0.5 s, no shake, no roll) because sudden motion is uncomfortable for many
 children. A Shot that accompanies a Dialogue holds until
 `DialogueFinished`; any other Shot lasts at most 4 seconds. The player
@@ -69,8 +91,8 @@ in the [glossary](../GLOSSARY.md#shots).
 |---|---|---|---|
 | `shot:Dialogue` | Every Dialogue whose Speaker is a Character in the world | Two-shot over Amy's shoulder, camera at the speaker's eye height, the projected head point inside x 0.33–0.67 and y 0.15–0.5 of the viewport. Narrator-only Dialogue keeps the current camera. | Eases in over 0.5 s, then still |
 | `shot:ForestWallReveal` | `chapter2.walk_to_forest.onComplete`, with canon Line 6 | Low behind Amy, looking up: the wall of trunks fills the width, the gap is centred, the cream sky and canopies above. Ends with the gap clearly visible, so the next Objective is obvious. | Slow tilt up from Amy to the canopy over about 3 s |
-| `shot:MeetCharacter` | The first `TalkedTo` of each animal in `chapter3`, before its `shot:Dialogue` | The animal in full at its own eye height, as the table below sets | As the table below sets |
-| `shot:MachineFinale` | `chapter4.explain.onComplete` (`beat:machine_stops`) and the Ending | Wide from the side: Amy small between the stopped blade and the giant trees, the crowd behind | Holds while the machine reverses, then tilts up to the treetops for the Ending's Lines |
+| `shot:MeetCharacter` | The first `TalkedTo` of each animal in `chapter3`, before its `shot:Dialogue` | The animal in full, facing Amy, as the table below sets | As the table below sets |
+| `shot:MachineFinale` | `chapter4.explain.onComplete` (`beat:machine_stops`) and the Ending | Wide, from behind Amy and the crowd, looking toward the machine and the trees: Amy small between the stopped blade and the giant trees | Holds while the machine reverses, then tilts up to the treetops for the Ending's Lines |
 
 `shot:MeetCharacter` takes the Character as its argument
 (`FrameShot(MeetCharacter, Fox)`), so a new animal adds a row here, not a
@@ -78,13 +100,14 @@ new Shot:
 
 | Character | Framing | Move |
 |---|---|---|
-| `character:Squirrel` | Low, among the roots, Amy entering from the side | Arc of about 15° |
+| `character:Squirrel` | Low behind Amy, the Squirrel among the roots ahead of her | Arc of about 15° |
 | `character:Fox` | Bright orange against the paradise greens | Arc of about 15° |
-| `character:Lion` | Slightly from below so he looks big, but in warm light and calm: he is gentle, never menacing | Slow push in |
+| `character:Lion` | Low behind Amy, looking up at him so he looks big, but in warm light and calm: he is gentle, never menacing | Slow push in |
 
 Tier 3 captures a screenshot at every Shot for every device class and
 checks that a ray from the camera reaches the subject's head without
-occlusion.
+occlusion, and asserts the [camera rule](#invariants) at every Shot and
+at sampled frames.
 
 ## 3. Text and readability
 
@@ -181,8 +204,11 @@ read an Objective, on every device class, in about a minute.
 ## 7. Visual rubric
 
 The agent scores every new or changed screenshot against these
-criteria, by looking at it, before proposing a baseline. Each scores
-0 (fails), 1 (acceptable) or 2 (good).
+criteria, by looking at it, before proposing a baseline. First, a gate:
+**Amy's face is not visible** in the frame, and no chapter card or
+illustration in it shows her face. A frame that fails the gate fails,
+whatever its scores. Then each criterion scores 0 (fails),
+1 (acceptable) or 2 (good).
 
 | Criterion | 2 means |
 |---|---|

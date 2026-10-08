@@ -313,6 +313,16 @@ the only map from old names to new; delete it once the refactor lands.
 | `getState(player)` | Progress |
 | `Map.*` coordinates, `position`, `faceZ`, `spawnPoints` | Spots |
 
+## Invariants
+
+Rules that hold in every version of the game. A change that would break
+one is not a valid change.
+
+| Invariant | Meaning | Checked by |
+|---|---|---|
+| Single player | Max Players = 1; the Story is never shared between players | Tier 2 |
+| Amy's face is never seen | The Player Character is only ever seen from behind: the camera rule in [`design/feel.md`](design/feel.md#invariants), every Shot, and all art | Tier 3; release checklist for art |
+
 ## How to propose a new term
 
 1. Check this file first. If a term already covers the idea, use it; do

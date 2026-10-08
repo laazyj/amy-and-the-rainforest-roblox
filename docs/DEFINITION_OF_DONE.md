@@ -58,6 +58,9 @@ Phase 0 PR that adds them; from then on they are required.
 - [ ] **Only CI publishes.** Nothing in this PR was published from
       Studio or by hand to Dev or Release.
 - [ ] **Max Players = 1** is unchanged and still asserted by tier 2.
+- [ ] **Amy's face is never seen**: every camera and Shot obeys the
+      [camera rule](design/feel.md#invariants), and no new art shows her
+      face.
 - [ ] No purchases or full names in anything a player can see (tier 0
       already rejects `http` strings).
 
