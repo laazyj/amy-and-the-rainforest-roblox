@@ -46,7 +46,52 @@ matches what was built.
    proxy in the prelude already guards them. Extend the lint to the same
    three methods so a script that would be refused at run time is refused
    before submission, and add the unit tests.
-8. **Brief 004 prerequisite.** Add to `docs/OPEN_CLOUD.md` that deleting
+8. **Dependency maintenance.** Add `.github/dependabot.yml` for the
+   `github-actions` ecosystem (weekly, grouped into one PR, labelled
+   `dependencies`) so every `uses:` line in the workflows and the
+   composite action is kept current and CI proves each bump. Dependabot
+   does not understand `rokit.toml` or `wally.toml`, so add
+   `.github/workflows/toolchain-check.yml`: a weekly `schedule` job that
+   compares each pin in `rokit.toml` (and any Wally dependency) with the
+   latest release on GitHub and opens or updates a single PR titled
+   "Toolchain updates" with the new pins, using `peter-evans/create-pull-request`
+   or equivalent, so CI runs the full check, test and build against the
+   new versions. Nothing auto-merges; the owner reviews. Document both in
+   `docs/OPEN_CLOUD.md`'s neighbour `docs/MAINTENANCE.md` (new): what is
+   automated, what Studio drift on the Mac still needs by hand, and the
+   key-rotation dates.
+9. **Harden the workflows.**
+   - Pin every `uses:` in every workflow and in the composite action to a
+     full-length commit SHA, with the version as a trailing comment
+     (`uses: actions/checkout@<sha> # v5.0.0`). Dependabot updates SHA
+     pins and keeps the comment current.
+   - Verify the Rokit release zip against its published SHA-256 checksum
+     before extracting it, and fail the job on mismatch. The expected
+     checksum lives next to the version pin in the composite action.
+   - Set the minimum `permissions:` block on every workflow and job
+     (`contents: read` unless a job needs more; `pull-requests: write`
+     only for the toolchain-update job).
+   - Add `zizmor` (GitHub Actions security linter) and `actionlint` to
+     `tools/check.sh` and CI, and fix what they report. A finding that
+     cannot be fixed is documented with a reason, never suppressed
+     silently.
+   - In `docs/MAINTENANCE.md`, tell the owner to enable the repository
+     setting "Require actions to be pinned to a full-length commit SHA"
+     under Settings → Actions → General, and to make the CI check a
+     required status check on `main`.
+10. **Lighting technology set in the project file.** Studio shows
+    "Migration from Compatibility to Voxel Lighting" on every open because
+    the Rojo project does not set `Lighting.Technology`, so the built place
+    carries the sunset legacy default. That property is place-level and
+    cannot be set by a script at run time. Add a `Lighting` service entry
+    to `default.project.json` with `$properties` setting `Technology` to
+    `ShadowMap` (good quality at mobile cost; the Phase 1 visual pass
+    re-evaluates `Future` against the frame-time budget), and keep any
+    other Lighting defaults the engine needs explicit there too. Extend
+    `tests/engine/smoke.luau` to assert `Lighting.Technology` equals the
+    configured value so a regression is caught in tier 2. Confirm the
+    Studio message no longer appears on the next published version.
+11. **Brief 004 prerequisite.** Add to `docs/OPEN_CLOUD.md` that deleting
    `test-<RUN_ID>-*` keys after an engine run needs a DataStore permission
    on the Dev key, so the owner adds it before brief 004.
 
@@ -59,11 +104,13 @@ matches what was built.
 
 - `tools/check.sh`, `tools/test.sh` and `tools/build.sh` pass locally and
   in CI, with every former `*.test.luau` test present as a spec.
-- `actionlint` passes on all workflows.
+- `actionlint` and `zizmor` pass on all workflows; no `uses:` is pinned
+  by tag or branch.
 - The PR lists the test count before and after the port.
 
 ## Proof the coordinator checks
 
 The coordinator runs `tools/test.sh` and compares the test count to the
-sum of PR #10's and PR #9's suites, and greps the workflows for `curl`
-piped to `bash`.
+sum of PR #10's and PR #9's suites, greps the workflows for `curl` piped
+to `bash` and for any `uses:` not followed by a 40-character SHA, and
+checks the Rokit checksum step fails on a wrong hash.

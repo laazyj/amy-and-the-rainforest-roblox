@@ -122,6 +122,15 @@ Rules that keep this honest, and that the tests enforce:
   players at different chapters to prove the engine would not cross-talk if
   the setting were ever lost. Co-op (Phase 2 spike) is a redesign that
   instances NPCs, prompts and lighting per player, not a toggle.
+- **Amy's face is never seen.** This is a quirk of Clara's story and an
+  invariant from the first release onward: the player always sees Amy
+  from behind, the camera stays locked behind her, and no Shot, chapter
+  card, illustration, icon, thumbnail or reflection shows her face. The
+  camera system is built around it (section 2.3), tier 3 asserts it at
+  every Shot and throughout a playthrough, and the release checklist
+  covers the store assets. The proof of concept does not yet follow it;
+  Phase 1 makes it true. Future chapters may play with the rule (a mirror
+  that still does not show her face), never break it.
 
 ### 2.2 Repository layout after Phase 0
 
@@ -195,7 +204,7 @@ actually needs reactive state; the Phase 1 screens do not.
 | Companions | Animals as followers with simple state machines (idle, follow, react, lead to point of interest); logic in core, movement in adapter. |
 | Collectibles | Data-driven (`content/collectibles`), journal UI, counts persisted, cosmetic rewards only. |
 | Puzzles | Small declarative puzzle types (order of actions, find and place, follow the animal) in core with engine triggers in adapters. No failure states; hints after a delay. |
-| Camera | Framed shots for the forest-wall reveal, meeting each animal, and the machine finale; a dialogue camera that frames speaker and Amy; default follow camera elsewhere. Specified in `docs/design/feel.md`. |
+| Camera | A custom follow camera that stays in Amy's rear hemisphere at all times: the player may turn the view, and Amy turns with it, so she is always seen from behind (the same feel as Roblox's shift-lock, on every device class). Every Shot (forest-wall reveal, meeting each animal, the machine finale, the dialogue two-shot) is framed from behind or over Amy's shoulder; a Shot that would show her face is not a valid Shot. Specified in `docs/design/feel.md`. |
 | Analytics | Roblox Analytics custom events: chapter start/complete, quest complete, collectible found, session length. |
 
 ### 2.4 The story model: one language for the story, the code and the conversation
@@ -441,7 +450,7 @@ for a Release promotion**. Tier 4 is you, on a real phone and a real tablet.
 | 0 Static | GitHub runner | Every push | StyLua, Selene, luau-lsp strict types with Roblox definitions, core/content purity, content schema validation (every hook referenced exists, every `rbxassetid://` is in the manifest, no `http` strings in content or UI text) | < 1 min |
 | 1 Unit (Lune) | GitHub runner | Every push | Core and view-model logic: every chapter completable from a fresh save, from every checkpoint and from a Resume at every Quest; for every Quest, the world state implied by walking there equals the world state produced by `resume` from the saved Progress; dialogue graphs have no dead ends; save migrations round-trip and one-version tolerance; canon text byte-identical; collectible, puzzle and companion logic; dialogue view-model with emoji and `♥` graphemes | < 1 min |
 | 2 Engine (Open Cloud Luau Execution) | Roblox servers | Every PR, after build | Place loads; `SceneBuilder` produces expected zones, NPCs, prompts, spawns; **reachability**: `PathfindingService` finds a path from spawn to every zone and prompt with R15 agent parameters; story walkthrough with a fake player through all chapters via the server adapter; save at every Quest, resume in a fresh DataModel, and assert the same Characters, Props and lighting are in place; two fake players at different chapters do not cross-talk; `Players.MaxPlayers == 1`; remote payloads validate against the core Net contract; no errors in the log; instance, part and triangle counts within budget; ProfileStore session lock released on `BindToClose` | 2–5 min |
-| 3 Studio (Mac) | Self-hosted runner | Opportunistic on PRs (label `needs-playtest`), **mandatory for Release** | Real client playthrough: scripted character walks each chapter, prompts fire, dialogue advances, touch input works under device emulation for a phone and a tablet preset in both orientations; on-screen assertions (text fits, safe areas, contrast, visibility, animations playing, nothing floating, lighting range, cues playing); screenshots at every Shot, chapter card and Scene entry per device class, diffed against `docs/screens/` baselines with a tolerance and a palette check; the agent reviews new frames against the `feel.md` rubric; client frame time, memory and `Stats` texture memory | 5–10 min |
+| 3 Studio (Mac) | Self-hosted runner | Opportunistic on PRs (label `needs-playtest`), **mandatory for Release** | Real client playthrough: scripted character walks each chapter, prompts fire, dialogue advances, touch input works under device emulation for a phone and a tablet preset in both orientations; **Amy's face is never visible**: at every Shot and sampled throughout the playthrough, the camera lies in Amy's rear hemisphere (the dot product of her facing vector and the vector from her to the camera is negative) and her head is never framed from the front; on-screen assertions (text fits, safe areas, contrast, visibility, animations playing, nothing floating, lighting range, cues playing); screenshots at every Shot, chapter card and Scene entry per device class, diffed against `docs/screens/` baselines with a tolerance and a palette check; the agent reviews new frames against the `feel.md` rubric; client frame time, memory and `Stats` texture memory | 5–10 min |
 | 4 Human | You and Clara, on Dev, on PC, a real phone and a real tablet | Before promotion | Feel, pacing, readability, fun; `RELEASE_CHECKLIST.md` | as needed |
 
 Design notes:
@@ -480,6 +489,22 @@ Design notes:
   Mac. The "smooth on a mid-range phone and tablet" target is a
   release-checklist item observed on real devices, because no automated
   tier can measure it.
+- **Coverage guards, not a coverage percentage.** There is no mature
+  line-coverage tool for Luau in this toolchain (Lune does not expose the
+  VM's coverage hooks and the in-engine runner has none), so the harness
+  enforces coverage structurally in tier 0 rather than by a number:
+  every module under `src/core` has a matching spec; every Quest kind,
+  Hook, World command and Player event in the glossary appears in at
+  least one spec by name; every chapter in content has a walkthrough
+  spec; and a PR that changes `src/core` without changing `tests/` fails,
+  with an explicit opt-out label and a written reason for the rare
+  justified case. A nightly **mutation check** applies a dozen canned
+  faults (rename a quest, drop a hook, break a migration, blank a canon
+  line) and asserts the suite fails for each, so the tests are proven to
+  bite. A non-blocking spike looks at exposing Luau VM coverage through
+  Lune for the pure core tests; if it stabilises, the number is reported
+  in PRs and only then considered as a gate. These guards arrive with the
+  Checkpoint B refactor, when `src/core` comes into being.
 - **Flake policy.** Open Cloud is beta. Tier 2 retries once on transport
   errors only, never on assertion failures. Outages are reported in the PR.
 
@@ -517,6 +542,7 @@ any other test. No images are needed.
 | Contrast | Text colour versus dialogue-box colour meets a contrast ratio of at least 4.5:1, computed from the actual colours in the frame |
 | The right things are visible | For each Shot and each Dialogue, a raycast from the camera reaches the speaker's head and the objective target without occlusion; the on-screen objective marker is within the viewport |
 | Characters look alive | Humanoid animation tracks are playing (no T-pose); the speaker faces Amy during Dialogue; Companions are within follow distance |
+| Amy's face is never seen | Camera position is in Amy's rear hemisphere at every sampled frame and every Shot; no Dialogue, Beat or respawn camera breaks it; reflective surfaces, if any, never render her face |
 | Nothing floats or sinks | For every Prop and Character, a downward raycast finds ground within a tolerance; no Prop intersects another unexpectedly |
 | Lighting sanity | Average frame luminance per Scene within a range (not too dark on a phone in daylight; not blown out); no fully black frames during Beats |
 | Audio present | Each Scene has an ambience and a music Cue playing; `PlaybackLoudness` above zero when a Cue fires |
@@ -696,8 +722,11 @@ pipeline. No new gameplay.
    walkthrough, two-player isolation, MaxPlayers, remote contracts, budgets,
    DataStore prefixing and cleanup.
 7. Spikes with written decisions: physics in Luau Execution, asset fetch
-   path (5.5), in-engine runner (Jest-Lua vs TestEZ).
-8. `GLOSSARY.md` (from section 2.4) with the content schema derived from
+   path (5.5), in-engine runner (Jest-Lua vs TestEZ), Luau VM coverage
+   through Lune (non-blocking).
+8. Coverage guards in tier 0 and the nightly mutation check, as defined
+   in section 4, landing with the refactor.
+9. `GLOSSARY.md` (from section 2.4) with the content schema derived from
    it; `DEFINITION_OF_DONE.md`, `RELEASE_CHECKLIST.md`,
    `docs/design/feel.md`, first skills.
 
@@ -721,7 +750,12 @@ Outcome: version 1.0 on the Release channel.
   narration of canon lines (see section 7).
 - Visual pass on the existing world: terrain and foliage, lighting and
   atmosphere, Clara's palette; chapter cards from her illustrations; the
-  camera shots in `feel.md`.
+  camera shots in `feel.md`. Choose the lighting technology (`ShadowMap`
+  or `Future`) against the mobile frame-time budget; it is set in the Rojo
+  project file, never left to the engine default.
+- The locked-behind camera that makes "Amy's face is never seen" true on
+  PC, phone and tablet, including spawn, respawn, Dialogue and every Shot;
+  chapter cards and store assets checked against the same rule.
 - Characters via `HumanoidDescription` and built-in animations; Sam's
   catch becomes a short chase; animals from free rigs with animations.
 - Settings (volume, text size, high-contrast dialogue box), pause,
@@ -773,7 +807,10 @@ Outcome: players return because there is more to discover.
 - Monthly quality PR driven by analytics: where players drop off, what is
   slow on phone or tablet, what is confusing.
 - Regular upkeep: Roblox engine changes, Open Cloud API updates, Studio
-  version drift on the Mac, key rotation.
+  version drift on the Mac, key rotation. Dependencies are kept current
+  automatically: Dependabot for GitHub Actions, and a weekly toolchain
+  job that opens a pinned-version bump PR for Rokit and Wally (which
+  Dependabot does not support). CI proves each bump; the owner merges.
 
 ---
 
@@ -808,6 +845,7 @@ Outcome: players return because there is more to discover.
 |---|---|---|
 | Correctness | Every chapter completable from every checkpoint, on PC, phone and tablet | Tiers 1–3 |
 | Reachability | Every zone and prompt reachable by an R15 character | Tier 2 pathfinding, tier 3 traversal |
+| Amy's face | Never seen, in game or in any art asset | Tier 3 camera assertion at every Shot and sampled frames; release checklist for icon, thumbnails and cards |
 | Performance | Instance, part, triangle and texture budgets; server Heartbeat under 8 ms; smooth on a mid-range phone and tablet | Tiers 2–3 budgets; real device on the release checklist |
 | Visual | Consistent with Clara's palette and illustration style; one baseline screenshot per scene in `docs/screens/`, updated deliberately when a scene changes | Tier 3 diff + your review |
 | Audio | Every interaction has feedback; every scene has ambience and music; canon lines narrated | Manifest test + review |
@@ -876,6 +914,7 @@ in parallel with the characterization test and refactor.
 | Platforms | PC, phone and tablet as three first-class device classes; console not targeted |
 | Multiplayer | Single player, Max Players = 1; co-op evaluated in Phase 2 as a redesign |
 | Player identity | The player is Amy (forced `HumanoidDescription`) |
+| Amy's face | Never seen: camera locked behind her, every Shot from behind, no art shows her face. Invariant from the first release; future chapters may play with it, never break it |
 | Gameplay direction | Exploration, animal companions, light puzzles; hub world; saves |
 | Retention | New chapters and collectibles |
 | Story authorship | Agent drafts proposals in Clara's voice; Clara and Jason approve; canon locked; credits say "Clara" only |
