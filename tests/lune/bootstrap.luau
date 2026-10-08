@@ -23,6 +23,8 @@ local ROBLOX_GLOBALS = {
 
 local bootstrap = {}
 
+bootstrap.REPO_ROOT = REPO_ROOT
+
 -- Paths are relative to the repository root.
 function bootstrap.readSource(path: string): string
 	return fs.readFile(`{REPO_ROOT}/{path}`)

@@ -1,0 +1,40 @@
+# Findings accepted rather than fixed, each with its reason. zizmor runs with
+# the pedantic persona in tools/check.sh and CI; nothing is suppressed inline.
+rules:
+  # Dev publishes must wait for CI (brief 005, item 5). The gate job runs only
+  # for a successful CI run of a push in this repository, and checks out that
+  # run's head_sha: a reviewed commit on main, never fork code.
+  dangerous-triggers:
+    ignore:
+      - publish-dev.yml
+
+  # A fixed path ($HOME/.rokit/bin); nothing attacker-controlled is written,
+  # and a composite action has no other way to put tools on PATH.
+  github-env:
+    ignore:
+      - action.yml
+
+  # The suggested `uses: $/.github/actions/setup-tools` is rejected by
+  # actionlint 1.7.12; `./` refers to the same checked-out commit.
+  self-repository:
+    ignore:
+      - ci.yml
+      - engine-tests.yml
+      - publish-dev.yml
+      - toolchain-check.yml
+
+  # Named by the brief; replacing it with gh calls means hand-rolled push and
+  # PR-update logic holding a write token. SHA-pinned, kept current by Dependabot.
+  superfluous-actions:
+    ignore:
+      - toolchain-check.yml
+
+  # Shown only by `--persona=auditor`; listed so nothing is hidden. The keys
+  # are repository secrets, passed only to the steps that need them. The
+  # owner follow-up (a `dev` environment for publish-dev) is in
+  # docs/MAINTENANCE.md.
+  secrets-outside-env:
+    ignore:
+      - engine-tests.yml
+      - publish-dev.yml
+      - toolchain-check.yml

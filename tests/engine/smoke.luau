@@ -20,6 +20,10 @@ describe("place", function()
 		expect(game:GetService("ServerScriptService"):FindFirstChild("StoryServer")).toBeTruthy()
 		expect(game:GetService("ReplicatedStorage"):FindFirstChild("StoryData")).toBeTruthy()
 	end)
+
+	-- Lighting.Technology is not readable here (Luau Execution lacks the
+	-- RobloxScript capability); tests/lune/place/lighting.spec.luau checks it
+	-- in the built place instead.
 end)
 
 finish()

@@ -10,6 +10,12 @@
       "$className": "ServerScriptService",
       "$path": "src/ServerScriptService"
     },
+    "Lighting": {
+      "$className": "Lighting",
+      "$properties": {
+        "Technology": "ShadowMap"
+      }
+    },
     "StarterPlayer": {
       "$className": "StarterPlayer",
       "StarterPlayerScripts": {

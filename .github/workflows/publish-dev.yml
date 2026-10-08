@@ -1,23 +1,21 @@
 # Publishes main to the Dev experience as a Published version, so the latest
-# merge is what you play on Dev. Manual runs are accepted from main only.
+# merge is what you play on Dev. Runs after CI succeeds on a push to main and
+# publishes the commit CI tested; a manual run is accepted from main only.
 # Never touches Release: that will be release.yml, behind the gated
 # `release` environment. See docs/OPEN_CLOUD.md.
 #
 # Inert until ROBLOX_DEV_API_KEY exists: without it the job skips with a notice.
-#
-# The tool and build steps duplicate ci.yml (brief 001); brief 005 shares them.
 name: Publish to Dev
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
-
-env:
-  ROKIT_VERSION: 1.2.0
 
 concurrency:
   group: publish-dev
@@ -26,8 +24,17 @@ concurrency:
 jobs:
   # A job-level `if:` cannot read secrets, so a tiny job checks for the key.
   gate:
+    name: Check for the Dev key
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+    # Only a successful CI run for a push to this repository counts
+    # (`branches: [main]` alone would also match a fork's branch named main).
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+      || (github.event.workflow_run.conclusion == 'success'
+          && github.event.workflow_run.event == 'push'
+          && github.event.workflow_run.head_repository.full_name == github.repository)
     outputs:
       run: ${{ steps.gate.outputs.run }}
     steps:
@@ -44,48 +51,31 @@ jobs:
           fi
 
   publish-dev:
+    name: Publish to Dev
     needs: gate
     if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 15
     env:
       DEV_UNIVERSE_ID: ${{ vars.DEV_UNIVERSE_ID }}
       DEV_PLACE_ID: ${{ vars.DEV_PLACE_ID }}
       RELEASE_UNIVERSE_ID: ${{ vars.RELEASE_UNIVERSE_ID }}
       RELEASE_PLACE_ID: ${{ vars.RELEASE_PLACE_ID }}
+      # The commit CI tested; on a manual run, main's head.
+      PUBLISH_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
-      - uses: actions/checkout@v5
-
-      # The next three steps are copied verbatim from ci.yml (brief 001, PR #10);
-      # brief 005 moves them into a shared composite action.
-      - name: Cache tool downloads
-        uses: actions/cache@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          path: |
-            ~/.rokit
-            build/globalTypes-*.d.luau
-          key: tools-${{ runner.os }}-rokit-${{ env.ROKIT_VERSION }}-${{ hashFiles('rokit.toml') }}
+          persist-credentials: false
+          ref: ${{ env.PUBLISH_SHA }}
 
-      - name: Install Rokit and the pinned tools
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          if [ ! -x ~/.rokit/bin/rokit ]; then
-            curl -fsSL -o "$RUNNER_TEMP/rokit.zip" \
-              "https://github.com/rojo-rbx/rokit/releases/download/v$ROKIT_VERSION/rokit-$ROKIT_VERSION-linux-x86_64.zip"
-            unzip -q "$RUNNER_TEMP/rokit.zip" -d "$RUNNER_TEMP/rokit"
-            "$RUNNER_TEMP/rokit/rokit" self-install
-          fi
-          echo "$HOME/.rokit/bin" >> "$GITHUB_PATH"
-          # Authenticated GitHub API calls avoid the shared-runner rate limit.
-          ~/.rokit/bin/rokit authenticate github --token "$GITHUB_TOKEN"
-          ~/.rokit/bin/rokit install --no-trust-check
-
-      - name: Remove the GitHub token from the cached Rokit directory
-        run: rokit authenticate github --remove
+      - name: Install the pinned toolchain
+        uses: ./.github/actions/setup-tools
 
       - name: Build the place
-        run: rojo build default.project.json -o build/AmyAndTheRainforest.rbxl
+        run: tools/build.sh
 
       - name: Publish to Dev
         env:
@@ -93,4 +83,4 @@ jobs:
         run: |
           version=$(lune run tools/publish --universe "$DEV_UNIVERSE_ID" --place "$DEV_PLACE_ID" \
             --file build/AmyAndTheRainforest.rbxl --version-type Published)
-          echo "Published Dev version $version from ${GITHUB_SHA}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Published Dev version $version from $PUBLISH_SHA" >> "$GITHUB_STEP_SUMMARY"

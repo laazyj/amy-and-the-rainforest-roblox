@@ -12,44 +12,27 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  ROKIT_VERSION: 1.2.0
-
 jobs:
   ci:
     name: Check, test, build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
-
-      - name: Cache tool downloads
-        uses: actions/cache@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          path: |
-            ~/.rokit
-            build/globalTypes-*.d.luau
-          key: tools-${{ runner.os }}-rokit-${{ env.ROKIT_VERSION }}-${{ hashFiles('rokit.toml') }}
+          persist-credentials: false
 
-      - name: Install Rokit and the pinned tools
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          if [ ! -x ~/.rokit/bin/rokit ]; then
-            curl -fsSL -o "$RUNNER_TEMP/rokit.zip" \
-              "https://github.com/rojo-rbx/rokit/releases/download/v$ROKIT_VERSION/rokit-$ROKIT_VERSION-linux-x86_64.zip"
-            unzip -q "$RUNNER_TEMP/rokit.zip" -d "$RUNNER_TEMP/rokit"
-            "$RUNNER_TEMP/rokit/rokit" self-install
-          fi
-          echo "$HOME/.rokit/bin" >> "$GITHUB_PATH"
-          # Authenticated GitHub API calls avoid the shared-runner rate limit.
-          ~/.rokit/bin/rokit authenticate github --token "$GITHUB_TOKEN"
-          ~/.rokit/bin/rokit install --no-trust-check
+      - name: Install the pinned toolchain
+        uses: ./.github/actions/setup-tools
 
-      - name: Remove the GitHub token from the cached Rokit directory
-        run: rokit authenticate github --remove
+      - name: Install the workflow linters (actionlint, zizmor)
+        run: tools/install-workflow-linters.sh "$RUNNER_TEMP/bin" && echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
 
       - name: Static checks
+        env:
+          GH_TOKEN: ${{ github.token }} # zizmor's online audits (impostor commits, known-vulnerable actions)
         run: tools/check.sh
 
       - name: Unit tests
@@ -59,7 +42,7 @@ jobs:
         run: tools/build.sh
 
       - name: Upload place file
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: place
           path: build/AmyAndTheRainforest.rbxl

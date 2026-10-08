@@ -19,21 +19,16 @@ a real key are for the owner, when debugging a CI failure. Everyone else uses
 | `tests/engine/_prelude.luau` | `describe` / `it` / `expect`, `storeName`, `finish` for engine test scripts. |
 | `tests/engine/*.luau` | Engine tests. Files starting with `_` are helpers and are not run. |
 | `tests/lune/tools/` | Unit tests for all of the above, against a mocked HTTP function. |
-| `.github/workflows/publish-dev.yml` | Push to `main` (or a manual run from `main`): build, publish to Dev as `Published`. |
+| `.github/workflows/publish-dev.yml` | After CI succeeds on a push to `main` (or a manual run from `main`): build the commit CI tested, publish it to Dev as `Published`. |
 | `.github/workflows/engine-tests.yml` | Every PR: build, publish to Dev as `Saved`, run `tests/engine/` against that exact version. |
-
-Two deviations from the plan's wording. The scripts are `.luau`, not
-`.lune`, because Lune 0.10 runs only `.luau` and `.lua` files. The guard
-variable is `RELEASE_JOB=1`, not `RELEASE=1`.
 
 ## Running locally
 
-Run from the repository root, with Lune installed (`rokit install` once
-brief 001's `rokit.toml` exists).
+Run from the repository root, with the toolchain installed (`rokit install`).
 
 ```sh
-# Unit tests (no network)
-lune run tests/lune/tools/run
+# Unit tests (no network); they run with every other tier 1 spec
+tools/test.sh
 
 # Show the request a publish would make, without sending anything
 lune run tools/publish --universe 1234 --place 5678 \
@@ -125,17 +120,18 @@ finish()
   stores with `storeName`, as in
   `game:GetService("DataStoreService"):GetDataStore(storeName("Saves"))`,
   which opens `test-<RUN_ID>-Saves`. Deleting test keys after a run is not
-  built yet: plan section 4 assigns it to a cleanup step, which will need a
-  DataStore permission on the Dev key.
+  built yet: brief 004 adds the cleanup step, which needs the DataStore
+  permission described under [API key permissions](#api-key-permissions).
 
 ### What protects real DataStores, and what does not
 
 Two checks apply to every engine test:
 
 1. **A lint, before submitting.** The runner strips comments and string
-   literals, then refuses any mention of `GetDataStore`,
-   `GetOrderedDataStore` or `GetGlobalDataStore` that is not a call of the
-   form `:GetDataStore(storeName(...), ...)`. That catches string-call and
+   literals. A store-opening method (`GetDataStore`, `GetOrderedDataStore`,
+   and MemoryStore's `GetQueue`, `GetSortedMap` and `GetHashMap`) may only
+   appear as a call of the form `:GetDataStore(storeName(...), ...)`; any
+   other mention, and any `GetGlobalDataStore`, is refused. That catches string-call and
    table-call syntax (`D:GetDataStore"x"`), indexing by name
    (`D["GetDataStore"]`), taking the method as a value
    (`local f = D.GetDataStore`), and expressions around `storeName`
@@ -165,16 +161,28 @@ repository variables `DEV_UNIVERSE_ID`, `DEV_PLACE_ID`,
 refusal. Docs-only PRs (`docs/**`, `**/*.md`) skip the engine-tests
 workflow.
 
-Rokit is installed from a pinned release (`ROKIT_VERSION`), authenticated
-with the job token, and cached, exactly as in brief 001's `ci.yml`. The
-token is removed before any step that receives the key.
+The toolchain comes from the shared composite action
+`.github/actions/setup-tools` (as in `ci.yml`): Rokit from a release pinned
+by version and SHA-256, authenticated with the job token, and cached. The
+token is removed before any step that receives the key. Both workflows build
+with `tools/build.sh`, the same entry point CI uses.
+
+`publish-dev.yml` runs on `workflow_run`, so it checks out the exact commit
+the successful CI run tested and never publishes a newer, untested `main`.
+CI cancels superseded runs on `main`, so an older commit cannot be published
+after a newer one. (GitHub reads `workflow_run` triggers from the default
+branch only.)
+
+**Owner setup for `main`'s branch protection** (Settings → Branches, or a
+ruleset): make the CI check (`Check, test, build`) a required status
+check, and enable "Require branches to be up to date before merging". Then
+what CI tests on a PR is what lands on `main`, and what lands is what Dev
+gets.
 
 Until the key exists, a small `gate` job posts a notice ("skipped, no key")
 and the real job is skipped, so nothing fails. PRs from forks get no secrets
 and skip the same way. The key is passed only to the steps that call Open
 Cloud. Neither workflow uses `pull_request_target`.
-
-The build steps need `rokit.toml` from brief 001.
 
 ## API key permissions
 
@@ -185,11 +193,16 @@ Create keys at create.roblox.com/credentials. Set the IP restriction to
 |---|---|---|---|
 | Dev (`ROBLOX_DEV_API_KEY`) | The Dev experience only | **universe-places**: Write | `universe-places:write` |
 | | | **universe.place.luau-execution-session**: Read, Write | `universe.place.luau-execution-session:read`, `…:write` (create needs write; get and logs accept either) |
+| | | **universe-datastores** (for brief 004's cleanup): list stores, list entries, read, delete | `universe-datastores.control:list`, `universe-datastores.objects:list`, `…:read`, `…:delete` |
 | Release (`ROBLOX_RELEASE_API_KEY`, `release` environment) | The Release experience only | **universe-places**: Write | `universe-places:write` |
 
 Asset upload permissions for the Dev key come with the asset-upload brief.
-These tools need no DataStore permission. The planned cleanup of test keys
-will need one, scoped to the Dev experience.
+The publish and engine-test tools use no DataStore permission.
+
+**Before brief 004, confirm the Dev key can list.** It already has DataStore
+read and delete for the Dev experience; brief 004's cleanup must also find
+the `test-<RUN_ID>-*` keys, which needs the two `:list` scopes in the table.
+Never add DataStore permissions to the Release key.
 
 ## Safety rules
 

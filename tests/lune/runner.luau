@@ -21,6 +21,8 @@
 
 	Matchers: toBe, toEqual (deep), toBeNil, toContain, toBeA (typeof),
 	toThrow; prefix with `never.` to negate, e.g. expect(x).never.toBeNil().
+	t.expectError(fn, needle) calls fn, fails unless it raises an error whose
+	message contains `needle`, and returns that message.
 
 	Requiring modules from src/ under Lune
 	--------------------------------------
@@ -79,7 +81,9 @@ end
 
 local function contains(container: any, item: any): boolean
 	if type(container) == "string" then
-		return string.find(container, item, 1, true) ~= nil
+		return type(item) == "string" and string.find(container, item, 1, true) ~= nil
+	elseif type(container) ~= "table" then
+		return false
 	end
 	for _, value in container do
 		if value == item then
@@ -123,12 +127,25 @@ local function expect(actual: any)
 	return expectation
 end
 
+local function expectError(fn: () -> ...any, needle: string): string
+	local ok, err = pcall(fn)
+	if ok then
+		error(`expected an error containing {format(needle)}, got success`, 2)
+	end
+	local message = tostring(err)
+	if not string.find(message, needle, 1, true) then
+		error(`expected an error containing {format(needle)}, got {format(message)}`, 2)
+	end
+	return message
+end
+
 -- Collects the tests declared by one spec, with describe names prefixed.
 local function collect(spec: (any) -> ()): { Test }
 	local tests: { Test } = {}
 	local scope: { string } = {}
 	local api = {
 		expect = expect,
+		expectError = expectError,
 		describe = function(name: string, body: () -> ())
 			table.insert(scope, name)
 			body()
