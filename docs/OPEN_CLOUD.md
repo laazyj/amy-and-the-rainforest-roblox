@@ -132,9 +132,10 @@ finish()
 Two checks apply to every engine test:
 
 1. **A lint, before submitting.** The runner strips comments and string
-   literals, then refuses any mention of `GetDataStore`,
-   `GetOrderedDataStore` or `GetGlobalDataStore` that is not a call of the
-   form `:GetDataStore(storeName(...), ...)`. That catches string-call and
+   literals. A store-opening method (`GetDataStore`, `GetOrderedDataStore`,
+   and MemoryStore's `GetQueue`, `GetSortedMap` and `GetHashMap`) may only
+   appear as a call of the form `:GetDataStore(storeName(...), ...)`; any
+   other mention, and any `GetGlobalDataStore`, is refused. That catches string-call and
    table-call syntax (`D:GetDataStore"x"`), indexing by name
    (`D["GetDataStore"]`), taking the method as a value
    (`local f = D.GetDataStore`), and expressions around `storeName`

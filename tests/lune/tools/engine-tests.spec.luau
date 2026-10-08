@@ -329,7 +329,7 @@ return function(t: any)
 			expect(m:stderr()).never.toContain(F.KEY)
 		end)
 
-		describe("DataStore lint", function()
+		describe("store lint", function()
 			local LINT_REFUSES: { [string]: string } = {
 				["a plain name"] = 'D:GetDataStore("PlayerData")',
 				["string-call syntax"] = 'D:GetDataStore"PlayerData"',
@@ -343,6 +343,11 @@ return function(t: any)
 				["GetGlobalDataStore"] = "D:GetGlobalDataStore()",
 				["a call inside an interpolated string"] = '`{D:GetDataStore("PlayerData")}`',
 				["GetOrderedDataStore with a plain name"] = 'D:GetOrderedDataStore( "Scores" )',
+				["MemoryStore GetQueue with a plain name"] = 'M:GetQueue("Q")',
+				["MemoryStore GetSortedMap with a plain name"] = 'M:GetSortedMap("Map", 30)',
+				["MemoryStore GetHashMap with a plain name"] = 'M:GetHashMap("Hash")',
+				["a MemoryStore method indexed by name"] = 'M["GetQueue"](M, "Q")',
+				["a MemoryStore method taken as a value"] = "local f = M.GetSortedMap",
 			}
 			for label, source in LINT_REFUSES do
 				it(`refuses {label}`, function()
@@ -359,6 +364,9 @@ return function(t: any)
 				["a storeName call with a scope"] = 'D:GetOrderedDataStore(storeName("Scores"), "scope")',
 				["a storeName call with an interpolated base"] = "D:GetDataStore(storeName(`run-{i}`))",
 				["a longer identifier"] = "local MyGetDataStoreHelper = 1",
+				["a storeName call to a MemoryStore method"] = 'M:GetQueue(storeName("Q"), 30)',
+				["other Get methods"] = 'game:GetService("Workspace"):GetChildren()',
+				["a string mentioning GetHashMap"] = 'print("GetHashMap(x)")',
 			}
 			for label, source in LINT_ALLOWS do
 				it(`allows {label}`, function()
@@ -378,6 +386,17 @@ return function(t: any)
 				})
 				expect(err).toContain(
 					"engine/a.luau:1: GetDataStore must be called as :GetDataStore(storeName(...), ...)"
+				)
+				expect(#m.calls).toBe(0)
+			end)
+
+			it("refuses to submit a script that opens an unprefixed MemoryStore", function()
+				local err, m = run({
+					behaviours = { ["a.luau"] = { logs = PASSING } },
+					files = { ["engine/a.luau"] = 'game:GetService("MemoryStoreService"):GetSortedMap("Scores")' },
+				})
+				expect(err).toContain(
+					"engine/a.luau:1: GetSortedMap must be called as :GetSortedMap(storeName(...), ...)"
 				)
 				expect(#m.calls).toBe(0)
 			end)

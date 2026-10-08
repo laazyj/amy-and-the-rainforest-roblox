@@ -39,19 +39,24 @@ function EngineTests.resolveRunId(explicit: string?, env: { [string]: string? })
 	return runId
 end
 
--- Replaces comments with spaces and string literals with "", so the lint
--- below sees only code. A string that is exactly a DataStore method name is
--- kept, so indexing by name (D["GetDataStore"]) stays visible. Interpolated
--- strings keep their {expressions}, which are code.
--- Store-opening methods on DataStoreService. MemoryStore methods are guarded
--- at run time only, by the prelude's `game` proxy.
-local DATASTORE_METHOD = "Get%a*DataStore"
+-- Methods that open a named store: any Get...DataStore on DataStoreService,
+-- and these on MemoryStoreService. Keep in step with _GUARDED in
+-- tests/engine/_prelude.luau, the run-time guard for the same methods.
+local MEMORYSTORE_METHODS = table.freeze({ GetQueue = true, GetSortedMap = true, GetHashMap = true })
+
+local function isStoreMethod(name: string): boolean
+	return MEMORYSTORE_METHODS[name] == true or string.match(name, "^Get%a*DataStore$") ~= nil
+end
 
 local function blankLines(text: string): string
 	local _, count = string.gsub(text, "\n", "")
 	return string.rep("\n", count)
 end
 
+-- Replaces comments with spaces and string literals with "", so the lint
+-- below sees only code. A string that is exactly a store method name is
+-- kept, so indexing by name (D["GetDataStore"]) stays visible. Interpolated
+-- strings keep their {expressions}, which are code.
 local function stripCommentsAndStrings(source: string): string
 	local out = {}
 	local i = 1
@@ -64,7 +69,7 @@ local function stripCommentsAndStrings(source: string): string
 		return close or #source
 	end
 	local function keepOrBlank(content: string)
-		local kept = if string.match(content, `^{DATASTORE_METHOD}$`) then `"{content}"` else '""'
+		local kept = if isStoreMethod(content) then `"{content}"` else '""'
 		table.insert(out, kept .. blankLines(content))
 	end
 	while i <= #source do
@@ -108,9 +113,10 @@ local function stripCommentsAndStrings(source: string): string
 	return table.concat(out)
 end
 
--- Engine tests touch live DataStores, so every store a script opens must be
--- named by storeName(), which prefixes it with the run id. Every mention of a
--- DataStore method must be a call of the form :GetDataStore(storeName(...), ...);
+-- Engine tests touch live DataStores and MemoryStores, so every store a
+-- script opens must be named by storeName(), which prefixes it with the run
+-- id. Every mention of a store method must be a call of the form
+-- :GetDataStore(storeName(...), ...) (or :GetQueue, :GetSortedMap, ...);
 -- anything else (indexing by name, taking the method as a value, string or
 -- table call syntax, an expression around storeName) is refused, and
 -- GetGlobalDataStore always is. The prelude's `game` proxy is the runtime
@@ -119,9 +125,13 @@ function EngineTests.checkDataStoreUse(name: string, source: string)
 	local code = stripCommentsAndStrings(source)
 	local at = 1
 	while true do
-		local first, last, method = string.find(code, `%f[%w_]({DATASTORE_METHOD})%f[^%w_]`, at)
-		if not (first and last) then
+		local first, last, method = string.find(code, "%f[%w_](Get[%w_]*)%f[^%w_]", at)
+		if not (first and last and method) then
 			return
+		end
+		if not isStoreMethod(method) then
+			at = last + 1
+			continue
 		end
 		local where = `{name}:{#blankLines(string.sub(code, 1, first)) + 1}`
 		if method == "GetGlobalDataStore" then

@@ -103,7 +103,8 @@ local function storeName(base)
 end
 
 -- Methods that open a named store: true means the name must come from
--- storeName(), false means never allowed in engine tests.
+-- storeName(), false means never allowed in engine tests. The lint in
+-- tools/lib/engine-tests.luau refuses the same methods before submission.
 local _GUARDED = {
 	DataStoreService = { GetDataStore = true, GetOrderedDataStore = true, GetGlobalDataStore = false },
 	MemoryStoreService = { GetQueue = true, GetSortedMap = true, GetHashMap = true },
