@@ -193,18 +193,16 @@ Create keys at create.roblox.com/credentials. Set the IP restriction to
 |---|---|---|---|
 | Dev (`ROBLOX_DEV_API_KEY`) | The Dev experience only | **universe-places**: Write | `universe-places:write` |
 | | | **universe.place.luau-execution-session**: Read, Write | `universe.place.luau-execution-session:read`, `…:write` (create needs write; get and logs accept either) |
+| | | **universe-datastores** (for brief 004's cleanup): list stores, list entries, read, delete | `universe-datastores.control:list`, `universe-datastores.objects:list`, `…:read`, `…:delete` |
 | Release (`ROBLOX_RELEASE_API_KEY`, `release` environment) | The Release experience only | **universe-places**: Write | `universe-places:write` |
 
 Asset upload permissions for the Dev key come with the asset-upload brief.
-These tools need no DataStore permission today.
+The publish and engine-test tools use no DataStore permission.
 
-**Before brief 004, add a DataStore permission to the Dev key.** Brief 004
-deletes the `test-<RUN_ID>-*` keys an engine run leaves behind, through the
-Open Cloud DataStore API, and the Dev key cannot do that yet. On the Dev key,
-add the **universe-datastores** API system for the Dev experience only, with
-the operations to list stores, list entries and delete entries (scope names
-`universe-datastores.control:list`, `universe-datastores.objects:list` and
-`universe-datastores.objects:delete`). Never add it to the Release key.
+**Before brief 004, confirm the Dev key can list.** It already has DataStore
+read and delete for the Dev experience; brief 004's cleanup must also find
+the `test-<RUN_ID>-*` keys, which needs the two `:list` scopes in the table.
+Never add DataStore permissions to the Release key.
 
 ## Safety rules
 
