@@ -21,10 +21,9 @@ describe("place", function()
 		expect(game:GetService("ReplicatedStorage"):FindFirstChild("StoryData")).toBeTruthy()
 	end)
 
-	it("uses the lighting technology set in default.project.json", function()
-		-- Place-level, so only the project file can set it; a script cannot.
-		expect(game:GetService("Lighting").Technology).toBe(Enum.Technology.ShadowMap)
-	end)
+	-- Lighting.Technology is not readable here (Luau Execution lacks the
+	-- RobloxScript capability); tests/lune/place/lighting.spec.luau checks it
+	-- in the built place instead.
 end)
 
 finish()
