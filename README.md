@@ -99,3 +99,15 @@ story data, then rebuild the place file with `tools/build.sh` (or let
 - Written as a solo experience; multiple players each get their own
   story progress, but the characters and the machine are shared in the
   world.
+
+## Documents
+
+| Document | What it is |
+|---|---|
+| [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md) | The plan: architecture, channels, test harness, roadmap |
+| [`docs/GLOSSARY.md`](docs/GLOSSARY.md) | The ubiquitous language and the enumerations the content schema is derived from |
+| [`docs/story/canon.md`](docs/story/canon.md) | Clara's words in the game, byte for byte and locked, and the game Lines that are not canon |
+| [`docs/story/style-guide.md`](docs/story/style-guide.md) | How to write new Lines in Clara's voice |
+| [`docs/DEFINITION_OF_DONE.md`](docs/DEFINITION_OF_DONE.md) | The checklist every PR must satisfy |
+| [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md) | The owner's checklist for promoting Dev to Release |
+| [`docs/design/feel.md`](docs/design/feel.md) | Camera Shots, device classes, readability, touch targets, onboarding and the visual rubric |
