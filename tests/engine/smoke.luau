@@ -20,6 +20,11 @@ describe("place", function()
 		expect(game:GetService("ServerScriptService"):FindFirstChild("StoryServer")).toBeTruthy()
 		expect(game:GetService("ReplicatedStorage"):FindFirstChild("StoryData")).toBeTruthy()
 	end)
+
+	it("uses the lighting technology set in default.project.json", function()
+		-- Place-level, so only the project file can set it; a script cannot.
+		expect(game:GetService("Lighting").Technology).toBe(Enum.Technology.ShadowMap)
+	end)
 end)
 
 finish()
