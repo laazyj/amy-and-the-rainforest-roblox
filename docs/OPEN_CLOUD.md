@@ -22,10 +22,6 @@ a real key are for the owner, when debugging a CI failure. Everyone else uses
 | `.github/workflows/publish-dev.yml` | Push to `main` (or a manual run from `main`): build, publish to Dev as `Published`. |
 | `.github/workflows/engine-tests.yml` | Every PR: build, publish to Dev as `Saved`, run `tests/engine/` against that exact version. |
 
-Two deviations from the plan's wording. The scripts are `.luau`, not
-`.lune`, because Lune 0.10 runs only `.luau` and `.lua` files. The guard
-variable is `RELEASE_JOB=1`, not `RELEASE=1`.
-
 ## Running locally
 
 Run from the repository root, with the toolchain installed (`rokit install`).
@@ -124,8 +120,8 @@ finish()
   stores with `storeName`, as in
   `game:GetService("DataStoreService"):GetDataStore(storeName("Saves"))`,
   which opens `test-<RUN_ID>-Saves`. Deleting test keys after a run is not
-  built yet: plan section 4 assigns it to a cleanup step, which will need a
-  DataStore permission on the Dev key.
+  built yet: brief 004 adds the cleanup step, which needs the DataStore
+  permission described under [API key permissions](#api-key-permissions).
 
 ### What protects real DataStores, and what does not
 
@@ -188,8 +184,15 @@ Create keys at create.roblox.com/credentials. Set the IP restriction to
 | Release (`ROBLOX_RELEASE_API_KEY`, `release` environment) | The Release experience only | **universe-places**: Write | `universe-places:write` |
 
 Asset upload permissions for the Dev key come with the asset-upload brief.
-These tools need no DataStore permission. The planned cleanup of test keys
-will need one, scoped to the Dev experience.
+These tools need no DataStore permission today.
+
+**Before brief 004, add a DataStore permission to the Dev key.** Brief 004
+deletes the `test-<RUN_ID>-*` keys an engine run leaves behind, through the
+Open Cloud DataStore API, and the Dev key cannot do that yet. On the Dev key,
+add the **universe-datastores** API system for the Dev experience only, with
+the operations to list stores, list entries and delete entries (scope names
+`universe-datastores.control:list`, `universe-datastores.objects:list` and
+`universe-datastores.objects:delete`). Never add it to the Release key.
 
 ## Safety rules
 
