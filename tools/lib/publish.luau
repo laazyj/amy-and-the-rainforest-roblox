@@ -37,7 +37,9 @@ local function main(ctx: Cli.Context)
 	end
 
 	local version = OpenCloud.parsePublishResponse(OpenCloud.call(ctx.http, ctx.sleep, request))
-	ctx.log(`published {path} to universe {target.universeId} place {target.placeId} as {versionType} version {version}`)
+	ctx.log(
+		`published {path} to universe {target.universeId} place {target.placeId} as {versionType} version {version}`
+	)
 	ctx.out(tostring(version))
 end
 

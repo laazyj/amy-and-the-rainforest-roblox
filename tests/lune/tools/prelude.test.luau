@@ -120,18 +120,13 @@ local DS = 'local D = game:GetService("DataStoreService")\n'
 local MS = 'local M = game:GetService("MemoryStoreService")\n'
 
 H.test("opens stores named by storeName, on the real service", function()
-	local _, err, opened = execute(
-		DS
-			.. MS
-			.. [[
+	local _, err, opened = execute(DS .. MS .. [[
 		D:GetDataStore(storeName("Saves"))
 		D:GetOrderedDataStore(storeName("Scores"), "scope")
 		M:GetQueue(storeName("Q"))
 		M:GetSortedMap(storeName("Map"))
 		M:GetHashMap(storeName("Hash"))
-	]],
-		"42-1"
-	)
+	]], "42-1")
 	H.eq(err, nil, "error")
 	H.eq(
 		table.concat(opened, ","),
@@ -171,7 +166,8 @@ for label, body in REFUSED do
 end
 
 H.test("passes everything else through to the real game", function()
-	local printed, err = execute('print(game.PlaceId, game:GetService("Workspace").Name, tostring(game) ~= nil)', "42-1")
+	local printed, err =
+		execute('print(game.PlaceId, game:GetService("Workspace").Name, tostring(game) ~= nil)', "42-1")
 	H.eq(err, nil, "error")
 	H.eq(printed[1], "7 Workspace true", "printed")
 end)

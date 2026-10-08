@@ -184,7 +184,9 @@ function OpenCloud.describeTaskPolling(): string
 	end
 	table.sort(states)
 	local path = "{task.path}"
-	return `then GET {cloudV2(path)} until state is one of {table.concat(states, ", ")}, then GET {cloudV2(path .. "/logs")}`
+	return `then GET {cloudV2(path)} until state is one of {table.concat(states, ", ")}, then GET {cloudV2(
+		path .. "/logs"
+	)}`
 end
 
 -- Sends a request with the retry policy from the plan: a transport error is

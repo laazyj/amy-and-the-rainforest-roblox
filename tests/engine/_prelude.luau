@@ -92,7 +92,10 @@ local function expect(actual)
 end
 
 local function storeName(base)
-	assert(type(RUN_ID) == "string" and RUN_ID ~= "", "RUN_ID is not set; run engine tests through tools/run-engine-tests")
+	assert(
+		type(RUN_ID) == "string" and RUN_ID ~= "",
+		"RUN_ID is not set; run engine tests through tools/run-engine-tests"
+	)
 	local name = "test-" .. RUN_ID .. "-" .. base
 	assert(#name <= 50, "DataStore name over 50 characters: " .. name)
 	return name

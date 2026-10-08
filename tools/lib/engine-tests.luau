@@ -30,8 +30,9 @@ type Script = { name: string, source: string }
 -- RUN_ID ends up inside DataStore names (limit 50 characters), so keep it short and plain.
 function EngineTests.resolveRunId(explicit: string?, env: { [string]: string? }): string
 	local runId = explicit
-		or if env.GITHUB_RUN_ID then `{env.GITHUB_RUN_ID}-{env.GITHUB_RUN_ATTEMPT or "1"}` else nil
-		or `local-{os.time()}-{math.random(1000, 9999)}`
+		or if env.GITHUB_RUN_ID
+			then `{env.GITHUB_RUN_ID}-{env.GITHUB_RUN_ATTEMPT or "1"}`
+			else nil or `local-{os.time()}-{math.random(1000, 9999)}`
 	if not string.match(runId, "^[%w%-]+$") or #runId > 32 then
 		error(`run id '{runId}' must be at most 32 letters, digits or hyphens`, 0)
 	end

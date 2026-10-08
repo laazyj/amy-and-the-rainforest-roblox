@@ -83,7 +83,18 @@ local function run(options: {
 		files[`engine/{name}`] = files[`engine/{name}`] or `print("{name}")\nfinish()\n`
 	end
 	local args = options.args
-		or { "--universe", H.DEV, "--place", H.PLACE, "--version", "5", "--dir", "engine", "--prelude", "engine/_prelude.luau" }
+		or {
+			"--universe",
+			H.DEV,
+			"--place",
+			H.PLACE,
+			"--version",
+			"5",
+			"--dir",
+			"engine",
+			"--prelude",
+			"engine/_prelude.luau",
+		}
 	for _, arg in options.extra or {} do
 		table.insert(args, arg)
 	end
@@ -403,7 +414,10 @@ H.test("URL-encodes the logs page token", function()
 			if string.find(request.url, "/logs?", 1, true) then
 				table.insert(urls, request.url)
 				if #urls == 1 then
-					return H.response(200, '{"luauExecutionSessionTaskLogs":[{"messages":[]}],"nextPageToken":"a+b/c="}')
+					return H.response(
+						200,
+						'{"luauExecutionSessionTaskLogs":[{"messages":[]}],"nextPageToken":"a+b/c="}'
+					)
 				end
 			end
 			return nil

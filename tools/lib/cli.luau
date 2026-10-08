@@ -108,10 +108,7 @@ local function assertNotRelease(ctx: Context, universeId: string, placeId: strin
 		elseif placeId == releasePlace then `place ({placeId})`
 		else nil
 	if target then
-		error(
-			`refusing to target the Release {target}: only the release job may do that (it sets RELEASE_JOB=1)`,
-			0
-		)
+		error(`refusing to target the Release {target}: only the release job may do that (it sets RELEASE_JOB=1)`, 0)
 	end
 end
 
