@@ -15,8 +15,11 @@ local function buildPlace(): any
 	fs.writeDir(`{bootstrap.REPO_ROOT}/build`)
 	local result = process.exec("rojo", { "build", "default.project.json", "-o", path }, { cwd = bootstrap.REPO_ROOT })
 	assert(result.ok, `rojo build failed: {result.stderr}`)
-	local place = roblox.deserializePlace(fs.readFile(path))
+	local ok, place = pcall(function()
+		return roblox.deserializePlace(fs.readFile(path))
+	end)
 	fs.removeFile(path)
+	assert(ok, place)
 	return place
 end
 
