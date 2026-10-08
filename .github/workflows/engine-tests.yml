@@ -1,0 +1,107 @@
+# Tier 2: build the place, publish it to Dev as a Saved version (not visible
+# to players), then run tests/engine/ against that exact version through Open
+# Cloud Luau Execution. See docs/OPEN_CLOUD.md.
+#
+# Without ROBLOX_DEV_API_KEY (before setup, or on a PR from a fork, which
+# gets no secrets) the job skips cleanly with a notice instead of failing.
+#
+# The tool and build steps duplicate ci.yml (brief 001); brief 005 shares them.
+name: Engine tests
+
+on:
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+
+permissions:
+  contents: read
+
+env:
+  ROKIT_VERSION: 1.2.0
+
+concurrency:
+  group: engine-tests-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # A job-level `if:` cannot read secrets, so a tiny job checks for the key.
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+    steps:
+      - id: gate
+        env:
+          HAS_KEY: ${{ secrets.ROBLOX_DEV_API_KEY != '' }}
+        run: |
+          if [ "$HAS_KEY" = "true" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=Engine tests skipped, no key::ROBLOX_DEV_API_KEY is not available to this run (not set up yet, or a PR from a fork). Nothing was published or run."
+            echo "Engine tests skipped, no key: ROBLOX_DEV_API_KEY is not available to this run (not set up yet, or a PR from a fork). Nothing was published or run." >> "$GITHUB_STEP_SUMMARY"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  engine-tests:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DEV_UNIVERSE_ID: ${{ vars.DEV_UNIVERSE_ID }}
+      DEV_PLACE_ID: ${{ vars.DEV_PLACE_ID }}
+      RELEASE_UNIVERSE_ID: ${{ vars.RELEASE_UNIVERSE_ID }}
+      RELEASE_PLACE_ID: ${{ vars.RELEASE_PLACE_ID }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # The next three steps are copied verbatim from ci.yml (brief 001, PR #10);
+      # brief 005 moves them into a shared composite action.
+      - name: Cache tool downloads
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.rokit
+            build/globalTypes-*.d.luau
+          key: tools-${{ runner.os }}-rokit-${{ env.ROKIT_VERSION }}-${{ hashFiles('rokit.toml') }}
+
+      - name: Install Rokit and the pinned tools
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if [ ! -x ~/.rokit/bin/rokit ]; then
+            curl -fsSL -o "$RUNNER_TEMP/rokit.zip" \
+              "https://github.com/rojo-rbx/rokit/releases/download/v$ROKIT_VERSION/rokit-$ROKIT_VERSION-linux-x86_64.zip"
+            unzip -q "$RUNNER_TEMP/rokit.zip" -d "$RUNNER_TEMP/rokit"
+            "$RUNNER_TEMP/rokit/rokit" self-install
+          fi
+          echo "$HOME/.rokit/bin" >> "$GITHUB_PATH"
+          # Authenticated GitHub API calls avoid the shared-runner rate limit.
+          ~/.rokit/bin/rokit authenticate github --token "$GITHUB_TOKEN"
+          ~/.rokit/bin/rokit install --no-trust-check
+
+      - name: Remove the GitHub token from the cached Rokit directory
+        run: rokit authenticate github --remove
+
+      - name: Build the place
+        run: rojo build default.project.json -o build/AmyAndTheRainforest.rbxl
+
+      - name: Publish to Dev as a Saved version
+        id: publish
+        env:
+          ROBLOX_DEV_API_KEY: ${{ secrets.ROBLOX_DEV_API_KEY }}
+        run: |
+          version=$(lune run tools/publish --universe "$DEV_UNIVERSE_ID" --place "$DEV_PLACE_ID" \
+            --file build/AmyAndTheRainforest.rbxl --version-type Saved)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Saved Dev version $version" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run engine tests against that version
+        env:
+          ROBLOX_DEV_API_KEY: ${{ secrets.ROBLOX_DEV_API_KEY }}
+          VERSION: ${{ steps.publish.outputs.version }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          lune run tools/run-engine-tests --universe "$DEV_UNIVERSE_ID" --place "$DEV_PLACE_ID" \
+            --version "$VERSION" --dir tests/engine --run-id "pr${PR}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
