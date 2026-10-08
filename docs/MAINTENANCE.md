@@ -32,9 +32,30 @@ start CI by closing and reopening it.
 
 | What | Where | How |
 |---|---|---|
+| actionlint and zizmor | `tools/install-workflow-linters.sh` | Pinned by version and checksum per platform; the script's header says how to bump. |
 | Rokit itself | `.github/actions/setup-tools/action.yml` (`ROKIT_VERSION`, `ROKIT_SHA256`) | Pinned by version and checksum together. To bump: download the new `rokit-<version>-linux-x86_64.zip`, check it against the asset's SHA-256 digest on the release page, and change both lines in one PR. |
 | Roblox Studio on the Mac | The Mac runner (brief mac-001) | Studio auto-updates weekly and can break the tier 3 bridge. The Mac job reports the Studio version with every run. When a tier 3 run fails after a Studio update, compare the reported version with the last green run's, and fix the wrapper in `tools/studio-playtest/` rather than holding Studio back. |
 | Roblox engine and Open Cloud API changes | `tools/opencloud.luau` | Tier 2 fails on a changed endpoint. Re-check against the creator-docs OpenAPI specs (see "What was verified" in `OPEN_CLOUD.md`). |
+
+## Repository settings (one-time, owner)
+
+- **Require actions to be pinned to a full-length commit SHA**: Settings →
+  Actions → General → "Require actions to be pinned to a full-length commit
+  SHA". Every `uses:` already is (with the version as a trailing comment,
+  which Dependabot keeps current); the setting stops an unpinned one from
+  ever running. The local `./.github/actions/setup-tools` is exempt: it is
+  this repository at the commit being run.
+- **Make CI a required status check on `main`**: Settings → Branches (or a
+  ruleset) → require the `Check, test, build` check, and enable "Require
+  branches to be up to date before merging". See also
+  [`OPEN_CLOUD.md`](OPEN_CLOUD.md#ci), which relies on it for the Dev
+  publish.
+
+## Workflow security checks
+
+`tools/check.sh` runs actionlint and zizmor (pedantic persona) on every PR;
+zizmor's online audits run in CI only. The few findings accepted rather than
+fixed are in `.github/zizmor.yml`, each with its reason.
 
 ## Key rotation
 

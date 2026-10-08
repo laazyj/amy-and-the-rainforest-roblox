@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Tier 0 static checks: StyLua formatting, Selene lint, luau-lsp type checking.
+# Tier 0 static checks: StyLua formatting, Selene lint, luau-lsp type checking,
+# and actionlint and zizmor (see tools/install-workflow-linters.sh) over .github.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p build
@@ -10,6 +11,19 @@ defs="build/globalTypes-$version.d.luau"
 if [ ! -f "$defs" ]; then
 	curl -fsSL -o "$defs.tmp" "https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/$version/scripts/globalTypes.d.luau"
 	mv "$defs.tmp" "$defs"
+fi
+
+echo "== actionlint"
+actionlint
+
+echo "== zizmor"
+# Online audits (impostor commits, known-vulnerable actions) need GitHub's API,
+# so they run in CI, where GH_TOKEN is set; locally only the offline audits run.
+# Accepted findings are listed, each with its reason, in .github/zizmor.yml.
+if [ -n "${GITHUB_ACTIONS:-}" ]; then
+	zizmor --persona=pedantic .github
+else
+	zizmor --persona=pedantic --offline .github
 fi
 
 echo "== StyLua"

@@ -10,6 +10,9 @@ updates:
       - /.github/actions/setup-tools
     schedule:
       interval: weekly
+    # Let a new release age a week before proposing it.
+    cooldown:
+      default-days: 7
     groups:
       github-actions:
         patterns: ["*"]

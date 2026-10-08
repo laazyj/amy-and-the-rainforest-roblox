@@ -22,7 +22,10 @@ concurrency:
 jobs:
   # A job-level `if:` cannot read secrets, so a tiny job checks for the key.
   gate:
+    name: Check for the Dev key
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       run: ${{ steps.gate.outputs.run }}
     steps:
@@ -39,9 +42,12 @@ jobs:
           fi
 
   engine-tests:
+    name: Publish a Saved version and run the engine tests
     needs: gate
     if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 30
     env:
       DEV_UNIVERSE_ID: ${{ vars.DEV_UNIVERSE_ID }}
@@ -49,7 +55,9 @@ jobs:
       RELEASE_UNIVERSE_ID: ${{ vars.RELEASE_UNIVERSE_ID }}
       RELEASE_PLACE_ID: ${{ vars.RELEASE_PLACE_ID }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       - name: Install the pinned toolchain
         uses: ./.github/actions/setup-tools

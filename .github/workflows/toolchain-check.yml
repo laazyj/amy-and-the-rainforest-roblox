@@ -26,7 +26,9 @@ jobs:
       contents: write # push the toolchain-updates branch
       pull-requests: write # open or update the PR
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       - name: Install the pinned toolchain
         uses: ./.github/actions/setup-tools
@@ -40,7 +42,7 @@ jobs:
       # TOOLCHAIN_PR_TOKEN secret (a fine-grained token, see
       # docs/MAINTENANCE.md) is used when it exists.
       - name: Open or update the Toolchain updates PR
-        uses: peter-evans/create-pull-request@v8
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ secrets.TOOLCHAIN_PR_TOKEN || github.token }}
           branch: toolchain-updates

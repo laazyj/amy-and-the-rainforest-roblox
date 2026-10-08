@@ -15,7 +15,7 @@ rokit install
 
 | What | Command | Notes |
 |---|---|---|
-| Static checks (tier 0) | `tools/check.sh` | StyLua `--check`, Selene, luau-lsp strict types |
+| Static checks (tier 0) | `tools/check.sh` | actionlint, zizmor, StyLua `--check`, Selene, luau-lsp strict types; install actionlint and zizmor once with `tools/install-workflow-linters.sh` |
 | Unit tests (tier 1) | `tools/test.sh [name filter]` | Lune runner, `tests/lune/**/*.spec.luau` |
 | Build | `tools/build.sh` | Writes `build/AmyAndTheRainforest.rbxl` |
 | Format | `stylua src tests tools` | Run before committing |
