@@ -43,7 +43,12 @@ end
 
 -- Runs `body` wrapped exactly as tools/run-engine-tests submits it, against a
 -- fake `game`; returns the printed lines, any error, and the stores opened.
-local function execute(body: string, runId: string?): ({ string }, string?, { string })
+-- `embedded` holds the files the runner would embed, by embed function.
+local function execute(
+	body: string,
+	runId: string?,
+	embedded: { [string]: { [string]: string } }?
+): ({ string }, string?, { string })
 	local printed, opened = {}, {}
 	local env = setmetatable({
 		game = fakeGame(opened),
@@ -55,7 +60,7 @@ local function execute(body: string, runId: string?): ({ string }, string?, { st
 			table.insert(printed, table.concat(parts, " "))
 		end,
 	}, { __index = getfenv() })
-	local source = EngineTests.wrap(runId or "", PRELUDE, { name = "test.luau", source = body })
+	local source = EngineTests.wrap(runId or "", PRELUDE, { name = "test.luau", source = body, embedded = embedded })
 	local chunk = luau.load(source, { debugName = "prelude", environment = env :: any })
 	local ok, err = pcall(chunk)
 	return printed, if ok then nil else tostring(err), opened
@@ -117,6 +122,45 @@ return function(t: any)
 			expect(err).toContain("RUN_ID is not set")
 		end)
 
+		it("include runs an embedded helper once, against the guarded game", function()
+			local printed, err = execute(
+				[[
+				local a, b = include("tests/engine/_helper.luau"), include("tests/engine/_helper.luau")
+				print(HELPER_RUNS, rawequal(a, b), a.placeId)
+				print(pcall(a.openStore))
+			]],
+				"42-1",
+				{
+					include = {
+						["tests/engine/_helper.luau"] = [[
+--!strict
+HELPER_RUNS = (HELPER_RUNS or 0) + 1
+return {
+	placeId = game.PlaceId,
+	openStore = function() return game:GetService("DataStoreService"):GetDataStore("Real") end,
+}
+]],
+					},
+				}
+			)
+			expect(err).toBeNil()
+			expect(printed[1]).toBe("1 true 7")
+			expect(printed[2]).toContain("false")
+			expect(printed[2]).toContain("engine tests may only open names made by storeName()")
+		end)
+
+		it("fixture returns an embedded file's text byte for byte", function()
+			local text = '[\n{"a":"quote \\" back\\\\ tab\\t"},\n"The end \u{2665}"\0\r\n]\n'
+			local printed, err = execute('print(fixture("f.json"))', "42-1", { fixture = { ["f.json"] = text } })
+			expect(err).toBeNil()
+			expect(printed[1]).toBe(text)
+		end)
+
+		it("include and fixture refuse a file that was not embedded", function()
+			local _, err = execute('fixture("missing.json")', "42-1")
+			expect(err).toContain("not embedded: missing.json")
+		end)
+
 		it("returns exactly the helpers the runner binds", function()
 			local env = setmetatable({ game = fakeGame({}) }, { __index = getfenv() })
 			local exports = luau.load(PRELUDE, { debugName = "prelude", environment = env :: any })()
@@ -130,13 +174,14 @@ return function(t: any)
 			expect(names).toEqual(expected)
 		end)
 
-		it("the static-check declarations match the helpers the runner binds", function()
+		it("the static-check declarations match the helpers and embed functions the runner binds", function()
 			local expected = {}
 			for _, name in EngineTests.PRELUDE_EXPORTS do
 				if name ~= "game" then -- declared by Roblox's own std and definitions
 					table.insert(expected, name)
 				end
 			end
+			table.move(EngineTests.EMBED_FUNCTIONS, 1, #EngineTests.EMBED_FUNCTIONS, #expected + 1, expected)
 			table.sort(expected)
 			local function declared(path: string, pattern: string): string
 				local names = {}

@@ -238,6 +238,62 @@ return function(t: any)
 			expect(server.created[1].body.script).never.toContain("declare RUN_ID")
 		end)
 
+		it("embeds the files a script names with include and fixture, once each", function()
+			local err, _, server = run({
+				behaviours = { ["a.luau"] = { logs = PASSING } },
+				files = {
+					["engine/a.luau"] = 'local h = include("engine/_h.luau")\n'
+						.. 'local g, g2 = fixture("golden/a.json"), fixture( "golden/a.json" )\nfinish()\n',
+					["engine/_h.luau"] = "return 'helper body'",
+					["golden/a.json"] = '["golden text"]',
+				},
+			})
+			expect(err).toBeNil()
+			local script = server.created[1].body.script
+			local _, helpers = string.gsub(script, "helper body", "")
+			local _, texts = string.gsub(script, "golden text", "")
+			expect(helpers).toBe(1)
+			expect(texts).toBe(1)
+			assert(
+				(string.find(script, "helper body", 1, true) :: number)
+					< string.find(script, "a.luau begins here", 1, true) :: number,
+				"embedded files come before the script"
+			)
+		end)
+
+		it("embeds the files an included helper names in turn", function()
+			local err, _, server = run({
+				behaviours = { ["a.luau"] = { logs = PASSING } },
+				files = {
+					["engine/a.luau"] = 'include("engine/_h.luau")',
+					["engine/_h.luau"] = 'return fixture("golden/b.json")',
+					["golden/b.json"] = "nested fixture text",
+				},
+			})
+			expect(err).toBeNil()
+			expect(server.created[1].body.script).toContain("nested fixture text")
+		end)
+
+		it("refuses an include or fixture path that is not a string literal, sending nothing", function()
+			local err, m = run({
+				behaviours = { ["a.luau"] = { logs = PASSING } },
+				files = {
+					["engine/a.luau"] = 'local p = "golden/a.json"\nfixture(p) -- fixture() in a comment is fine',
+				},
+			})
+			expect(err).toContain("engine/a.luau: fixture() takes a path in double quotes")
+			expect(#m.calls).toBe(0)
+		end)
+
+		it("refuses a script whose included or fixture file is missing, sending nothing", function()
+			local err, m = run({
+				behaviours = { ["a.luau"] = { logs = PASSING } },
+				files = { ["engine/a.luau"] = 'fixture("golden/missing.json")' },
+			})
+			expect(err).toContain('engine/a.luau: fixture("golden/missing.json"): file not found')
+			expect(#m.calls).toBe(0)
+		end)
+
 		it(`runs at most {EngineTests.CONCURRENCY} tasks at once`, function()
 			local behaviours = {}
 			for i = 1, EngineTests.CONCURRENCY + 3 do
@@ -387,6 +443,18 @@ return function(t: any)
 				expect(err).toContain(
 					"engine/a.luau:1: GetDataStore must be called as :GetDataStore(storeName(...), ...)"
 				)
+				expect(#m.calls).toBe(0)
+			end)
+
+			it("lints an included helper too", function()
+				local err, m = run({
+					behaviours = { ["a.luau"] = { logs = PASSING } },
+					files = {
+						["engine/a.luau"] = 'include("engine/_h.luau")',
+						["engine/_h.luau"] = 'return game:GetService("DataStoreService"):GetDataStore("Saves")',
+					},
+				})
+				expect(err).toContain("engine/_h.luau:1: GetDataStore must be called")
 				expect(#m.calls).toBe(0)
 			end)
 

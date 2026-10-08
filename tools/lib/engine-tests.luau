@@ -25,7 +25,10 @@ EngineTests.QUEUE_ALLOWANCE = 300
 EngineTests.RATE_LIMIT_WAIT = 15
 EngineTests.DEFAULT_PRELUDE = "tests/engine/_prelude.luau"
 
-type Script = { name: string, source: string }
+-- Embedded files: for each of EngineTests.EMBED_FUNCTIONS, repository path ->
+-- the file's text (see collectEmbeds).
+type Embedded = { [string]: { [string]: string } }
+type Script = { name: string, source: string, embedded: Embedded? }
 
 -- RUN_ID ends up inside DataStore names (limit 50 characters), so keep it short and plain.
 function EngineTests.resolveRunId(explicit: string?, env: { [string]: string? }): string
@@ -149,8 +152,98 @@ end
 -- What tests/engine/_prelude.luau returns, bound as locals for the script.
 EngineTests.PRELUDE_EXPORTS = table.freeze({ "describe", "it", "expect", "storeName", "finish", "game" })
 
+-- Locals the runner itself binds, after the prelude's. A task cannot read the
+-- repository, so a script names the files it needs and the runner embeds them:
+--   include("tests/engine/_helper.luau")  runs that helper once, returns its value
+--   fixture("tests/fixtures/x.json")      returns that file's text
+EngineTests.EMBED_FUNCTIONS = table.freeze({ "include", "fixture" })
+
+-- The paths `source` passes to `call` ("include" or "fixture"). Only a
+-- string literal can be embedded, so any other argument is refused here,
+-- before a task is spent.
+local function embedPaths(name: string, source: string, call: string): { string }
+	local paths = {}
+	for path in string.gmatch(source, `%f[%w_]{call}%s*%(%s*"([^"]+)"%s*%)`) do
+		table.insert(paths, path)
+	end
+	-- In code with comments removed and strings emptied, a literal call reads call("").
+	local code = stripCommentsAndStrings(source)
+	local _, calls = string.gsub(code, `%f[%w_]{call}%s*%(`, "")
+	local _, literals = string.gsub(code, `%f[%w_]{call}%s*%(%s*""%s*%)`, "")
+	if calls ~= literals then
+		error(`{name}: {call}() takes a path in double quotes, which the runner embeds`, 0)
+	end
+	return paths
+end
+
+-- Every file `source` names with include() or fixture(), and every file those
+-- helpers name in turn. A helper is code in the task, so it is linted too.
+local function collectEmbeds(ctx: Cli.Context, name: string, source: string): Embedded
+	local embedded: Embedded = {}
+	for _, call in EngineTests.EMBED_FUNCTIONS do
+		embedded[call] = {}
+	end
+	local queue = { { name = name, source = source } }
+	while #queue > 0 do
+		local item = table.remove(queue) :: { name: string, source: string }
+		for _, call in EngineTests.EMBED_FUNCTIONS do
+			for _, file in embedPaths(item.name, item.source, call) do
+				if embedded[call][file] == nil then
+					local text = ctx.readFile(file) or error(`{item.name}: {call}("{file}"): file not found`, 0)
+					embedded[call][file] = text
+					if call == "include" then
+						EngineTests.checkDataStoreUse(file, text)
+						table.insert(queue, { name = file, source = text })
+					end
+				end
+			end
+		end
+	end
+	return embedded
+end
+
+local function sortedKeys(map: { [string]: string }): { string }
+	local keys = {}
+	for key in map do
+		table.insert(keys, key)
+	end
+	table.sort(keys)
+	return keys
+end
+
+-- The include() and fixture() locals, over the embedded files. A helper is
+-- inlined as a function body, so it sees the prelude's locals (its `game` is
+-- the guarded one); a fixture is a string literal.
+local function embedSource(embedded: Embedded): string
+	local includes, fixtures = embedded.include or {}, embedded.fixture or {}
+	local lines = { "local include, fixture", "do", "\tlocal helpers, texts, loaded = {}, {}, {}" }
+	for _, path in sortedKeys(includes) do
+		table.insert(lines, `helpers[{string.format("%q", path)}] = function()`)
+		table.insert(lines, includes[path])
+		table.insert(lines, "end")
+	end
+	for _, path in sortedKeys(fixtures) do
+		table.insert(lines, `texts[{string.format("%q", path)}] = {string.format("%q", fixtures[path])}`)
+	end
+	table.insert(
+		lines,
+		[[
+	function include(path)
+		if loaded[path] == nil then
+			loaded[path] = { (assert(helpers[path], "not embedded: " .. path))() }
+		end
+		return table.unpack(loaded[path])
+	end
+	function fixture(path)
+		return (assert(texts[path], "not embedded: " .. path))
+	end
+end]]
+	)
+	return table.concat(lines, "\n")
+end
+
 -- The task script: the injected globals, the prelude run as a function whose
--- exports become locals, then the test script.
+-- exports become locals, the embedded files, then the test script.
 function EngineTests.wrap(runId: string, prelude: string, script: Script): string
 	local values = {}
 	for i, name in EngineTests.PRELUDE_EXPORTS do
@@ -164,6 +257,7 @@ function EngineTests.wrap(runId: string, prelude: string, script: Script): strin
 		prelude,
 		"end)()",
 		`local {table.concat(EngineTests.PRELUDE_EXPORTS, ", ")} = {table.concat(values, ", ")}`,
+		embedSource(script.embedded or {}),
 		`-- {script.name} begins here`,
 		script.source,
 	}, "\n")
@@ -304,7 +398,7 @@ local function loadScripts(ctx: Cli.Context, values: { [string]: string }): { Sc
 	for _, path in paths do
 		local source = ctx.readFile(path) or error(`script not found: {path}`, 0)
 		EngineTests.checkDataStoreUse(path, source)
-		table.insert(scripts, { name = path, source = source })
+		table.insert(scripts, { name = path, source = source, embedded = collectEmbeds(ctx, path, source) })
 	end
 	return scripts
 end
