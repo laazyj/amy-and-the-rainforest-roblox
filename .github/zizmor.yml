@@ -28,3 +28,13 @@ rules:
   superfluous-actions:
     ignore:
       - toolchain-check.yml
+
+  # Shown only by `--persona=auditor`; listed so nothing is hidden. The keys
+  # are repository secrets, passed only to the steps that need them. The
+  # owner follow-up (a `dev` environment for publish-dev) is in
+  # docs/MAINTENANCE.md.
+  secrets-outside-env:
+    ignore:
+      - engine-tests.yml
+      - publish-dev.yml
+      - toolchain-check.yml

@@ -57,6 +57,13 @@ start CI by closing and reopening it.
 zizmor's online audits run in CI only. The few findings accepted rather than
 fixed are in `.github/zizmor.yml`, each with its reason.
 
+**Follow-up (owner):** the Roblox keys are repository secrets, which zizmor's
+`secrets-outside-env` audit flags (auditor persona). For `publish-dev.yml`,
+create a `dev` environment limited to the `main` branch, move
+`ROBLOX_DEV_API_KEY` into it and set `environment: dev` on the publish job, so
+a workflow edited on a PR branch cannot reach a publish path with the key.
+`engine-tests.yml` runs on PRs by design, so it keeps the repository secret.
+
 ## Key rotation
 
 Every key has an expiry date. Record it here when you create or rotate a
