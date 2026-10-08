@@ -4,8 +4,6 @@
 #
 # Without ROBLOX_DEV_API_KEY (before setup, or on a PR from a fork, which
 # gets no secrets) the job skips cleanly with a notice instead of failing.
-#
-# The tool and build steps duplicate ci.yml (brief 001); brief 005 shares them.
 name: Engine tests
 
 on:
@@ -16,9 +14,6 @@ on:
 
 permissions:
   contents: read
-
-env:
-  ROKIT_VERSION: 1.2.0
 
 concurrency:
   group: engine-tests-${{ github.event.pull_request.number }}
@@ -56,36 +51,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # The next three steps are copied verbatim from ci.yml (brief 001, PR #10);
-      # brief 005 moves them into a shared composite action.
-      - name: Cache tool downloads
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.rokit
-            build/globalTypes-*.d.luau
-          key: tools-${{ runner.os }}-rokit-${{ env.ROKIT_VERSION }}-${{ hashFiles('rokit.toml') }}
-
-      - name: Install Rokit and the pinned tools
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          if [ ! -x ~/.rokit/bin/rokit ]; then
-            curl -fsSL -o "$RUNNER_TEMP/rokit.zip" \
-              "https://github.com/rojo-rbx/rokit/releases/download/v$ROKIT_VERSION/rokit-$ROKIT_VERSION-linux-x86_64.zip"
-            unzip -q "$RUNNER_TEMP/rokit.zip" -d "$RUNNER_TEMP/rokit"
-            "$RUNNER_TEMP/rokit/rokit" self-install
-          fi
-          echo "$HOME/.rokit/bin" >> "$GITHUB_PATH"
-          # Authenticated GitHub API calls avoid the shared-runner rate limit.
-          ~/.rokit/bin/rokit authenticate github --token "$GITHUB_TOKEN"
-          ~/.rokit/bin/rokit install --no-trust-check
-
-      - name: Remove the GitHub token from the cached Rokit directory
-        run: rokit authenticate github --remove
+      - name: Install the pinned toolchain
+        uses: ./.github/actions/setup-tools
 
       - name: Build the place
-        run: rojo build default.project.json -o build/AmyAndTheRainforest.rbxl
+        run: tools/build.sh
 
       - name: Publish to Dev as a Saved version
         id: publish
