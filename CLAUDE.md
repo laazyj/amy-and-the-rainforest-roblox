@@ -18,7 +18,7 @@ rokit install
 | Static checks (tier 0) | `tools/check.sh` | StyLua `--check`, Selene, luau-lsp strict types |
 | Unit tests (tier 1) | `tools/test.sh [name filter]` | Lune runner, `tests/lune/**/*.spec.luau` |
 | Build | `tools/build.sh` | Writes `build/AmyAndTheRainforest.rbxl` |
-| Format | `stylua src tests` | Run before committing |
+| Format | `stylua src tests tools` | Run before committing |
 
 CI (`.github/workflows/ci.yml`) runs all three scripts on every PR and push
 to `main` and uploads the place file as the `place` artifact. Run them
