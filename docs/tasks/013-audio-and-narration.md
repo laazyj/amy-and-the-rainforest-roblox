@@ -16,8 +16,13 @@ the canon Lines are narrated, as plan section 7 describes.
    prompts, pickups, footsteps, chapter cards. `PlayCue` World commands
    from Beats and Hooks; tier 1 asserts every Scene names an ambience and a
    music Cue and every Cue name resolves in the manifest.
-2. **Sources.** Free-licence or synthesised SFX and music recorded in the
-   manifest with licences. Clara's palette of feeling: gentle, warm.
+2. **Sources.** Music and ambience from Roblox's own audio library on the
+   Creator Store by default (free, pre-approved, no upload), recorded in
+   the manifest by asset id and licence; free-licence or synthesised
+   sources only where the library has nothing suitable. Clara's palette of
+   feeling: gentle, warm. An original theme tune for the title screen,
+   chapter cards and ending is tracked in the GitHub issue "Original theme
+   tune for the game"; use it if delivered, otherwise a library track.
 3. **Narration.** Canon Lines recorded (ideally by Clara; the owner
    provides files) batched per chapter into single audio files with a
    timestamp table in content, played in sync with the dialogue
