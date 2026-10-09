@@ -16,6 +16,9 @@ export type RGB = { r: number, g: number, b: number }
 
 -- One thing said. `speaker` is "Narrator" or a Character id; `canon` marks
 -- Clara's exact words (docs/story/canon.md).
+-- A Dialogue whose first Line is canon and others are not is written
+-- `{ ... } :: { Story.Line }`: the type checker takes an optional list's
+-- item type from its first item.
 export type Line = { speaker: string, text: string, canon: boolean? }
 
 export type QuestKind = "talk" | "reach" | "collect"
@@ -45,12 +48,24 @@ export type Quest = {
 -- A Beat: World commands, with Waits, played in order at a Hook.
 export type Beat = { WorldCommand }
 
+-- A Chapter as its data.luau declares it; its hooks.luau adds the Beats.
+export type ChapterData = { id: string, title: string, subtitle: string, quests: { Quest } }
+
 export type Chapter = {
 	id: string,
 	title: string,
 	subtitle: string,
 	quests: { Quest },
 	beats: { [string]: Beat },
+}
+
+-- A Scene's Spots, Zones and Props (src/content/scenes/<Scene>.luau). The
+-- scene files also hold the layout SceneBuilder builds from.
+export type Scene = {
+	id: string,
+	spots: { [string]: Spot },
+	zones: { [string]: Zone },
+	props: { [string]: Prop },
 }
 
 export type Character = {

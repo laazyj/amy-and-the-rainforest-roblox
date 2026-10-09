@@ -161,18 +161,16 @@ A Speaker is `Narrator` or a Character id. Display names come from the
 Character, never from the Line. Character kinds are the values of the
 Kind column.
 
-| Character | Kind | Display name | Notes |
-|---|---|---|---|
-| `Narrator` | none | Narrator | Speaker only; not a Character, never in the world |
-| `character:Amy` | `human` | Amy | The Player Character; spawns in the garden |
-| `character:Dad` | `human` | Dad | Home in the garden |
-| `character:Mum` | `human` | Mum | Home in the garden |
-| `character:Sam` | `dog` | Sam the Dog | Companion; home in the garden, by the gate |
-| `character:Squirrel` | `squirrel` | the Maroon Squirrel | Home in the paradise |
-| `character:Fox` | `fox` | the Orange Fox | Home in the paradise |
-| `character:Lion` | `lion` | the Golden Lion | Home in the paradise, deep glade |
-
-Home Spot ids are named in the Phase 0 refactor and added here then.
+| Character | Kind | Display name | Home Spot | Notes |
+|---|---|---|---|---|
+| `Narrator` | none | Narrator | none | Speaker only; not a Character, never in the world |
+| `character:Amy` | `human` | Amy | `spot:AmySpawn` | The Player Character; spawns in the garden |
+| `character:Dad` | `human` | Dad | `spot:DadHome` | Home in the garden |
+| `character:Mum` | `human` | Mum | `spot:MumHome` | Home in the garden |
+| `character:Sam` | `dog` | Sam the Dog | `spot:SamHome` | Companion; home in the garden, by the gate |
+| `character:Squirrel` | `squirrel` | the Maroon Squirrel | `spot:SquirrelHome` | Home in the paradise |
+| `character:Fox` | `fox` | the Orange Fox | `spot:FoxHome` | Home in the paradise |
+| `character:Lion` | `lion` | the Golden Lion | `spot:LionHome` | Home in the paradise, deep glade |
 
 ### Hook names
 
@@ -192,16 +190,40 @@ Home Spot ids are named in the Phase 0 refactor and added here then.
 | `beat:machine_arrives` | `chapter3.tell_mum.onComplete` | The machine and villagers arrive; Dad, Mum and Sam move to the field |
 | `beat:machine_stops` | `chapter4.explain.onComplete` | The blade stops, sparkles over the crowd, the machine reverses away |
 
+### Spots
+
+| Spot | Scene | Used for |
+|---|---|---|
+| `spot:AmySpawn` | `scene:Garden` | Amy's home Spot: where she spawns |
+| `spot:DadHome` | `scene:Garden` | Dad's home Spot |
+| `spot:MumHome` | `scene:Garden` | Mum's home Spot |
+| `spot:SamHome` | `scene:Garden` | Sam's home Spot, by the gate |
+| `spot:GateOutside` | `scene:Garden` | `beat:sam_catches`: Sam bounds to just outside the gate |
+| `spot:GardenInside` | `scene:Garden` | `beat:sam_catches`: Amy lands back in the garden |
+| `spot:SamGuardPost` | `scene:Garden` | `beat:sam_catches`: Sam settles beside her |
+| `spot:Farm` | `scene:Village` | `beat:sam_goes_to_farm` |
+| `spot:MachineBay` | `scene:Field` | Where `prop:Machine` parks |
+| `spot:DadAtMachine` | `scene:Field` | `beat:machine_arrives` |
+| `spot:MumAtMachine` | `scene:Field` | `beat:machine_arrives` |
+| `spot:SamAtMachine` | `scene:Field` | `beat:machine_arrives` |
+| `spot:Villager1` | `scene:Field` | Where `prop:Villagers` stand, one each |
+| `spot:Villager2` | `scene:Field` | |
+| `spot:Villager3` | `scene:Field` | |
+| `spot:Villager4` | `scene:Field` | |
+| `spot:SquirrelHome` | `scene:Paradise` | The Squirrel's home Spot |
+| `spot:FoxHome` | `scene:Paradise` | The Fox's home Spot |
+| `spot:LionHome` | `scene:Paradise` | The Lion's home Spot, in the deep glade |
+
 ### Zones
 
 | Zone | Scene | Used by |
 |---|---|---|
-| `zone:GardenGate` | Garden | `chapter1.sneak_out_1`, `chapter1.sneak_out_2` |
-| `zone:ForestEdge` | Field | `chapter2.walk_to_forest` |
-| `zone:ForestGap` | Forest Wall | `chapter2.enter_forest` |
-| `zone:HeartGlade` | Heart Glade | `chapter2.heart_glade` |
-| `zone:HomeGarden` | Garden | `chapter3.rush_home` |
-| `zone:MachineFront` | Field | `chapter4.stand_in_front` |
+| `zone:GardenGate` | `scene:Garden` | `chapter1.sneak_out_1`, `chapter1.sneak_out_2` |
+| `zone:ForestEdge` | `scene:Field` | `chapter2.walk_to_forest` |
+| `zone:ForestGap` | `scene:ForestWall` | `chapter2.enter_forest` |
+| `zone:HeartGlade` | `scene:HeartGlade` | `chapter2.heart_glade` |
+| `zone:HomeGarden` | `scene:Garden` | `chapter3.rush_home` |
+| `zone:MachineFront` | `scene:Field` | `chapter4.stand_in_front` |
 
 ### Scenes
 
@@ -219,6 +241,7 @@ Home Spot ids are named in the Phase 0 refactor and added here then.
 | Prop | States, in order |
 |---|---|
 | `prop:Machine` | `absent`, `advancing`, `stopped`, `retreating` |
+| `prop:Villagers` | `absent`, `gathered`, `cheering` |
 
 ### Lighting presets
 
