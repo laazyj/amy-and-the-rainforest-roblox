@@ -100,9 +100,6 @@ longer matches the one recorded, so the next upload run sends it again.
 Roblox cannot update an image or a sound in place, so it becomes a new
 asset with a new id; the "Asset ids" PR shows the old id being replaced.
 
-Never write an `assetId` by hand, and never put an asset id in `src/`
-that is not in the manifest: tier 0 fails on both.
-
 ### What the tier 0 scan catches
 
 `tools/check-assets` reads every file under `src/`, whatever its
@@ -124,6 +121,10 @@ as `InsertService:LoadAsset`), or a scheme split across strings
 is compressed. Review catches those. A thumbnail of a user
 (`rbxthumb://type=AvatarHeadShot&id=…`) is flagged too; the game shows
 none.
+
+Tier 0 also cannot tell an `assetId` or `sha256` the uploader wrote from
+one typed in, so **review is the gate**: a change to either belongs only
+in the "Asset ids" PR the workflow opens.
 
 ## Licences
 
