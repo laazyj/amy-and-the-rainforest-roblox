@@ -20,14 +20,19 @@ for real. That costs every session time and lets lint failures reach CI.
 
 1. **Commit Selene's Roblox standard library.** Add a CI step (in the
    composite action or `ci.yml`) that runs `selene generate-roblox-std` and
-   fails if the generated `roblox.yml` differs from the committed one at
-   the repository root, with a clear message to run the update. Commit the
+   warns if the generated `roblox.yml` differs from the committed one at
+   the repository root (ignoring the two lines that record when it was
+   generated), with a clear message to run the update. *Amended in PR #24:*
+   a warning, not a failure, because the file goes stale with every Roblox
+   release and a stale file only lacks the newest globals; the weekly job
+   (item 2) fails hard if it cannot regenerate it. Commit the
    file once by generating it in a `workflow_dispatch` run that opens a PR,
    or from CI's output artifact. Selene prefers a project-directory
    `roblox.yml` over its cache, so local runs need no network. Confirm
    `tests/engine/selene.toml` (`roblox+engine`) still resolves.
 2. **Keep it fresh.** The weekly toolchain job runs
-   `selene update-roblox-std` and includes any change to `roblox.yml` in its
+   `selene generate-roblox-std` (*amended in PR #24:* `update-roblox-std`
+   writes only Selene's cache, never `roblox.yml`) and includes any change to `roblox.yml` in its
    "Toolchain updates" PR.
 3. **`tools/bootstrap-agent.sh`.** Installs the pinned toolchain into
    `~/.rokit/bin` or `build/bin` from the github.com release zips using the
@@ -37,7 +42,8 @@ for real. That costs every session time and lets lint failures reach CI.
    Roblox definitions for the pinned version, runs `lune setup`, installs
    actionlint and zizmor via the existing script, and prints what it did.
    Idempotent; skips what is present; works with and without the proxy;
-   never pipes a remote script to a shell.
+   never pipes a remote script to a shell. (PR #24 installs into
+   `build/bin`, which the `tools/*.sh` scripts put first on PATH.)
 4. **SessionStart hook.** A repository `.claude/settings.json` hook that
    runs the bootstrap on session start (use the `session-start-hook`
    guidance: fast, idempotent, failures reported but non-fatal), so

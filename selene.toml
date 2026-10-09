@@ -1,4 +1,7 @@
 std = "roblox"
+# Use the committed roblox.yml (kept current by CI and the weekly toolchain
+# job, see docs/MAINTENANCE.md), never a copy Selene downloads and caches.
+roblox-std-source = "pinned"
 # tests/engine has its own config (tests/engine/selene.toml).
 exclude = ["tests/engine/*"]
 

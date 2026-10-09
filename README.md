@@ -50,8 +50,9 @@ agent-driven feature development is in
 4. Press **Play** (F5). The whole world is built by script when the
    game starts — no assets to install.
 
-Or build it yourself from source with [Rojo](https://rojo.space): install
-[Rokit](https://github.com/rojo-rbx/rokit), run `rokit install`, then
+Or build it yourself from source with [Rojo](https://rojo.space): run
+`tools/bootstrap-agent.sh` (or install
+[Rokit](https://github.com/rojo-rbx/rokit) and run `rokit install`), then
 `tools/build.sh`, which writes `build/AmyAndTheRainforest.rbxl`. To edit
 live, run `rojo serve` and connect from the Rojo plugin in Studio.
 
