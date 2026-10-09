@@ -9,6 +9,10 @@
 	    if the engine is showing a Dialogue, the host waits until the client
 	    says DialogueFinished (or 300 s pass) and feeds that to the engine.
 
+	Every World command is held to its schema (World.execute) and every
+	message to a client to the Net contract before it is sent; either
+	failing is an error, not a dropped message.
+
 	While a player's commands are being carried out the host is busy for
 	them, and other Player events from them are dropped, as a player cannot
 	act in the middle of a Beat or a Dialogue.
@@ -125,12 +129,16 @@ function StoryHost.handle(player: any, event: Events.PlayerEvent)
 	end)
 end
 
-local function initPlayer(player: any)
-	if sessions[player] then
-		return
+-- Starts a session for `player` at `progress` (fresh when nil), ending any
+-- session they had.
+local function newSession(player: any, progress: StoryEngine.Progress?)
+	local old = sessions[player]
+	if old then
+		old.alive = false
+		PickupHost.clear(player)
 	end
 	sessions[player] = {
-		engine = StoryEngine.new(player.UserId, nil, story),
+		engine = StoryEngine.new(player.UserId, progress, story),
 		world = WorldImpl.new(story, player, function(command)
 			toClient(player, command)
 		end),
@@ -140,6 +148,12 @@ local function initPlayer(player: any)
 	}
 end
 
+local function initPlayer(player: any)
+	if not sessions[player] then
+		newSession(player, nil)
+	end
+end
+
 -- The client has loaded: the Story starts (once).
 function StoryHost.onClientReady(player: any)
 	initPlayer(player)
@@ -147,6 +161,29 @@ function StoryHost.onClientReady(player: any)
 		local _, _, commands = engine:start()
 		return commands
 	end)
+end
+
+-- Resume (plan section 2.4): a new session for `player` at `progress`, and
+-- the World rebuilt to what its Quest expects. Saves are brief 010's; today
+-- the Dev shortcuts (DevShortcuts) and the engine tests resume.
+function StoryHost.resume(player: any, progress: StoryEngine.Progress)
+	newSession(player, progress)
+	run(player, function()
+		return StoryEngine.resume(story, progress)
+	end)
+end
+
+-- The player's Progress, as it would be saved; nil without a session.
+function StoryHost.progress(player: any): StoryEngine.Progress?
+	local session = sessions[player]
+	return if session then session.engine:snapshot() else nil
+end
+
+-- Whether the host is waiting on the player: no Beat or Dialogue of theirs
+-- is being carried out.
+function StoryHost.idle(player: any): boolean
+	local session = sessions[player]
+	return session ~= nil and not session.busy
 end
 
 -- The client has shown the last Line of the Dialogue it was given.
@@ -172,8 +209,11 @@ end
 -- A handler for a client -> server remote that drops a malformed payload.
 local function fromClient(remote: string, handler: (player: Player) -> ()): (Player, ...any) -> ()
 	return function(player, ...)
-		if Net.check(remote, table.pack(...)) then
+		local ok, reason = Net.check(remote, table.pack(...))
+		if ok then
 			handler(player)
+		else
+			warn(`dropped a malformed {remote} from {player.Name}: {reason}`)
 		end
 	end
 end

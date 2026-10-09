@@ -25,8 +25,13 @@ export type World = {
 
 local World = {}
 
--- Carries out `command` through `world`.
+-- Carries out `command` through `world`, once it holds to its schema in
+-- Events; a malformed command is an error.
 function World.execute(world: World, command: Events.WorldCommand)
+	local ok, reason = Events.check(Events.WORLD_COMMANDS, command)
+	if not ok then
+		error(`malformed World command: {reason}`, 2)
+	end
 	if command.kind == "ShowDialogue" then
 		world.showDialogue(command.lines)
 	elseif command.kind == "SetObjective" then

@@ -79,6 +79,11 @@ Scene (look + sound)                     Player
 | **Resume** | Rebuilding the world for a returning player from Progress alone: `StoryEngine.resume(progress)` returns the World commands that put every Character, Prop, Lighting preset and Pickup where the current Quest expects them, then shows the Objective. "Continue" on the title screen is a Resume. | |
 | **World state** | What the World looks like to the Story, as plain data: where each Character stands, each Prop's state, the Lighting preset, the Pickups out, the Objective, the offered talk affordances. What the World commands mean without the engine (`src/core/WorldState.luau`); a Resume rebuilds it. | Sam at `spot:Farm`, `lighting:paradise` |
 | **World** | The one interface the core uses to act on the engine. Every Beat is written against it, one method per World command. | `World.moveCharacter(id, spot)` |
+| **Objective tracker** | Where the client shows the active Quest's Objective, under the header "✦ Objective". | "Ask Dad if you can go outside" |
+| **Client binder** | The client script (`src/client`): it builds the UI, renders the view-model and forwards the player's input. It holds no logic. | `StoryClient.client.luau` |
+| **View-model** | The client's logic as plain data in core, which the client binder renders: the Dialogue as it types out and advances (`DialogueViewModel`), the Objective tracker (`ObjectiveText`) and how a Chapter card plays over time (`ChapterCardTimeline`). Tested in tier 1, no client needed. | `DialogueViewModel.view(vm)` |
+| **Grapheme** | One character as a reader sees it, which may be several code points: "♥️", "👍🏽". Dialogue types out one grapheme at a time. | `DialogueViewModel.graphemes("♥️") == 1` |
+| **Dev shortcut** | A Dev-only way to reach any point of the Story in seconds: the chat commands `/chapter N` and `/quest <id>`, and the jump-to-Quest entry point (`DevShortcuts.jumpTo`). A jump is a Resume at the Progress of a player who has just started the Quest. Release builds have none: the release job strips them when it publishes. | `/chapter 3` |
 | **Device class** | One of the three first-class targets, each with its own layout and touch rules: `PC`, `Phone`, `Tablet`. Defined in [`design/feel.md`](design/feel.md). | `Tablet` |
 | **Walkthrough** | A test that plays the Story, or one Chapter, from start to end by driving a player's inputs, and checks what the server sends back. | `tests/engine/walkthrough.luau` |
 | **Fake player** | A stand-in for a Player in a test, where there is no client: a Character to move, plus the identity fields a Player has. | `tests/engine/_fakeplayer.luau` |
@@ -162,7 +167,12 @@ predate this glossary and are kept so the golden file still matches:
 `ShowDialogue`, `SetObjective`, and `ShowChapterCard` as `ShowChapter`
 (or `ShowEnding` for the end card). The client sends `DialogueFinished`,
 and `ClientReady` once it has loaded, which starts the Story; that is an
-adapter detail, not a Player event.
+adapter detail, not a Player event. Both sides hold every payload to the
+contract: the server checks each World command against its schema in
+`src/core/Events.luau` and each message before it sends it, and the client
+binder wraps every remote it receives in `Net.guard`, which drops a
+malformed payload; tier 2 (`tests/engine/contract.luau`) passes every
+payload in the golden file through that guard.
 
 ## 4. Enumerations
 

@@ -1,34 +1,58 @@
 --!strict
 --[[
-	StoryClient: the client binder. It renders what the server sends over
-	Net (src/shared/Net, contract in src/core/Net) and sends DialogueFinished
-	back:
-	  * ShowDialogue: the dialogue box with a typewriter effect
-	  * SetObjective: the Objective tracker (top right)
-	  * ShowChapter / ShowEnding: the Chapter card and the end card
+	StoryClient: the client binder. It renders the core view-model and
+	forwards input; the logic is in the core, tested in tier 1:
 
-	Click, press E, Space or Enter to advance dialogue. The view-model that
-	will hold this logic in the core is brief 007's work.
+	  ShowDialogue    -> DialogueViewModel: the dialogue box, typed out
+	  SetObjective    -> ObjectiveText: the Objective tracker (top right)
+	  ShowChapter /   -> ChapterCardTimeline: the Chapter card and the end card
+	  ShowEnding
+
+	Every remote it receives is held to the Net contract first (Net.guard);
+	a malformed payload is dropped with a warning.
+
+	Click, tap, or press E, Space or Enter to advance a Dialogue; when the
+	view-model says it is finished, DialogueFinished goes to the server.
+	What is left here is building the UI, turning plain colours into
+	Color3, and connecting remotes, input and the frame loop.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
-local Events = require(ReplicatedStorage:WaitForChild("core"):WaitForChild("Events"))
-local Net = require(ReplicatedStorage:WaitForChild("shared"):WaitForChild("Net"))
+local Core = ReplicatedStorage:WaitForChild("core")
+local ChapterCardTimeline = require(Core:WaitForChild("ChapterCardTimeline"))
+local DialogueViewModel = require(Core:WaitForChild("DialogueViewModel"))
+local Events = require(Core:WaitForChild("Events"))
+local ObjectiveText = require(Core:WaitForChild("ObjectiveText"))
+local Story = require(Core:WaitForChild("Story"))
+local Net = require(Core:WaitForChild("Net"))
+local Remotes = require(ReplicatedStorage:WaitForChild("shared"):WaitForChild("Net"))
 
-local remotes = Net.waitForRemotes()
+local remotes = Remotes.waitForRemotes()
 local ShowDialogue = remotes.ShowDialogue
 local DialogueFinished = remotes.DialogueFinished
 local SetObjective = remotes.SetObjective
 local ShowChapter = remotes.ShowChapter
 local ShowEnding = remotes.ShowEnding
 local ClientReady = remotes.ClientReady
+
+-- The view-model's colours are a few frozen tables; each becomes a Color3 once.
+local colours: { [Story.RGB]: Color3 } = {}
+local function rgb(colour: Story.RGB): Color3
+	local converted = colours[colour]
+	if not converted then
+		converted = Color3.fromRGB(colour.r, colour.g, colour.b)
+		colours[colour] = converted
+	end
+	return converted
+end
 
 ----------------------------------------------------------------
 -- Build the UI
@@ -143,7 +167,7 @@ objectiveHeader.Font = Enum.Font.FredokaOne
 objectiveHeader.TextSize = 16
 objectiveHeader.TextColor3 = Color3.fromRGB(255, 214, 120)
 objectiveHeader.TextXAlignment = Enum.TextXAlignment.Left
-objectiveHeader.Text = "✦ Objective"
+objectiveHeader.Text = ObjectiveText.HEADER
 objectiveHeader.Parent = objectiveFrame
 
 local objectiveText = Instance.new("TextLabel")
@@ -197,22 +221,32 @@ subtitleLabel.ZIndex = 21
 subtitleLabel.Parent = titleOverlay
 
 ----------------------------------------------------------------
--- Dialogue playback
+-- Dialogue
 ----------------------------------------------------------------
-local dialogueQueue: { { Events.ShownLine } } = {}
-local dialogueActive = false
-local advanceRequested = false
+local dialogue = DialogueViewModel.new()
 
-local function requestAdvance()
-	advanceRequested = true
+local function renderDialogue()
+	local view = DialogueViewModel.view(dialogue)
+	dialogueFrame.Visible = view.open
+	clickCatcher.Visible = view.open
+	speakerLabel.Text = view.speaker
+	speakerLabel.Visible = view.speaker ~= ""
+	speakerLabel.BackgroundColor3 = rgb(view.style.tag)
+	bodyLabel.TextColor3 = rgb(view.style.text)
+	bodyLabel.Text = view.text
+	bodyLabel.MaxVisibleGraphemes = view.visibleGraphemes
 end
 
-clickCatcher.Activated:Connect(requestAdvance)
+local function advance()
+	if DialogueViewModel.advance(dialogue) then
+		DialogueFinished:FireServer()
+	end
+	renderDialogue()
+end
+
+clickCatcher.Activated:Connect(advance)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then
-		return
-	end
-	if not dialogueActive then
 		return
 	end
 	if
@@ -220,129 +254,71 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		or input.KeyCode == Enum.KeyCode.Space
 		or input.KeyCode == Enum.KeyCode.Return
 	then
-		requestAdvance()
+		advance()
 	end
 end)
 
-local function waitForAdvance()
-	advanceRequested = false
-	while not advanceRequested do
-		task.wait(0.05)
-	end
-end
-
-local function typewrite(label: TextLabel, text: string)
-	label.Text = text
-	local total = utf8.len(text) or string.len(text)
-	label.MaxVisibleGraphemes = 0
-	advanceRequested = false
-	local shown = 0
-	while shown < total do
-		if advanceRequested then
-			break -- skip straight to the full line
-		end
-		shown = shown + 1
-		label.MaxVisibleGraphemes = shown
-		task.wait(0.022)
-	end
-	label.MaxVisibleGraphemes = -1
-end
-
-local function playLines(lines: { Events.ShownLine })
-	dialogueActive = true
-	dialogueFrame.Visible = true
-	clickCatcher.Visible = true
-
-	for _, line in ipairs(lines) do
-		local speaker = line.speaker or ""
-		speakerLabel.Text = speaker
-		speakerLabel.Visible = speaker ~= ""
-
-		if speaker == "Narrator" then
-			speakerLabel.BackgroundColor3 = Color3.fromRGB(120, 110, 160)
-			bodyLabel.TextColor3 = Color3.fromRGB(225, 225, 245)
-		elseif speaker == "Amy" then
-			speakerLabel.BackgroundColor3 = Color3.fromRGB(214, 120, 140)
-			bodyLabel.TextColor3 = Color3.fromRGB(248, 240, 240)
-		else
-			speakerLabel.BackgroundColor3 = Color3.fromRGB(94, 160, 80)
-			bodyLabel.TextColor3 = Color3.fromRGB(240, 248, 235)
-		end
-
-		typewrite(bodyLabel, line.text or "")
-		waitForAdvance()
-	end
-
-	dialogueFrame.Visible = false
-	clickCatcher.Visible = false
-	dialogueActive = false
-	DialogueFinished:FireServer()
-end
-
-ShowDialogue.OnClientEvent:Connect(function(lines: { Events.ShownLine })
-	table.insert(dialogueQueue, lines)
-end)
-
-task.spawn(function()
-	while true do
-		if #dialogueQueue > 0 and not dialogueActive then
-			playLines(table.remove(dialogueQueue, 1) :: { Events.ShownLine })
-		end
-		task.wait(0.1)
-	end
-end)
+ShowDialogue.OnClientEvent:Connect(Net.guard("ShowDialogue", function(lines: { Events.ShownLine })
+	DialogueViewModel.enqueue(dialogue, lines)
+	renderDialogue()
+end, warn))
 
 ----------------------------------------------------------------
 -- Objective tracker
 ----------------------------------------------------------------
-SetObjective.OnClientEvent:Connect(function(text: string?)
-	if text and text ~= "" then
-		objectiveFrame.Visible = true
-		objectiveText.Text = text
-		-- little pop so updates are noticeable
+SetObjective.OnClientEvent:Connect(Net.guard("SetObjective", function(text: string?)
+	local view = ObjectiveText.view(text)
+	objectiveFrame.Visible = view.visible
+	objectiveText.Text = view.text
+	if view.visible then
 		objectiveFrame.BackgroundTransparency = 0
-		TweenService:Create(objectiveFrame, TweenInfo.new(0.6), { BackgroundTransparency = 0.25 }):Play()
-	else
-		objectiveFrame.Visible = false
+		TweenService:Create(objectiveFrame, TweenInfo.new(ObjectiveText.POP_SECONDS), {
+			BackgroundTransparency = ObjectiveText.RESTING_TRANSPARENCY,
+		}):Play()
 	end
-end)
+end, warn))
 
 ----------------------------------------------------------------
--- Chapter cards / ending
+-- Chapter cards and the end card
 ----------------------------------------------------------------
-local function showCard(title: string, subtitle: string, holdTime: number, keepDark: boolean)
-	titleOverlay.Visible = true
-	titleLabel.Text = title or ""
-	subtitleLabel.Text = subtitle or ""
+local card: ChapterCardTimeline.Card? = nil
+local cardStarted = 0
 
-	local fadeIn = TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	TweenService:Create(titleOverlay, fadeIn, { BackgroundTransparency = 0.25 }):Play()
-	TweenService:Create(titleLabel, fadeIn, { TextTransparency = 0 }):Play()
-	TweenService:Create(subtitleLabel, fadeIn, { TextTransparency = 0 }):Play()
-
-	task.wait(holdTime or 2.6)
-
-	local fadeOut = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-	if not keepDark then
-		TweenService:Create(titleOverlay, fadeOut, { BackgroundTransparency = 1 }):Play()
+local function renderCard()
+	local frame = ChapterCardTimeline.at(card :: ChapterCardTimeline.Card, os.clock() - cardStarted)
+	titleOverlay.Visible = frame ~= nil
+	if not frame then
+		card = nil
+		return
 	end
-	TweenService:Create(titleLabel, fadeOut, { TextTransparency = 1 }):Play()
-	TweenService:Create(subtitleLabel, fadeOut, { TextTransparency = 1 }):Play()
-	task.wait(0.9)
-	if not keepDark then
-		titleOverlay.Visible = false
+	titleOverlay.BackgroundTransparency = frame.overlayTransparency
+	titleLabel.TextTransparency = frame.textTransparency
+	subtitleLabel.TextTransparency = frame.textTransparency
+end
+
+local function showCard(ending: boolean): (title: string, subtitle: string) -> ()
+	return function(title, subtitle)
+		titleLabel.Text = title
+		subtitleLabel.Text = subtitle
+		card, cardStarted = ChapterCardTimeline.new(ending), os.clock()
+		renderCard()
 	end
 end
 
-ShowChapter.OnClientEvent:Connect(function(title: string, subtitle: string)
-	task.spawn(showCard, title, subtitle, 2.4, false)
-end)
+ShowChapter.OnClientEvent:Connect(Net.guard("ShowChapter", showCard(false), warn))
+ShowEnding.OnClientEvent:Connect(Net.guard("ShowEnding", showCard(true), warn))
 
-ShowEnding.OnClientEvent:Connect(function(title: string, subtitle: string)
-	task.spawn(function()
-		showCard(title, subtitle, 6, false)
-		-- after the card fades, the player is free to wander in the rain
-	end)
+----------------------------------------------------------------
+-- Every frame: time passes for the Dialogue and the card
+----------------------------------------------------------------
+RunService.RenderStepped:Connect(function(seconds)
+	if dialogue.lines then
+		DialogueViewModel.tick(dialogue, seconds)
+		renderDialogue()
+	end
+	if card then
+		renderCard()
+	end
 end)
 
 ----------------------------------------------------------------

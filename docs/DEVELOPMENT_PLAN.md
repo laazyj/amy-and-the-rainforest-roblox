@@ -470,11 +470,11 @@ Design notes:
   accept a "player-like" object (UserId, Character, position setter) and
   tier 2 drives them with a fake. Real client behaviour is tier 3's job;
   client logic is covered in tier 1 through the view-model.
-- **Reachability is tested, traversal may be.** Whether physics and
-  `Heartbeat` step inside Luau Execution is unverified. Phase 0 spike:
-  if they do, tier 2 drives a Humanoid with `MoveTo` through each chapter;
-  if not, pathfinding is the ceiling in tier 2 and real traversal is tier 3
-  only. The answer gets written into this document.
+- **Reachability is tested in tier 2, traversal in tier 3.** Physics does
+  not step in a Luau Execution task (decided by brief 007's spike; the
+  evidence is in `docs/OPEN_CLOUD.md`, "Physics in a task"). So
+  pathfinding is the ceiling in tier 2, and real traversal, a Humanoid
+  walking each chapter, is tier 3 only.
 - **Engine tests have real side effects on DataStores.** The DataModel is
   not persisted, but `DataStoreService`, `MemoryStoreService` and
   `MessagingService` are live. Tier 2 names every store with `storeName`
