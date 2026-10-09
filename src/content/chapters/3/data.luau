@@ -16,12 +16,9 @@ local chapter: Story.ChapterData = {
 			talkLabel = "Say hello",
 			objective = "Say hello to the maroon squirrel",
 			intro = {
-				{
-					speaker = "Narrator",
-					text = "Amy discoverd so many animals! Something maroon was hopping between the roots...",
-					canon = true,
-				},
-			},
+				{ speaker = "Narrator", text = "Amy discoverd so many animals!", canon = true },
+				{ speaker = "Narrator", text = "Something maroon was hopping between the roots..." },
+			} :: { Story.Line },
 			dialogue = {
 				{
 					speaker = "Amy",

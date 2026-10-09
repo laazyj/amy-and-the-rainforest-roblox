@@ -36,6 +36,7 @@ approve new Lines in her voice is in the [style guide](style-guide.md).
 | Date | Decision |
 |---|---|
 | 2026-10-08 | The owner corrected Clara's "vilage" to "village" throughout the game, in canon and game Lines alike. Every other spelling of Clara's stays exactly as written. The published text quoted at the end of this file is unchanged, because it records her page as it is. Applied to StoryData in PR #17. |
+| 2026-10-09 | The owner approved splitting canon Line 9 into a canon Line and a game Line (rule 2). The player sees the same words in the same Dialogue, now as two Lines. The golden walkthrough's one message for that Dialogue was edited to match; the engine walkthrough on CI verifies it. |
 
 ## Canon Lines
 
@@ -54,7 +55,7 @@ they are.
 | 6 | chapter2.walk_to_forest | outro | Narrator | `Then suddenly a dark forest loomed infront of her.` | Exact. |
 | 7 | chapter2.enter_forest | outro | Narrator | `As soon as she went in Amy saw it was a world parallel to thier own!` | Exact. |
 | 8 | chapter2.enter_forest | outro | Narrator | `It was a bautyfull paradise!` | Exact. |
-| 9 | chapter3.meet_squirrel | intro | Narrator | `Amy discoverd so many animals! Something maroon was hopping between the roots...` | Mixed: only "Amy discoverd so many animals!" is Clara's; "Something maroon was hopping between the roots..." was written for the game. Rule 2 splits it, in a PR of its own that re-records the golden file; until then the whole Line is marked canon. |
+| 9 | chapter3.meet_squirrel | intro | Narrator | `Amy discoverd so many animals!` | Exact. Split from a mixed Line on 2026-10-09; see Decisions. |
 | 10 | chapter3.rush_home | intro | Narrator | `She rushed Home...` | Adapted: the start of her sentence, ending in "..."; it continues in the next canon Line. |
 | 11 | chapter3.tell_mum | dialogue | Narrator | `...and told her mum who told her dad who told the village.` | Adapted: continues "She rushed Home"; her sentence goes on "— who made", the Line ends with a full stop. |
 | 12 | chapter4.stand_in_front | intro | Narrator | `The village made a giant tree-chopping machine and they decided to chop down the forest because they thought it was a thret to humankind.` | Adapted: her text reads "who made"; the Line starts "The village made". |
@@ -84,33 +85,34 @@ checked against Clara's text.
 | 12 | chapter2.walk_to_forest | outro | Amy | `The trees are like a giant wall... they're holding hands so nobody can get in. But look -- there's a little gap. Just my size.` |  |
 | 13 | chapter2.enter_forest | intro | Amy | `She decided to explore the unexplored world. That's me. I'm the she. Here goes nothing...` | Quotes Clara's sentence "She decided to Explore the unexplored world." with "Explore" lower-cased, inside a game Line. Not canon because it is not byte-identical. |
 | 14 | chapter2.enter_forest | outro | Amy | `The colours! The flowers are singing... no wait, that's birds. no, wait. it might be the flowers.` |  |
-| 15 | chapter3.meet_squirrel | dialogue | Amy | `A squirrel! A MAROON squirrel! You're the colour of my nanna's favourite cardigan.` |  |
-| 16 | chapter3.meet_squirrel | dialogue | Squirrel | `And you're the first human I've ever seen! Are all of you this leafless?` |  |
-| 17 | chapter3.meet_squirrel | dialogue | Amy | `You can TALK?!` |  |
-| 18 | chapter3.meet_squirrel | dialogue | Squirrel | `Everything talks on this side of the trees. You just have to come in and listen.` |  |
-| 19 | chapter3.meet_fox | dialogue | Fox | `Ooooh, a visitor. I'm sorry about the squirrel. He says 'leafless' to everyone.` |  |
-| 20 | chapter3.meet_fox | dialogue | Amy | `You're the orangest fox I have ever seen. You look like a sunset with a tail.` |  |
-| 21 | chapter3.meet_fox | dialogue | Fox | `Thank you! We take very good care of our colours here. The forest looks after us, and we look after the forest.` |  |
-| 22 | chapter3.meet_lion | dialogue | Amy | `A lion. A golden lion. Right. Be brave, Amy. He probably had a big breakfast.` |  |
-| 23 | chapter3.meet_lion | dialogue | Lion | `Peace, little explorer. No one is eaten in the paradise. It is against the whole idea of a paradise.` |  |
-| 24 | chapter3.meet_lion | dialogue | Lion | `You have seen our world now, Amy. When you go home... tell them what you saw. Tell them the truth about us.` |  |
-| 25 | chapter3.meet_lion | dialogue | Amy | `I will. I promise. Mum is NOT going to believe this!` |  |
-| 26 | chapter3.tell_mum | dialogue | Amy | `MUM! The rain forest isn't dangerous, it's a paradise! There's a maroon squirrel and an orange fox and a golden lion and they TALK!` |  |
-| 27 | chapter3.tell_mum | dialogue | Mum | `A golden... lion? That talks? Oh Amy. WAIT until your father hears about this.` |  |
-| 28 | chapter3.tell_mum | dialogue | Narrator | `But the village did not hear 'paradise'. The village heard 'LION'.` |  |
-| 29 | chapter4.stand_in_front | intro | Amy | `No no no no NO. Not my paradise. Not my friends. MOVE, legs!` |  |
-| 30 | chapter4.stand_in_front | outro | Narrator | `Amy planted her feet in the grass, right between the whirring blade and the giant trees, and did not move.` |  |
-| 31 | chapter4.stand_in_front | outro | Amy | `STOP! Everybody just... STOP!` |  |
-| 32 | chapter4.explain | dialogue | Dad | `Amy! Get away from there, it isn't safe!` |  |
-| 33 | chapter4.explain | dialogue | Amy | `It IS safe, Dad. I've been inside. It isn't a threat -- it's a paradise, a whole world parallel to ours!` |  |
-| 34 | chapter4.explain | dialogue | Amy | `There's a squirrel the colour of nanna's cardigan, and a fox like a sunset, and the golden lion is GENTLE, Dad. Nobody is eaten in a paradise. It's against the whole idea.` |  |
-| 35 | chapter4.explain | dialogue | Amy | `You shouldn't be scared of the forest. You should be PROUD of it. We should take care of it!` |  |
-| 36 | chapter4.explain | dialogue | Dad | `...Proud of it. Well. I suppose it IS the biggest, greenest thing any village ever had.` |  |
-| 37 | Ending | Ending | Narrator | `The great machine rolled backwards, away from the trees, and its terrible blade went still.` |  |
-| 38 | Ending | Ending | Narrator | `And from the very top of the giant trees, a maroon squirrel, an orange fox and a golden lion watched the girl who saved their world.` |  |
-| 39 | Ending | Ending | Dad | `Alright, alright. But next time you explore a parallel universe, young lady... you take the dog.` |  |
-| 40 | Ending | Ending | Sam | `Woof!` |  |
-| 41 | Ending | Ending | Amy | `Deal.` |  |
+| 15 | chapter3.meet_squirrel | intro | Narrator | `Something maroon was hopping between the roots...` | Split from canon Line 9; see Decisions. |
+| 16 | chapter3.meet_squirrel | dialogue | Amy | `A squirrel! A MAROON squirrel! You're the colour of my nanna's favourite cardigan.` |  |
+| 17 | chapter3.meet_squirrel | dialogue | Squirrel | `And you're the first human I've ever seen! Are all of you this leafless?` |  |
+| 18 | chapter3.meet_squirrel | dialogue | Amy | `You can TALK?!` |  |
+| 19 | chapter3.meet_squirrel | dialogue | Squirrel | `Everything talks on this side of the trees. You just have to come in and listen.` |  |
+| 20 | chapter3.meet_fox | dialogue | Fox | `Ooooh, a visitor. I'm sorry about the squirrel. He says 'leafless' to everyone.` |  |
+| 21 | chapter3.meet_fox | dialogue | Amy | `You're the orangest fox I have ever seen. You look like a sunset with a tail.` |  |
+| 22 | chapter3.meet_fox | dialogue | Fox | `Thank you! We take very good care of our colours here. The forest looks after us, and we look after the forest.` |  |
+| 23 | chapter3.meet_lion | dialogue | Amy | `A lion. A golden lion. Right. Be brave, Amy. He probably had a big breakfast.` |  |
+| 24 | chapter3.meet_lion | dialogue | Lion | `Peace, little explorer. No one is eaten in the paradise. It is against the whole idea of a paradise.` |  |
+| 25 | chapter3.meet_lion | dialogue | Lion | `You have seen our world now, Amy. When you go home... tell them what you saw. Tell them the truth about us.` |  |
+| 26 | chapter3.meet_lion | dialogue | Amy | `I will. I promise. Mum is NOT going to believe this!` |  |
+| 27 | chapter3.tell_mum | dialogue | Amy | `MUM! The rain forest isn't dangerous, it's a paradise! There's a maroon squirrel and an orange fox and a golden lion and they TALK!` |  |
+| 28 | chapter3.tell_mum | dialogue | Mum | `A golden... lion? That talks? Oh Amy. WAIT until your father hears about this.` |  |
+| 29 | chapter3.tell_mum | dialogue | Narrator | `But the village did not hear 'paradise'. The village heard 'LION'.` |  |
+| 30 | chapter4.stand_in_front | intro | Amy | `No no no no NO. Not my paradise. Not my friends. MOVE, legs!` |  |
+| 31 | chapter4.stand_in_front | outro | Narrator | `Amy planted her feet in the grass, right between the whirring blade and the giant trees, and did not move.` |  |
+| 32 | chapter4.stand_in_front | outro | Amy | `STOP! Everybody just... STOP!` |  |
+| 33 | chapter4.explain | dialogue | Dad | `Amy! Get away from there, it isn't safe!` |  |
+| 34 | chapter4.explain | dialogue | Amy | `It IS safe, Dad. I've been inside. It isn't a threat -- it's a paradise, a whole world parallel to ours!` |  |
+| 35 | chapter4.explain | dialogue | Amy | `There's a squirrel the colour of nanna's cardigan, and a fox like a sunset, and the golden lion is GENTLE, Dad. Nobody is eaten in a paradise. It's against the whole idea.` |  |
+| 36 | chapter4.explain | dialogue | Amy | `You shouldn't be scared of the forest. You should be PROUD of it. We should take care of it!` |  |
+| 37 | chapter4.explain | dialogue | Dad | `...Proud of it. Well. I suppose it IS the biggest, greenest thing any village ever had.` |  |
+| 38 | Ending | Ending | Narrator | `The great machine rolled backwards, away from the trees, and its terrible blade went still.` |  |
+| 39 | Ending | Ending | Narrator | `And from the very top of the giant trees, a maroon squirrel, an orange fox and a golden lion watched the girl who saved their world.` |  |
+| 40 | Ending | Ending | Dad | `Alright, alright. But next time you explore a parallel universe, young lady... you take the dog.` |  |
+| 41 | Ending | Ending | Sam | `Woof!` |  |
+| 42 | Ending | Ending | Amy | `Deal.` |  |
 
 ## Titles that borrow Clara's words
 
