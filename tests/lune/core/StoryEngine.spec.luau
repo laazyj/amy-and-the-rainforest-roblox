@@ -206,6 +206,22 @@ return function(t: any)
 			expect(walk.progress.ended).toBe(true)
 		end)
 
+		it("shows the end card at once when the Ending has no Lines", function()
+			local silent = table.clone(fixture)
+			silent.ending = table.clone(fixture.ending)
+			silent.ending.lines = {}
+			local steps = Walker.walk(silent).steps
+			local final = steps[#steps]
+			expect(final.event).toEqual({ kind = "TouchedPickup", pickup = "FlowerB" })
+			expect(final.commands[#final.commands]).toEqual({
+				kind = "ShowChapterCard",
+				title = fixture.ending.title,
+				subtitle = fixture.ending.subtitle,
+				ending = true,
+			})
+			expect(final.events[#final.events]).toEqual({ kind = "StoryEnded" })
+		end)
+
 		it("ignores a Pickup already touched", function()
 			local progress = walk.playable["chapter2.pick"].progress
 			local once = StoryEngine.step(fixture, progress, { kind = "TouchedPickup", pickup = "FlowerC" })
