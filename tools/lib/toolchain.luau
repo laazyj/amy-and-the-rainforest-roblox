@@ -79,14 +79,17 @@ end
 function Toolchain.updateChecksums(text: string, name: string, release: Release): string
 	local digests: { [string]: string } = {}
 	for _, asset in release.assets do
-		digests[asset.name] = if asset.digest then string.match(asset.digest, "^sha256:(%x+)$") else nil
+		local hex = if asset.digest then string.match(asset.digest, "^sha256:(%x+)$") else nil
+		if hex then
+			digests[asset.name] = hex
+		end
 	end
 	local newVersion = Toolchain.versionFromTag(release.tag_name)
 	return (
-		string.gsub(text, "[^\n]+", function(line): string?
+		string.gsub(text, "[^\n]+", function(line: string): string
 			local tool, tag, platform, asset = string.match(line, "^(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+%x+$")
 			if tool ~= name or not (tag and platform and asset) then
-				return nil -- keep the line
+				return line
 			end
 			local old = Toolchain.versionFromTag(tag)
 			local first, last = string.find(asset, old, 1, true)

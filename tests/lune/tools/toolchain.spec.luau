@@ -162,7 +162,7 @@ return function(t: any)
 				local found = 0
 				for tool, tag in string.gmatch(text, "\n(%S+)%s+(%S+)") do
 					if tool == pin.name then
-						expect(Toolchain.versionFromTag(tag)).toBe(pin.version)
+						expect(Toolchain.versionFromTag(tag :: string)).toBe(pin.version)
 						found += 1
 					end
 				end
