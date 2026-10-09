@@ -1,12 +1,9 @@
-# Installs Rokit and the tools pinned in rokit.toml, and puts them on PATH.
+# Installs the toolchain pinned in rokit.toml, the workflow linters and the
+# type definitions by running tools/bootstrap-agent.sh, the same script cloud
+# sessions run, so CI and local runs use the same, checksum-verified tools.
 # Every workflow that needs the toolchain uses this action.
-#
-# Rokit is pinned by version and by the SHA-256 of its release zip, checked
-# before anything in it runs. Rokit publishes no checksum file, so the hash is
-# that of the linux-x86_64 asset of the pinned release. To bump, change both
-# lines together.
 name: Set up tools
-description: Install Rokit (checksum-verified) and the toolchain pinned in rokit.toml.
+description: Install the toolchain pinned in rokit.toml with tools/bootstrap-agent.sh.
 
 runs:
   using: composite
@@ -15,37 +12,13 @@ runs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
-          ~/.rokit
+          build/bin
           build/globalTypes-*.d.luau
-        # The action file holds the Rokit pin, rokit.toml the tool pins.
-        key: tools-${{ runner.os }}-${{ hashFiles('.github/actions/setup-tools/action.yml', 'rokit.toml') }}
+        # The pins, their checksums and the linters' pins.
+        key: tools-${{ runner.os }}-${{ hashFiles('rokit.toml', 'tools/toolchain-checksums.txt', 'tools/install-workflow-linters.sh') }}
 
-    - name: Install Rokit and the pinned tools
-      shell: bash
-      env:
-        ROKIT_VERSION: 1.2.0
-        ROKIT_SHA256: 951a7f3ec3d2a5e021fd1867d32f69f010ee4c2927f644b759578afc59c65fc0
-        GITHUB_TOKEN: ${{ github.token }}
-      run: |
-        if [ ! -x ~/.rokit/bin/rokit ]; then
-          zip="$RUNNER_TEMP/rokit.zip"
-          curl -fsSL -o "$zip" \
-            "https://github.com/rojo-rbx/rokit/releases/download/v$ROKIT_VERSION/rokit-$ROKIT_VERSION-linux-x86_64.zip"
-          if ! echo "$ROKIT_SHA256  $zip" | sha256sum --check --strict -; then
-            echo "::error title=Rokit checksum mismatch::rokit-$ROKIT_VERSION-linux-x86_64.zip does not match the SHA-256 pinned in .github/actions/setup-tools/action.yml"
-            exit 1
-          fi
-          unzip -q "$zip" -d "$RUNNER_TEMP/rokit"
-          "$RUNNER_TEMP/rokit/rokit" self-install
-        fi
-        echo "$HOME/.rokit/bin" >> "$GITHUB_PATH"
-        # Authenticated GitHub API calls avoid the shared-runner rate limit.
-        ~/.rokit/bin/rokit authenticate github --token "$GITHUB_TOKEN"
-        ~/.rokit/bin/rokit install --no-trust-check
-
-    # Always, so the token never lands in the cache even if the install failed.
-    - name: Remove the GitHub token from the cached Rokit directory
-      if: always()
+    - name: Install the pinned tools
       shell: bash
       run: |
-        if [ -x ~/.rokit/bin/rokit ]; then ~/.rokit/bin/rokit authenticate github --remove; fi
+        tools/bootstrap-agent.sh
+        echo "$PWD/build/bin" >> "$GITHUB_PATH" # for steps that call the tools directly

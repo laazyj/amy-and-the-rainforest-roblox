@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Installs the GitHub Actions linters tools/check.sh runs, actionlint and
-# zizmor, into the directory given (default ~/.local/bin). Each is pinned by
-# version and by the SHA-256 of its release archive, checked before it is
-# unpacked. Neither is in rokit.toml because Rokit does not verify checksums.
+# zizmor, into the directory given (default build/bin), skipping one that
+# is already there at its pinned version. Each is pinned by version and by
+# the SHA-256 of its release archive, checked before it is unpacked. Called
+# by tools/bootstrap-agent.sh.
 # To bump: change the version and both checksums together (actionlint
 # publishes a checksums file; zizmor does not, so hash the release assets).
 set -euo pipefail
@@ -29,16 +30,21 @@ Darwin-arm64)
 	;;
 esac
 
-bin="${1:-$HOME/.local/bin}"
+bin="${1:-$(cd "$(dirname "$0")/.." && pwd)/build/bin}"
 mkdir -p "$bin"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-# install_tool <name> <url> <sha256>: download, verify, unpack into $bin.
+# install_tool <name> <version> <url> <sha256>: download, verify, unpack into
+# $bin, unless $bin already has <name> at <version>.
 install_tool() {
-	curl -fsSL -o "$tmp/$1.tar.gz" "$2"
-	if ! echo "$3  $tmp/$1.tar.gz" | shasum -a 256 --check --status; then
-		echo "error: $2 does not match its pinned SHA-256 in tools/install-workflow-linters.sh" >&2
+	if [ -x "$bin/$1" ] && "$bin/$1" --version 2>/dev/null | grep -qwF "$2"; then
+		echo "$1 $2: present"
+		return
+	fi
+	curl -fsSL -o "$tmp/$1.tar.gz" "$3"
+	if ! echo "$4  $tmp/$1.tar.gz" | shasum -a 256 --check --status; then
+		echo "error: $3 does not match its pinned SHA-256 in tools/install-workflow-linters.sh" >&2
 		exit 1
 	fi
 	tar -xzf "$tmp/$1.tar.gz" -C "$tmp" "$1"
@@ -47,7 +53,7 @@ install_tool() {
 	echo "installed $bin/$1"
 }
 
-install_tool actionlint \
+install_tool actionlint "$ACTIONLINT_VERSION" \
 	"https://github.com/rhysd/actionlint/releases/download/v$ACTIONLINT_VERSION/$actionlint_asset" "$actionlint_sha256"
-install_tool zizmor \
+install_tool zizmor "$ZIZMOR_VERSION" \
 	"https://github.com/zizmorcore/zizmor/releases/download/v$ZIZMOR_VERSION/$zizmor_asset" "$zizmor_sha256"
