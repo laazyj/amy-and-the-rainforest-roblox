@@ -11,6 +11,8 @@
 	  lune run tools/guard coverage a spec per core module, every glossary
 	                                name tests must use in a spec, and a
 	                                Walkthrough spec per Chapter
+	  lune run tools/guard faults   every canned fault of the mutation check
+	                                (tools/lib/mutate.luau) still applies
 	  lune run tools/guard test-change
 	                                a PR changing src/core changes tests/
 	                                (CHANGED_FILES, PR_LABELS as JSON,
@@ -23,6 +25,7 @@
 local Cli = require("./lib/cli")
 local Coverage = require("./lib/coverage")
 local Files = require("./lib/files")
+local Mutate = require("./lib/mutate")
 local Purity = require("./lib/purity")
 local Schema = require("./lib/schema")
 local Story = require("../src/content/Story")
@@ -64,6 +67,9 @@ local GUARDS: { [string]: (Cli.Context) -> { string } } = {
 			chapters = chapters,
 			glossary = Files.read("docs/GLOSSARY.md"),
 		})
+	end,
+	faults = function()
+		return Mutate.stale(Mutate.FAULTS, Files.read)
 	end,
 	["test-change"] = function(ctx)
 		local changed = string.split(ctx.env.CHANGED_FILES or "", "\n")

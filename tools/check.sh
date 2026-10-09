@@ -61,3 +61,6 @@ lune run tools/guard links
 
 echo "== Coverage guards: a spec per core module, glossary names in specs, a Walkthrough per Chapter"
 lune run tools/guard coverage
+
+echo "== Mutation check: every canned fault still applies (the nightly job runs them)"
+lune run tools/guard faults

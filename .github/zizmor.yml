@@ -20,6 +20,7 @@ rules:
     ignore:
       - ci.yml
       - engine-tests.yml
+      - mutation.yml
       - publish-dev.yml
       - test-change.yml
       - toolchain-check.yml

@@ -1,0 +1,38 @@
+# Nightly mutation check (plan section 4, brief 008): tools/mutate.luau
+# applies a dozen canned faults one at a time to a copy of the repository
+# and runs tier 1 against each. The job fails if any fault leaves the suite
+# green, or no longer applies. The job summary names the tests that caught
+# each fault. Run it by hand from the Actions tab (workflow_dispatch).
+name: Mutation check
+
+on:
+  schedule:
+    - cron: "41 3 * * *" # nightly, 03:41 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutation
+  cancel-in-progress: true
+
+jobs:
+  mutation:
+    name: Every canned fault fails tier 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Install the pinned toolchain
+        uses: ./.github/actions/setup-tools
+
+      # The report (stdout) goes to the job summary; bash's pipefail keeps
+      # the tool's exit status.
+      - name: Run the mutation check
+        run: lune run tools/mutate | tee -a "$GITHUB_STEP_SUMMARY"

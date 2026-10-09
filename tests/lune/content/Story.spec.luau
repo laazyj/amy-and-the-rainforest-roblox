@@ -110,6 +110,29 @@ return function(t: any)
 			expect(world.characters.Sam).toBe("SamGuardPost")
 		end)
 
+		it(
+			"plays beat sam_catches in order: Sam bounds to spot GateOutside before Amy is put at spot GardenInside",
+			function()
+				local staged = {}
+				for _, command: any in assert(stepPlaying("sam_catches"), "never played").commands do
+					if command.kind == "MoveCharacter" then
+						table.insert(staged, `MoveCharacter {command.character} {command.spot}`)
+					elseif command.kind == "TeleportPlayer" then
+						table.insert(staged, `TeleportPlayer {command.spot}`)
+					elseif command.kind == "Wait" then
+						table.insert(staged, `Wait {command.seconds}`)
+					end
+				end
+				expect(staged).toEqual({
+					"MoveCharacter Sam GateOutside",
+					"Wait 0.5",
+					"TeleportPlayer GardenInside",
+					"MoveCharacter Sam SamGuardPost",
+					"Wait 0.4",
+				})
+			end
+		)
+
 		it("plays beat sam_catches after both sneak-outs, waiting 0.5 s and 0.4 s each time", function()
 			local waits = {}
 			for _, step in walk.steps do
