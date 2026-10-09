@@ -354,8 +354,11 @@ StoryData.Chapters = {
 						speaker = "Mum",
 						text = "A golden... lion? That talks? Oh Amy. WAIT until your father hears about this.",
 					},
-					{ speaker = "Narrator", text = "...and told her mum who told her dad who told the vilage." },
-					{ speaker = "Narrator", text = "But the vilage did not hear 'paradise'. The vilage heard 'LION'." },
+					{ speaker = "Narrator", text = "...and told her mum who told her dad who told the village." },
+					{
+						speaker = "Narrator",
+						text = "But the village did not hear 'paradise'. The village heard 'LION'.",
+					},
 				},
 			},
 		},
@@ -375,7 +378,7 @@ StoryData.Chapters = {
 				intro = {
 					{
 						speaker = "Narrator",
-						text = "The vilage made a giant tree-chopping machine and they decided to chop down the forest because they thought it was a thret to humankind.",
+						text = "The village made a giant tree-chopping machine and they decided to chop down the forest because they thought it was a thret to humankind.",
 					},
 					{ speaker = "Amy", text = "No no no no NO. Not my paradise. Not my friends. MOVE, legs!" },
 				},
