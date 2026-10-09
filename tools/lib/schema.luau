@@ -10,6 +10,11 @@
 	each run (tools/lib/glossary.luau); nothing here lists them. A World
 	command's argument types are the core's (src/core/Events.luau).
 
+	Some records are open on purpose: a Scene's layout keys (`house`,
+	`fence`, ...) and the rest of Story.luau's assembled Story are for
+	SceneBuilder and are not compared with the glossary, and layout.luau and
+	palette.luau (helpers) get only the plain-value rule.
+
 	Positions and colours are plain tables wherever they appear: no value
 	is an engine datatype (userdata, vector), a table with an `x`, `y` and
 	`z` is exactly { x, y, z } numbers and one with an `r`, `g` and `b`
@@ -82,7 +87,7 @@ function Schema.fromGlossary(text: string): Schema
 		if entry.id ~= entry.name then -- the Narrator is a Speaker, not a Character
 			schema.characters[entry.name] = {
 				kind = first(entry.cells.Kind),
-				display = entry.cells["Display name"] or "",
+				display = entry.cells["Display name"],
 				home = first(entry.cells["Home Spot"]),
 			}
 		end

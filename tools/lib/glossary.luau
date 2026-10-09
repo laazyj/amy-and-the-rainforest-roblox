@@ -7,6 +7,11 @@
 	a reserved name: it is an entry, flagged `later`, and `inUse` and
 	`names` leave it out, so tier 0 rejects it in content until the mark is
 	removed.
+
+	A change to the glossary's format fails loudly rather than open: a
+	missing section, a column read by a header the table does not have, and
+	a first cell that says "later" without the exact *later* mark are all
+	errors.
 ]]
 
 export type Entry = {
@@ -14,7 +19,8 @@ export type Entry = {
 	id: string,
 	name: string,
 	later: boolean,
-	-- column header -> the cell's text, trimmed
+	-- column header -> the cell's text, trimmed; reading a header the table
+	-- does not have is an error
 	cells: { [string]: string },
 }
 
@@ -65,21 +71,28 @@ function Glossary.parse(text: string): Glossary
 		end
 		local headers: { string }?
 		local found = {}
+		-- Reading a column the table does not have names it.
+		local strictColumns = {
+			__index = function(_, header)
+				error(`the glossary's "{heading}" table has no "{header}" column`, 2)
+			end,
+		}
 		for row in string.gmatch(section, "\n(|[^\n]*)") do
 			local list = cells(row)
 			local id = string.match(list[1] or "", "^`([^`]+)`")
 			if not headers then
 				headers = list
 			elseif id then
-				local entry: Entry = {
-					id = id,
-					name = Glossary.name(id),
-					later = string.find(list[1], "*later*", 1, true) ~= nil,
-					cells = {},
-				}
+				local after = string.gsub(list[1], "^`[^`]+`", "")
+				local later = string.find(after, "*later*", 1, true) ~= nil
+				if not later and string.find(string.lower(after), "%f[%a]later%f[%A]") then
+					error(`the "{heading}" row {id} says later without the exact *later* mark`, 2)
+				end
+				local entry: Entry = { id = id, name = Glossary.name(id), later = later, cells = {} }
 				for i, cell in list do
 					entry.cells[(headers :: { string })[i] or tostring(i)] = cell
 				end
+				setmetatable(entry.cells, strictColumns)
 				table.insert(found, entry)
 			end
 		end
