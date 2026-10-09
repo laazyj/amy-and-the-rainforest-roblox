@@ -116,6 +116,69 @@ return function(t: any)
 			})
 		end)
 
+		-- Each way to write an asset id (the review of PR #26), the file it is
+		-- in, and the problem tier 0 reports for it.
+		local NOT_LITERAL = "must be written out as digits"
+		local NOT_LISTED = "asset id 123456789 is not in assets/manifest.json"
+		local CARD = "src/client/Card.luau"
+		type Attempt = { how: string, line: string, problem: string, path: string? }
+		local ATTEMPTS: { Attempt } = {
+			{ how = "a concatenation", line = '"rbxassetid://" .. "123456789"', problem = NOT_LITERAL },
+			{ how = "an interpolated string", line = "`rbxassetid://{123456789}`", problem = NOT_LITERAL },
+			{ how = "a string.format", line = 'string.format("rbxassetid://%d", 123456789)', problem = NOT_LITERAL },
+			{
+				how = "a Content.fromAssetId call",
+				line = "Content.fromAssetId(123456789)",
+				problem = "Content.fromAssetId outside",
+			},
+			{ how = "the scheme in capitals", line = '"RBXASSETID://123456789"', problem = NOT_LISTED },
+			{
+				how = "asset?id= with no slash",
+				line = '"http://www.roblox.com/asset?id=123456789"',
+				problem = NOT_LISTED,
+			},
+			{
+				how = "an asset delivery URL",
+				line = '"https://assetdelivery.roblox.com/v1/asset/?id=123456789"',
+				problem = NOT_LISTED,
+			},
+			{ how = "a thumbnail", line = '"rbxthumb://type=Asset&id=123456789&w=150&h=150"', problem = NOT_LISTED },
+			{
+				how = "a .model.json file",
+				path = "src/shared/x/Card.model.json",
+				line = '{"Properties":{"Image":"rbxassetid://123456789"}}',
+				problem = NOT_LISTED,
+			},
+			{
+				how = "a .lua file",
+				path = "src/shared/Old.lua",
+				line = 'return "rbxassetid://123456789"',
+				problem = NOT_LISTED,
+			},
+			{
+				how = "default.project.json",
+				path = "default.project.json",
+				line = '{"Image": "rbxassetid://123456789"}',
+				problem = NOT_LISTED,
+			},
+		}
+		for _, attempt in ATTEMPTS do
+			local path = attempt.path or CARD
+			it(`fails on an asset id in {attempt.how}`, function()
+				local mock = repo(manifest(entry()), { [path] = attempt.line })
+				local problems = Manifest.check(mock.ctx)
+				expect(#problems).toBe(1)
+				expect(problems[1]).toContain(`{path}:1: `)
+				expect(problems[1]).toContain(attempt.problem)
+			end)
+		end
+
+		it("lets AssetIds.luau build content ids with Content.fromAssetId", function()
+			local m = manifest(entry())
+			local source = Manifest.generateAssetIds(m) .. "-- Content.fromAssetId(id)\n"
+			expect(Manifest.scanSources(m, { [Manifest.ASSET_IDS_PATH] = source })).toEqual({})
+		end)
+
 		it("fails when AssetIds.luau was edited by hand", function()
 			local mock = repo(manifest(entry()), { [Manifest.ASSET_IDS_PATH] = "return {}" })
 			expect(Manifest.check(mock.ctx)[1]).toContain("does not match assets/manifest.json")

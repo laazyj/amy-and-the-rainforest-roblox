@@ -81,9 +81,19 @@ for _, field in FIELDS do
 	IS_FIELD[field] = true
 end
 
--- Where a file's asset ids hide in source: `rbxassetid://<id>` and the old
--- `roblox.com/asset/?id=<id>`.
-local ID_PATTERNS = { "rbxassetid://(%d+)", "roblox%.com/asset/%?id=(%d+)" }
+-- Where an asset id hides in source, matched against the lowercased line: the
+-- content scheme, the old and the delivery URLs (`asset/?id=` and
+-- `asset?id=`), and thumbnails. Each captures the digits after it, which are
+-- empty when the id is not written out (`"rbxassetid://" .. id`).
+local ID_PATTERNS = { "rbxassetid://(%d*)", "asset/?%?id=(%d*)", "rbxthumb://[%w=&]-id=(%d*)" }
+
+-- Only AssetIds.luau may build a content id from a number.
+local FROM_ASSET_ID = "content.fromassetid("
+
+-- The project file Rojo builds from, scanned with src/.
+local PROJECT_FILE = "default.project.json"
+
+local USE_ASSET_IDS = "look the Asset up in AssetIds instead"
 
 function Manifest.decode(text: string): Manifest
 	local ok, decoded = pcall(serde.decode, "json" :: any, text)
@@ -221,9 +231,11 @@ function Manifest.validate(manifest: any, readFile: (string) -> string?): { stri
 	return problems
 end
 
--- `rbxassetid://` references in `sources` (path -> text) whose id no manifest
--- entry has.
-function Manifest.unknownIds(manifest: Manifest, sources: { [string]: string }): { string }
+-- Every asset id in `sources` (path -> text) that the manifest does not
+-- have, every id that is not written out as digits, and every
+-- Content.fromAssetId outside AssetIds.luau. Code reaches an Asset through
+-- AssetIds, so a literal id from the manifest is the only id it may name.
+function Manifest.scanSources(manifest: Manifest, sources: { [string]: string }): { string }
 	local known: { [string]: boolean } = {}
 	for _, entry in manifest.assets do
 		if entry.assetId then
@@ -232,15 +244,32 @@ function Manifest.unknownIds(manifest: Manifest, sources: { [string]: string }):
 	end
 	local problems = {}
 	for path, text in sources do
+		text = string.lower(text)
+		-- Most files name no asset at all; only those are split into lines.
+		if not (string.find(text, "rbx", 1, true) or string.find(text, "asset", 1, true)) then
+			continue
+		end
 		local lineNumber = 0
 		for line in string.gmatch(text .. "\n", "([^\n]*)\n") do
 			lineNumber += 1
+			local where = `{path}:{lineNumber}`
 			for _, pattern in ID_PATTERNS do
 				for id in string.gmatch(line, pattern) do
-					if not known[id] then
-						table.insert(problems, `{path}:{lineNumber}: asset id {id} is not in {Manifest.PATH}`)
+					if id == "" then
+						table.insert(
+							problems,
+							`{where}: an asset id must be written out as digits from {Manifest.PATH}; {USE_ASSET_IDS}`
+						)
+					elseif not known[id] then
+						table.insert(problems, `{where}: asset id {id} is not in {Manifest.PATH}`)
 					end
 				end
+			end
+			if path ~= Manifest.ASSET_IDS_PATH and string.find(line, FROM_ASSET_ID, 1, true) then
+				table.insert(
+					problems,
+					`{where}: Content.fromAssetId outside {Manifest.ASSET_IDS_PATH}; {USE_ASSET_IDS}`
+				)
 			end
 		end
 	end
@@ -274,17 +303,16 @@ function Manifest.generateAssetIds(manifest: Manifest): string
 	return table.concat(lines, "\n") .. "\n"
 end
 
--- Every `.luau` file under `dir`, path -> text. Each directory is listed once.
+-- Every file under `dir`, whatever its extension, path -> text. Each
+-- directory is listed once.
 local function readSources(ctx: Cli.Context, dir: string, names: { string }, into: { [string]: string })
 	for _, name in names do
 		local path = `{dir}/{name}`
-		if string.match(name, "%.luau$") then
-			into[path] = ctx.readFile(path) or ""
+		local children = ctx.listDir(path)
+		if children then
+			readSources(ctx, path, children, into)
 		else
-			local children = ctx.listDir(path)
-			if children then
-				readSources(ctx, path, children, into)
-			end
+			into[path] = ctx.readFile(path) or ""
 		end
 	end
 end
@@ -304,9 +332,10 @@ function Manifest.load(ctx: Cli.Context): (Manifest, { string }, (string) -> str
 	return manifest, Manifest.validate(manifest, readAsset), readAsset
 end
 
--- The tier 0 asset check: the manifest is valid, every asset id in src/ is in
--- it, and src/shared/AssetIds.luau is what the manifest generates. Returns
--- the problems, and logs a note for each entry still to upload.
+-- The tier 0 asset check: the manifest is valid, every asset id in src/ and
+-- default.project.json is in it, and src/shared/AssetIds.luau is what the
+-- manifest generates. Returns the problems, and logs a note for each entry
+-- still to upload.
 function Manifest.check(ctx: Cli.Context): { string }
 	local manifest, problems, readAsset = Manifest.load(ctx)
 	if #problems > 0 then
@@ -314,7 +343,8 @@ function Manifest.check(ctx: Cli.Context): { string }
 	end
 	local sources = {}
 	readSources(ctx, "src", ctx.listDir("src") or {}, sources)
-	problems = Manifest.unknownIds(manifest, sources)
+	sources[PROJECT_FILE] = ctx.readFile(PROJECT_FILE) or ""
+	problems = Manifest.scanSources(manifest, sources)
 	if ctx.readFile(Manifest.ASSET_IDS_PATH) ~= Manifest.generateAssetIds(manifest) then
 		table.insert(
 			problems,

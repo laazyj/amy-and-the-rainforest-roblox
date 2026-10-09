@@ -17,7 +17,7 @@ the rest.
 | `assets/manifest.json` | Every asset the game references: name, kind, file, Roblox asset id, the SHA-256 of the file uploaded, moderation status, creator, licence and origin. |
 | `assets/images/`, `assets/audio/`, `assets/meshes/` | The files. Clara's illustrations, placeholders, sounds, models. |
 | `src/shared/AssetIds.luau` | Generated from the manifest: asset name → `rbxassetid://` content id, for every uploaded asset the game shows. Never edited by hand. |
-| `tools/check-assets.luau` | Tier 0 (run by `tools/check.sh`): the manifest is valid, every `rbxassetid://` in `src/` is in it, and `AssetIds.luau` matches it. |
+| `tools/check-assets.luau` | Tier 0 (run by `tools/check.sh`): the manifest is valid, every asset id the scan finds is in it (see [What the tier 0 scan catches](#what-the-tier-0-scan-catches)), and `AssetIds.luau` matches it. |
 | `tools/upload-assets.luau` | The uploader. Run only by CI; `--dry-run` anywhere. |
 | `.github/workflows/upload-assets.yml` | Runs the uploader on demand and opens the "Asset ids" PR. |
 
@@ -94,8 +94,30 @@ longer matches the one recorded, so the next upload run sends it again.
 Roblox cannot update an image or a sound in place, so it becomes a new
 asset with a new id; the "Asset ids" PR shows the old id being replaced.
 
-Never write an `assetId` by hand, and never put an `rbxassetid://` in
-`src/` that is not in the manifest: tier 0 fails on both.
+Never write an `assetId` by hand, and never put an asset id in `src/`
+that is not in the manifest: tier 0 fails on both.
+
+### What the tier 0 scan catches
+
+`tools/check-assets` reads every file under `src/`, whatever its
+extension, and `default.project.json`, matching case-insensitively. It
+fails on:
+
+- an asset id in `rbxassetid://<id>`, `…/asset/?id=<id>`, `…/asset?id=<id>`
+  (the old and the asset delivery URLs) or `rbxthumb://…id=<id>` that is
+  not in the manifest;
+- any of those schemes not followed by the id written out as digits, such
+  as `"rbxassetid://" .. id`, `` `rbxassetid://{id}` `` or
+  `string.format("rbxassetid://%d", id)`;
+- `Content.fromAssetId(` anywhere but `src/shared/AssetIds.luau`.
+
+So code reaches an Asset only through `AssetIds`. The scan does not catch
+an id with no scheme at all (a bare number passed to an engine API such
+as `InsertService:LoadAsset`), or a scheme split across strings
+(`"rbxasset" .. "id://"`), or an id inside a binary `.rbxm` model, which
+is compressed. Review catches those. A thumbnail of a user
+(`rbxthumb://type=AvatarHeadShot&id=…`) is flagged too; the game shows
+none.
 
 ## Licences
 
