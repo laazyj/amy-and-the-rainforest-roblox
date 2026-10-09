@@ -87,6 +87,12 @@ back to plain UI (or silence, for a Cue). Nothing in `src/` reads
    PR **Asset ids**, which changes only `assets/manifest.json` and
    `src/shared/AssetIds.luau`. Merging it is what makes the ids reach
    the game.
+7. **Merge the Asset ids PR before running the workflow again.** Until it
+   merges, `main` still lists every Asset as pending, so another run
+   would upload them all again as new assets. The workflow refuses to
+   start while that PR is open. This holds after a run that failed part
+   way too: merge the PR with the ids it did get, then run again for the
+   rest.
 
 **To replace a file** (a placeholder swapped for Clara's drawing), just
 replace the file under the same path and open a PR. Its SHA-256 no

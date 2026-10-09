@@ -24,15 +24,28 @@ concurrency:
 
 jobs:
   # A job-level `if:` cannot read secrets, so a tiny job checks for the key.
+  # It also refuses to run while the "Asset ids" PR is open (docs/ASSETS.md).
   gate:
-    name: Check for the Dev key
+    name: Check for the Dev key and an open Asset ids PR
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: read # list the open Asset ids PR
     if: github.ref == 'refs/heads/main'
     outputs:
       run: ${{ steps.gate.outputs.run }}
     steps:
+      # Fails closed: if the PR list cannot be read, the step fails.
+      - name: Refuse while an Asset ids PR is open
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          open=$(gh pr list --repo "$GITHUB_REPOSITORY" --head asset-ids --state open --json number --jq length)
+          if [ "$open" != "0" ]; then
+            echo "::error title=Asset ids PR still open::Merge or close the Asset ids PR first, then run this again (see docs/ASSETS.md): until it merges, this run would upload every Asset again."
+            exit 1
+          fi
+
       - id: gate
         env:
           HAS_KEY: ${{ secrets.ROBLOX_DEV_API_KEY != '' }}
