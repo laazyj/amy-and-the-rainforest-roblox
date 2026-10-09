@@ -114,10 +114,11 @@ function Manifest.hash(contents: string): string
 	return serde.hash("sha256", contents)
 end
 
--- Whether an entry needs uploading: never uploaded, or its file changed since.
+-- Whether an entry needs uploading, given its file's hash: never uploaded, or
+-- its file changed since.
 -- Roblox cannot update an image or a sound in place, so a changed file is a new asset.
-function Manifest.isPending(entry: Entry, contents: string): boolean
-	return entry.upload and (entry.assetId == nil or entry.sha256 ~= Manifest.hash(contents))
+function Manifest.isPending(entry: Entry, sha256: string): boolean
+	return entry.upload and (entry.assetId == nil or entry.sha256 ~= sha256)
 end
 
 -- A set's keys, sorted and listed, for messages.
@@ -288,15 +289,10 @@ local function readSources(ctx: Cli.Context, dir: string, names: { string }, int
 	end
 end
 
--- The tier 0 asset check: the manifest is valid, every asset id in src/ is in
--- it, and src/shared/AssetIds.luau is what the manifest generates. Returns
--- the problems, and logs a note for each entry still to upload.
-function Manifest.check(ctx: Cli.Context): { string }
-	local text = ctx.readFile(Manifest.PATH)
-	if not text then
-		return { `{Manifest.PATH} not found` }
-	end
-	-- Each asset file is read once, for validation and for the pending note.
+-- Reads and validates the manifest. Returns it, its problems, and a reader
+-- for asset files that reads each file once.
+function Manifest.load(ctx: Cli.Context): (Manifest, { string }, (string) -> string?)
+	local text = ctx.readFile(Manifest.PATH) or error(`{Manifest.PATH} not found`, 0)
 	local files: { [string]: string | false } = {}
 	local function readAsset(path: string): string?
 		if files[path] == nil then
@@ -305,7 +301,14 @@ function Manifest.check(ctx: Cli.Context): { string }
 		return files[path] or nil
 	end
 	local manifest = Manifest.decode(text)
-	local problems = Manifest.validate(manifest, readAsset)
+	return manifest, Manifest.validate(manifest, readAsset), readAsset
+end
+
+-- The tier 0 asset check: the manifest is valid, every asset id in src/ is in
+-- it, and src/shared/AssetIds.luau is what the manifest generates. Returns
+-- the problems, and logs a note for each entry still to upload.
+function Manifest.check(ctx: Cli.Context): { string }
+	local manifest, problems, readAsset = Manifest.load(ctx)
 	if #problems > 0 then
 		return problems
 	end
@@ -319,7 +322,7 @@ function Manifest.check(ctx: Cli.Context): { string }
 		)
 	end
 	for _, entry in manifest.assets do
-		if Manifest.isPending(entry, readAsset(entry.path) :: string) then
+		if Manifest.isPending(entry, Manifest.hash(readAsset(entry.path) :: string)) then
 			ctx.log(`note: {entry.name} is waiting for upload ({entry.path})`)
 		end
 	end

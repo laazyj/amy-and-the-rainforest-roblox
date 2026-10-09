@@ -14,6 +14,7 @@ export type Context = {
 	log: (string) -> (), -- stderr: progress, warnings, dry-run output
 	readFile: (path: string) -> string?,
 	listDir: (path: string) -> { string }?,
+	writeFile: (path: string, contents: string) -> (),
 }
 
 -- What every tool targets: a place in a universe, with the Release guard
@@ -163,6 +164,7 @@ function Cli.liveContext(): Context
 		listDir = function(path)
 			return if fs.isDir(path) then fs.readDir(path) else nil
 		end,
+		writeFile = fs.writeFile,
 	}
 end
 

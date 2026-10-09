@@ -34,6 +34,7 @@ end
 
 export type Mock = {
 	calls: { OpenCloud.Request },
+	files: { [string]: string }, -- the filesystem, after any writes
 	out: { string },
 	log: { string },
 	ctx: Cli.Context,
@@ -70,7 +71,7 @@ function Fixtures.mock(options: {
 	sleep: OpenCloud.Sleep?,
 }): Mock
 	local files: { [string]: string } = options.files or {}
-	local mock = setmetatable({ calls = {}, out = {}, log = {} }, Mock) :: any
+	local mock = setmetatable({ calls = {}, out = {}, log = {}, files = files }, Mock) :: any
 	mock.ctx = {
 		args = options.args,
 		env = options.env or Fixtures.env(),
@@ -91,6 +92,9 @@ function Fixtures.mock(options: {
 		end,
 		readFile = function(path)
 			return files[path]
+		end,
+		writeFile = function(path, contents)
+			files[path] = contents
 		end,
 		-- The files and subdirectories directly in `path`.
 		listDir = function(path)

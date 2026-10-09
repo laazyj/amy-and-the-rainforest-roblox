@@ -1,52 +1,19 @@
 local Cli = require("../../../tools/lib/cli")
 local F = require("../fixtures/opencloud")
 local Manifest = require("../../../tools/lib/manifest")
+local M = require("../fixtures/manifest")
 local bootstrap = require("../bootstrap")
 
-local PNG = "\137PNG card"
-local HASH = Manifest.hash(PNG)
-
--- In `overrides`, removes the field.
-local REMOVE = {}
-
--- A valid image entry, uploaded or not, with `overrides` applied.
-local function entry(overrides: { [string]: any }?): Manifest.Entry
-	local e: { [string]: any } = {
-		name = "card:chapter2",
-		kind = "image",
-		path = "assets/images/card-chapter2.png",
-		moderation = "pending",
-		upload = true,
-		placeholder = false,
-		amy = "from-behind",
-		creator = "Clara",
-		licence = "owner",
-		origin = "the website's hero drawing",
-	}
-	for key, value in (overrides or {}) :: { [string]: any } do
-		e[key] = if value == REMOVE then nil else value
-	end
-	return e :: any
-end
-
-local UPLOADED = { assetId = "4242", sha256 = HASH, moderation = "reviewing" }
-
-local function manifest(...: Manifest.Entry): Manifest.Manifest
-	return { version = 1, assets = { ... } }
-end
+local PNG, HASH, UPLOADED, REMOVE = M.PNG, M.HASH, M.UPLOADED, M.REMOVE
+local entry, manifest = M.entry, M.manifest
 
 local function readFile(path: string): string?
-	return if path == "assets/images/card-chapter2.png" then PNG else nil
+	return if path == M.PNG_PATH then PNG else nil
 end
 
 -- A repository with this manifest, its generated AssetIds, and `files`.
 local function repo(m: Manifest.Manifest, files: { [string]: string }?): F.Mock
-	local all = {
-		[Manifest.PATH] = Manifest.encode(m),
-		[Manifest.ASSET_IDS_PATH] = Manifest.generateAssetIds(m),
-		["assets/images/card-chapter2.png"] = PNG,
-		["src/client/Card.luau"] = "local x = 1",
-	}
+	local all = M.files(m, { ["src/client/Card.luau"] = "local x = 1" })
 	for path, text in (files or {}) :: { [string]: string } do
 		all[path] = text
 	end
@@ -112,10 +79,10 @@ return function(t: any)
 		end)
 
 		it("is pending until uploaded, and again when the file changes", function()
-			expect(Manifest.isPending(entry(), PNG)).toBe(true)
-			expect(Manifest.isPending(entry(UPLOADED), PNG)).toBe(false)
-			expect(Manifest.isPending(entry(UPLOADED), "a new drawing")).toBe(true)
-			expect(Manifest.isPending(entry({ upload = false }), PNG)).toBe(false)
+			expect(Manifest.isPending(entry(), HASH)).toBe(true)
+			expect(Manifest.isPending(entry(UPLOADED), HASH)).toBe(false)
+			expect(Manifest.isPending(entry(UPLOADED), Manifest.hash("a new drawing"))).toBe(true)
+			expect(Manifest.isPending(entry({ upload = false }), HASH)).toBe(false)
 		end)
 
 		it("generates AssetIds for uploaded entries only, sorted", function()
