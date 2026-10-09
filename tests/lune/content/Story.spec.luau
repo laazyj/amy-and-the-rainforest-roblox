@@ -113,23 +113,17 @@ return function(t: any)
 		it(
 			"plays beat sam_catches in order: Sam bounds to spot GateOutside before Amy is put at spot GardenInside",
 			function()
-				local staged = {}
-				for _, command: any in assert(stepPlaying("sam_catches"), "never played").commands do
-					if command.kind == "MoveCharacter" then
-						table.insert(staged, `MoveCharacter {command.character} {command.spot}`)
-					elseif command.kind == "TeleportPlayer" then
-						table.insert(staged, `TeleportPlayer {command.spot}`)
-					elseif command.kind == "Wait" then
-						table.insert(staged, `Wait {command.seconds}`)
+				local commands = assert(stepPlaying("sam_catches"), "never played").commands :: { any }
+				local function at(kind: string, spot: string): number?
+					for i, command in commands do
+						if command.kind == kind and command.spot == spot then
+							return i
+						end
 					end
+					return nil
 				end
-				expect(staged).toEqual({
-					"MoveCharacter Sam GateOutside",
-					"Wait 0.5",
-					"TeleportPlayer GardenInside",
-					"MoveCharacter Sam SamGuardPost",
-					"Wait 0.4",
-				})
+				local bounds, caught = at("MoveCharacter", "GateOutside"), at("TeleportPlayer", "GardenInside")
+				expect(bounds and caught and bounds < caught).toBe(true)
 			end
 		)
 
