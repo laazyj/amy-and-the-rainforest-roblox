@@ -21,8 +21,11 @@ Rules every build session follows, regardless of brief:
 
 | Brief | Checkpoint | Status |
 |---|---|---|
-| 001 Toolchain and CI | A | open |
-| 002 Foundation documents | A | open |
-| 003 Open Cloud tooling | A | open |
-| 004 Golden walkthrough on Dev | A | waiting on Roblox setup and 005 |
-| 005 Integrate toolchain and Open Cloud tooling | A | after 001 and 003 merge |
+| 001 Toolchain and CI | A | done |
+| 002 Foundation documents | A | done |
+| 003 Open Cloud tooling | A | done |
+| 004 Golden walkthrough on Dev | A | done |
+| 005 Integrate toolchain and Open Cloud tooling | A | done |
+| 006 Core and content (the refactor) | B | after the village respelling PR merges |
+| 007 Client view-model and engine suite | B | after 006 |
+| 008 Content schema, purity and coverage guards | B | after 007 |
