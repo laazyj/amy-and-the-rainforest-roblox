@@ -11,6 +11,7 @@
 # The fresh file is left in build/roblox-std/roblox.yml.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+export PATH="$PWD/build/bin:$PATH" # where tools/bootstrap-agent.sh installs
 
 mode="${1:?usage: tools/roblox-std.sh check|update [selene]}"
 selene="${2:-selene}"

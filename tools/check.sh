@@ -3,6 +3,7 @@
 # and actionlint and zizmor (installed by tools/bootstrap-agent.sh) over .github.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+export PATH="$PWD/build/bin:$PATH" # where tools/bootstrap-agent.sh installs
 
 defs="$(tools/roblox-types.sh)" # Roblox API types for the installed luau-lsp
 

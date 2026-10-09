@@ -25,6 +25,7 @@ jobs:
           persist-credentials: false
 
       - name: Install the pinned toolchain
+        id: tools
         uses: ./.github/actions/setup-tools
 
       - name: Static checks
@@ -50,7 +51,7 @@ jobs:
       # regenerates it and fails hard if it cannot.
       - name: Check roblox.yml against a freshly generated one
         id: roblox-std
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.tools.outcome == 'success' }}
         run: |
           if ! tools/roblox-std.sh check; then
             echo "::warning file=roblox.yml,title=Selene's Roblox standard library is stale::See this step's log; the roblox-std artifact holds a fresh roblox.yml."

@@ -8,7 +8,8 @@
 # - Lune's type definitions (`lune setup`);
 # - actionlint and zizmor, through tools/install-workflow-linters.sh.
 #
-# Usage: tools/bootstrap-agent.sh [bin dir]   (default ~/.local/bin)
+# Usage: tools/bootstrap-agent.sh [bin dir]   (default build/bin, which the
+# tools/*.sh scripts put first on PATH themselves)
 #
 # Idempotent: a tool already in the bin directory at its pinned version is
 # kept. Only github.com release downloads and raw.githubusercontent.com are
@@ -17,12 +18,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-bin="${1:-$HOME/.local/bin}"
+bin="${1:-$PWD/build/bin}"
 mkdir -p "$bin"
-case ":$PATH:" in
-*":$bin:"*) on_path=1 ;;
-*) on_path= ;;
-esac
 export PATH="$bin:$PATH"
 
 case "$(uname -s)-$(uname -m)" in
@@ -92,7 +89,4 @@ tools/install-workflow-linters.sh "$bin"
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
 	line="export PATH=\"$bin:\$PATH\""
 	grep -qxF "$line" "$CLAUDE_ENV_FILE" 2>/dev/null || echo "$line" >>"$CLAUDE_ENV_FILE"
-fi
-if [ -z "$on_path" ] && [ -z "${CLAUDE_ENV_FILE:-}" ]; then
-	echo "note: $bin is not on PATH; add it before running tools/check.sh"
 fi
