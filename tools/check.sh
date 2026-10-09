@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Tier 0 static checks: StyLua formatting, Selene lint, luau-lsp type checking,
-# and actionlint and zizmor (installed by tools/bootstrap-agent.sh) over .github.
+# actionlint and zizmor (installed by tools/bootstrap-agent.sh) over .github,
+# and the guards of tools/guard.luau (plan sections 2.1, 2.4 and 4).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$PWD/build/bin:$PATH" # where tools/bootstrap-agent.sh installs
@@ -48,3 +49,6 @@ if ! grep -q "typedefs/$lune_version/" .luaurc; then
 fi
 lune setup >/dev/null # writes the @lune type definitions that .luaurc points at
 luau-lsp analyze --platform=standard tests/lune tools
+
+echo "== Content schema (derived from docs/GLOSSARY.md)"
+lune run tools/guard schema
