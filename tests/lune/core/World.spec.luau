@@ -59,5 +59,22 @@ return function(t: any)
 			expect(calls[1]).toEqual({ "showChapterCard", "The end ♥", "b", true :: any })
 			expect(calls[2]).toEqual({ "moveCharacter", "Sam", "Farm" })
 		end)
+
+		for _, case in
+			{
+				{ { kind = "Shout" }, "unknown kind Shout" },
+				{ { kind = "MoveCharacter", character = "Sam" }, "MoveCharacter.spot must be string" },
+				{ { kind = "ShowDialogue", lines = {} }, "ShowDialogue.lines must be lines" },
+				{ { kind = "Wait", seconds = 1, extra = true }, "Wait has no field extra" },
+			} :: { { any } }
+		do
+			it(`refuses a malformed World command: {case[2]}`, function()
+				table.clear(calls)
+				t.expectError(function()
+					World.execute(recording, case[1])
+				end, `malformed World command: {case[2]}`)
+				expect(#calls).toBe(0)
+			end)
+		end
 	end)
 end

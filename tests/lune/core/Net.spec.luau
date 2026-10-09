@@ -41,6 +41,31 @@ return function(t: any)
 		end
 	end)
 
+	describe("Net.guard", function()
+		it("passes a payload that holds to the handler, nil arguments included", function()
+			local received: any
+			local guarded = Net.guard("SetObjective", function(...)
+				received = table.pack(...)
+			end, error)
+			guarded(nil)
+			expect(received).toEqual({ n = 1 })
+			guarded("Tell Mum")
+			expect(received).toEqual(table.pack("Tell Mum"))
+		end)
+
+		it("drops a malformed payload and says why", function()
+			local handled, reason = false, nil
+			local guarded = Net.guard("ShowChapter", function()
+				handled = true
+			end, function(why)
+				reason = why
+			end)
+			guarded("Chapter One")
+			expect(handled).toBe(false)
+			expect(reason).toBe("dropped a malformed ShowChapter: ShowChapter argument 2 must be string, got nil")
+		end)
+	end)
+
 	describe("Net.message", function()
 		it("carries ShowDialogue, SetObjective and both cards to the client", function()
 			local lines = { { speaker = "Amy", text = "Deal." } }

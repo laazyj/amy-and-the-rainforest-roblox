@@ -77,7 +77,13 @@ local WIRING: { { file: string, label: string, code: string } } = {
 	},
 }
 
-local serverFiles = fs.readDir(`{bootstrap.REPO_ROOT}/{SERVER}`)
+-- The adapter files of src/server (its Dev folder is checked on its own).
+local serverFiles = {}
+for _, file in fs.readDir(`{bootstrap.REPO_ROOT}/{SERVER}`) do
+	if string.match(file, "%.luau$") then
+		table.insert(serverFiles, file)
+	end
+end
 table.sort(serverFiles)
 
 -- Every Script in src/server, and the one thing it does.
@@ -99,6 +105,10 @@ return function(t: any)
 				end)
 			end
 		end
+
+		it("Dev/DevServer.server.luau is thin: it only starts the Dev shortcuts", function()
+			expect(source(`{SERVER}/Dev/DevServer.server.luau`)).toBe(" require(script.Parent.DevShortcuts).start() ")
+		end)
 
 		it("calls FireClient in one place only, inside send", function()
 			local count = 0
@@ -126,8 +136,8 @@ return function(t: any)
 					expect(source(CLIENT)).toContain(`{name}:FireServer()`)
 				end)
 			else
-				it(`has the client render {name}`, function()
-					expect(source(CLIENT)).toContain(`{name}.OnClientEvent:Connect(`)
+				it(`has the client render {name}, payload checked`, function()
+					expect(source(CLIENT)).toContain(`{name}.OnClientEvent:Connect(Net.guard("{name}", `)
 				end)
 			end
 		end

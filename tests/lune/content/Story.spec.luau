@@ -26,6 +26,7 @@ for _, step in walk.steps do
 	for _, command in step.commands do
 		local remote, args = Net.message(command)
 		if remote and args then
+			assert(Net.check(remote, args))
 			table.insert(sent, Golden.messageLine(remote, step.quest, args))
 		end
 	end

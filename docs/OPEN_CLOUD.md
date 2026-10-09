@@ -104,12 +104,13 @@ end)
 finish()
 ```
 
-- Per the API spec, physics does not run in a task, and server and client
-  scripts do not start on their own. The DataModel is a fresh copy of the
-  place version, and changes are not saved. So `Touched` never fires, and
-  game code a test needs must be a ModuleScript it can `require` (the
-  StoryServer Script only requires and starts the `StoryHost` module for
-  this reason).
+- Physics does not run in a task (see [Physics in a task](#physics-in-a-task-decided)),
+  and server and client scripts do not start on their own. The DataModel
+  is a fresh copy of the place version, and changes are not saved. So
+  `Touched` never fires, and game code a test needs must be a ModuleScript
+  it can `require` (the StoryServer Script only requires and starts the
+  `StoryHost` module for this reason). `tests/engine/_world.luau` builds
+  the world as the place's Scripts would.
 - A task cannot read the repository. A script names the files it needs with
   string literals, and the runner embeds them in the task
   (`EngineTests.EMBED_FUNCTIONS`):
@@ -143,6 +144,37 @@ finish()
   built yet. No engine test opens a store today, so the
   cleanup step comes with the first test that does, and needs the DataStore
   permission described under [API key permissions](#api-key-permissions).
+
+### Physics in a task (decided)
+
+Brief 007's spike, `tests/engine/physics.luau`, measured on Saved Dev
+version 27 (PR #25) over two seconds:
+
+| What | Seen |
+|---|---|
+| `RunService.Heartbeat` | fires, about 60 times a second (120 in 2 s) |
+| `RunService.Stepped` | never fires |
+| An unanchored part 20 studs above a floor | does not fall (0.00 studs) |
+| `Touched` when it would land | never fires |
+| An R15 rig (`CreateHumanoidModelFromDescription`) told to `MoveTo` 10 studs | does not move (0.00 studs); its state reads `Running` |
+| `PathfindingService:ComputeAsync` | works (`tests/engine/reachability.luau`) |
+
+**Decision.** The engine's scheduler runs in a task (Heartbeat, so
+`task.wait`, tweens and the Zone poll work), but physics does not step.
+So tier 2 proves *reachability* with `PathfindingService` and drives the
+Story with the fake player (teleports into Zones, prompt handlers called
+directly); **real traversal, a Humanoid walking a Chapter, is tier 3
+only**. `physics.luau` stays in the suite and asserts this answer, so if
+Roblox starts stepping physics in tasks it fails and the decision is
+revisited.
+
+### Max Players in a task
+
+`Players.MaxPlayers` is readable in a task
+(`tests/engine/maxplayers.luau`), so the single-player check stays in
+tier 2 rather than moving to a tier 1 built-place spec. It reads the Dev
+place's server size, a Creator Dashboard setting that is not part of a
+place version; the Release place's is a line of the release checklist.
 
 ### What protects real DataStores, and what does not
 
@@ -262,6 +294,16 @@ Never add DataStore permissions to the Release key.
    request, then reported as a failure. Every
    other 4xx, including any other 409, fails at once. The engine-test run
    deadline allows for this wait.
+
+9. **Release builds have no Dev shortcuts.** With `RELEASE_JOB=1`,
+   `tools/publish` strips `ServerScriptService.Dev` (`src/server/Dev`: the
+   `/chapter` and `/quest` chat commands and the jump-to-Quest entry point,
+   plan section 5.3; `tools/lib/release.luau`) from the place before
+   uploading it, and refuses a place without that folder, so moving it
+   fails the release rather than shipping it. The release job publishes the
+   artifact CI built, so the strip happens at publish, not at build. A
+   tier 1 spec (`tests/lune/tools/release.spec.luau`) builds the place and
+   checks both sides of the flag.
 
 ### What the guard is, and what it is not
 
