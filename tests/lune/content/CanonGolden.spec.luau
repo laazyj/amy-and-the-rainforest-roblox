@@ -9,15 +9,6 @@
 local bootstrap = require("../bootstrap")
 local serde = require("@lune/serde")
 
--- The one allowed difference. The owner respelt Clara's "vilage" as
--- "village" throughout the game (docs/story/canon.md, "Decisions",
--- 2026-10-08), and canon.md already reads "village" while StoryData still
--- reads "vilage". The Checkpoint B refactor applies the respelling in content
--- and removes this allowance; nothing else may differ.
-local function asTheGameSpellsIt(line: string): string
-	return (string.gsub(line, "%f[%a]village%f[%A]", "vilage"))
-end
-
 type CanonRow = { number: number, quest: string, line: string }
 
 -- The rows of the "Canon Lines" table: number, Quest and the backticked Line
@@ -66,9 +57,8 @@ local shown = shownLines(serde.decode("json", bootstrap.readSource("tests/fixtur
 local found: { number? } = {}
 local from = 1
 for i, row in canon do
-	local want = asTheGameSpellsIt(row.line)
 	for at = from, #shown do
-		if shown[at].text == want and shown[at].quest == row.quest then
+		if shown[at].text == row.line and shown[at].quest == row.quest then
 			found[i] = at
 			break
 		end

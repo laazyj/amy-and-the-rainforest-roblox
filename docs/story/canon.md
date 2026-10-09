@@ -22,10 +22,12 @@ approve new Lines in her voice is in the [style guide](style-guide.md).
    the "Canon Line" column below, and every row must appear in content as
    a Line marked `canon`. In every table here the Line is the only
    backticked text in its row. Until the refactor the source is
-   `src/ReplicatedStorage/StoryData.lua`, which still reads "vilage"
-   where this file reads "village"; the Checkpoint B refactor applies
-   that respelling in StoryData, and the tier 1 canon test then matches
-   this file exactly.
+   `src/ReplicatedStorage/StoryData.lua`, and
+   `tests/lune/content/CanonGolden.spec.luau` checks the half of this rule
+   that applies today: every row must be shown in the walkthrough's
+   [golden file](../GLOSSARY.md), in its Quest and in story order, byte
+   for byte with no spelling differences. Its single "vilage" allowance
+   was removed in PR #17.
 4. **Never "corrected".** Spell checkers, formatters and translation must
    not touch canon Lines, which is why automatic translation stays off
    (see the [release checklist](../RELEASE_CHECKLIST.md)).
@@ -34,7 +36,7 @@ approve new Lines in her voice is in the [style guide](style-guide.md).
 
 | Date | Decision |
 |---|---|
-| 2026-10-08 | The owner corrected Clara's "vilage" to "village" throughout the game, in canon and game Lines alike. Every other spelling of Clara's stays exactly as written. The published text quoted at the end of this file is unchanged, because it records her page as it is. |
+| 2026-10-08 | The owner corrected Clara's "vilage" to "village" throughout the game, in canon and game Lines alike. Every other spelling of Clara's stays exactly as written. The published text quoted at the end of this file is unchanged, because it records her page as it is. Applied to StoryData in PR #17. |
 
 ## Canon Lines
 
