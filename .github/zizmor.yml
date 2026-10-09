@@ -8,7 +8,7 @@ rules:
     ignore:
       - publish-dev.yml
 
-  # A fixed path ($HOME/.rokit/bin); nothing attacker-controlled is written,
+  # A fixed path ($HOME/.cache/amy-toolchain/bin); nothing attacker-controlled is written,
   # and a composite action has no other way to put tools on PATH.
   github-env:
     ignore:

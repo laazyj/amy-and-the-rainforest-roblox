@@ -3,15 +3,8 @@
 # and actionlint and zizmor (see tools/install-workflow-linters.sh) over .github.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-mkdir -p build
 
-# Roblox API type definitions, matched to the installed luau-lsp version.
-version="$(luau-lsp --version)"
-defs="build/globalTypes-$version.d.luau"
-if [ ! -f "$defs" ]; then
-	curl -fsSL -o "$defs.tmp" "https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/$version/scripts/globalTypes.d.luau"
-	mv "$defs.tmp" "$defs"
-fi
+defs="$(tools/roblox-types.sh)" # Roblox API types for the installed luau-lsp
 
 echo "== actionlint"
 actionlint
