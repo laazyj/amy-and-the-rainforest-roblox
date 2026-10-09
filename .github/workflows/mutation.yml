@@ -32,7 +32,9 @@ jobs:
       - name: Install the pinned toolchain
         uses: ./.github/actions/setup-tools
 
-      # The report (stdout) goes to the job summary; bash's pipefail keeps
-      # the tool's exit status.
+      # The report (stdout) goes to the job summary. An explicit
+      # `shell: bash` runs with `-eo pipefail`, so the step fails when the
+      # tool does; the default shell (`bash -e`) would keep tee's status.
       - name: Run the mutation check
+        shell: bash
         run: lune run tools/mutate | tee -a "$GITHUB_STEP_SUMMARY"
