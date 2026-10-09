@@ -9,6 +9,10 @@
 	    if the engine is showing a Dialogue, the host waits until the client
 	    says DialogueFinished (or 300 s pass) and feeds that to the engine.
 
+	Every World command is held to its schema (World.execute) and every
+	message to a client to the Net contract before it is sent; either
+	failing is an error, not a dropped message.
+
 	While a player's commands are being carried out the host is busy for
 	them, and other Player events from them are dropped, as a player cannot
 	act in the middle of a Beat or a Dialogue.
@@ -172,8 +176,11 @@ end
 -- A handler for a client -> server remote that drops a malformed payload.
 local function fromClient(remote: string, handler: (player: Player) -> ()): (Player, ...any) -> ()
 	return function(player, ...)
-		if Net.check(remote, table.pack(...)) then
+		local ok, reason = Net.check(remote, table.pack(...))
+		if ok then
 			handler(player)
+		else
+			warn(`dropped a malformed {remote} from {player.Name}: {reason}`)
 		end
 	end
 end

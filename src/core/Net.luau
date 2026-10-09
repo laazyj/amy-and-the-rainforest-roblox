@@ -47,6 +47,21 @@ function Net.check(remote: string, args: Args): (boolean, string?)
 	return true, nil
 end
 
+-- A handler for `remote`'s payload that holds it to the contract first: a
+-- payload that holds is passed to `handler`, and a malformed one is dropped
+-- and its reason given to `reject`. The client wraps every remote it
+-- receives in one.
+function Net.guard(remote: string, handler: (...any) -> (), reject: (reason: string) -> ()): (...any) -> ()
+	return function(...)
+		local ok, reason = Net.check(remote, table.pack(...))
+		if ok then
+			handler(...)
+		else
+			reject(`dropped a malformed {remote}: {reason}`)
+		end
+	end
+end
+
 -- The remote and arguments that carry `command` to the client, or nil for a
 -- command the server carries out itself.
 function Net.message(command: Events.WorldCommand): (string?, Args?)

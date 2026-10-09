@@ -126,8 +126,8 @@ return function(t: any)
 					expect(source(CLIENT)).toContain(`{name}:FireServer()`)
 				end)
 			else
-				it(`has the client render {name}`, function()
-					expect(source(CLIENT)).toContain(`{name}.OnClientEvent:Connect(`)
+				it(`has the client render {name}, payload checked`, function()
+					expect(source(CLIENT)).toContain(`{name}.OnClientEvent:Connect(Net.guard("{name}", `)
 				end)
 			end
 		end

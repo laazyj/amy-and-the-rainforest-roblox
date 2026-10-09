@@ -162,7 +162,12 @@ predate this glossary and are kept so the golden file still matches:
 `ShowDialogue`, `SetObjective`, and `ShowChapterCard` as `ShowChapter`
 (or `ShowEnding` for the end card). The client sends `DialogueFinished`,
 and `ClientReady` once it has loaded, which starts the Story; that is an
-adapter detail, not a Player event.
+adapter detail, not a Player event. Both sides hold every payload to the
+contract: the server checks each World command against its schema in
+`src/core/Events.luau` and each message before it sends it, and the client
+binder wraps every remote it receives in `Net.guard`, which drops a
+malformed payload; tier 2 (`tests/engine/contract.luau`) passes every
+payload in the golden file through that guard.
 
 ## 4. Enumerations
 

@@ -8,6 +8,9 @@
 	  ShowChapter /   -> ChapterCardTimeline: the Chapter card and the end card
 	  ShowEnding
 
+	Every remote it receives is held to the Net contract first (Net.guard);
+	a malformed payload is dropped with a warning.
+
 	Click, tap, or press E, Space or Enter to advance a Dialogue; when the
 	view-model says it is finished, DialogueFinished goes to the server.
 	What is left here is building the UI, turning plain colours into
@@ -29,9 +32,10 @@ local DialogueViewModel = require(Core:WaitForChild("DialogueViewModel"))
 local Events = require(Core:WaitForChild("Events"))
 local ObjectiveText = require(Core:WaitForChild("ObjectiveText"))
 local Story = require(Core:WaitForChild("Story"))
-local Net = require(ReplicatedStorage:WaitForChild("shared"):WaitForChild("Net"))
+local Net = require(Core:WaitForChild("Net"))
+local Remotes = require(ReplicatedStorage:WaitForChild("shared"):WaitForChild("Net"))
 
-local remotes = Net.waitForRemotes()
+local remotes = Remotes.waitForRemotes()
 local ShowDialogue = remotes.ShowDialogue
 local DialogueFinished = remotes.DialogueFinished
 local SetObjective = remotes.SetObjective
@@ -254,15 +258,15 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 
-ShowDialogue.OnClientEvent:Connect(function(lines: { Events.ShownLine })
+ShowDialogue.OnClientEvent:Connect(Net.guard("ShowDialogue", function(lines: { Events.ShownLine })
 	DialogueViewModel.enqueue(dialogue, lines)
 	renderDialogue()
-end)
+end, warn))
 
 ----------------------------------------------------------------
 -- Objective tracker
 ----------------------------------------------------------------
-SetObjective.OnClientEvent:Connect(function(text: string?)
+SetObjective.OnClientEvent:Connect(Net.guard("SetObjective", function(text: string?)
 	local view = ObjectiveText.view(text)
 	objectiveFrame.Visible = view.visible
 	objectiveText.Text = view.text
@@ -272,7 +276,7 @@ SetObjective.OnClientEvent:Connect(function(text: string?)
 			BackgroundTransparency = ObjectiveText.RESTING_TRANSPARENCY,
 		}):Play()
 	end
-end)
+end, warn))
 
 ----------------------------------------------------------------
 -- Chapter cards and the end card
@@ -301,8 +305,8 @@ local function showCard(ending: boolean): (title: string, subtitle: string) -> (
 	end
 end
 
-ShowChapter.OnClientEvent:Connect(showCard(false))
-ShowEnding.OnClientEvent:Connect(showCard(true))
+ShowChapter.OnClientEvent:Connect(Net.guard("ShowChapter", showCard(false), warn))
+ShowEnding.OnClientEvent:Connect(Net.guard("ShowEnding", showCard(true), warn))
 
 ----------------------------------------------------------------
 -- Every frame: time passes for the Dialogue and the card
