@@ -1,0 +1,47 @@
+# Coverage guard (plan section 4, brief 008): a PR that changes src/core
+# changes tests/ too, unless it carries the `no-test-change` label and its
+# body says why on a line "No test change: <reason>". Runs again when the
+# label or the body changes. The rule is tools/lib/coverage.luau, tested in
+# tier 1.
+#
+# Read-only: everything it needs is in the event payload and the checkout.
+name: Test change
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-change-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test-change:
+    name: Core changes come with test changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      # The PR's merge commit and its first parent, the base it merges into.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Install the pinned toolchain
+        uses: ./.github/actions/setup-tools
+
+      # The labels and body are passed as environment variables, never
+      # expanded into the script.
+      - name: Check that a core change comes with a test change
+        env:
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          CHANGED_FILES="$(git diff --name-only HEAD^1 HEAD)"
+          export CHANGED_FILES
+          lune run tools/guard test-change

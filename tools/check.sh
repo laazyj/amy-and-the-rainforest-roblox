@@ -58,3 +58,6 @@ lune run tools/guard purity
 
 echo "== No external links in content, core or client text"
 lune run tools/guard links
+
+echo "== Coverage guards: a spec per core module, glossary names in specs, a Walkthrough per Chapter"
+lune run tools/guard coverage

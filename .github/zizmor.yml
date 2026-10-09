@@ -21,6 +21,7 @@ rules:
       - ci.yml
       - engine-tests.yml
       - publish-dev.yml
+      - test-change.yml
       - toolchain-check.yml
 
   # Named by the brief; replacing it with gh calls means hand-rolled push and
