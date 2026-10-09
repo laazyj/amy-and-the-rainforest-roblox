@@ -164,6 +164,60 @@ function OpenCloud.parseLogsPage(response: Response): ({ string }, string?)
 	return messages, if token and token ~= "" then token else nil
 end
 
+-- Assets API: what it accepts, for the asset manifest (docs/ASSETS.md).
+-- Verified against content/en-us/reference/cloud/assets/v1.json and
+-- cloud/guides/usage-assets.md; see docs/OPEN_CLOUD.md.
+
+-- The Roblox asset type for each manifest kind. Images go up as `Image`, whose
+-- id an ImageLabel takes directly (a `Decal` id would need resolving first).
+OpenCloud.ASSET_TYPES = table.freeze({
+	image = "Image",
+	audio = "Audio",
+	model = "Model",
+})
+
+-- The file extensions the Assets API accepts for each kind, and the content
+-- type each is sent with.
+OpenCloud.ASSET_CONTENT_TYPES = table.freeze({
+	image = table.freeze({
+		png = "image/png",
+		jpg = "image/jpeg",
+		jpeg = "image/jpeg",
+		bmp = "image/bmp",
+		tga = "image/tga",
+	}),
+	audio = table.freeze({ mp3 = "audio/mpeg", ogg = "audio/ogg", wav = "audio/wav", flac = "audio/flac" }),
+	model = table.freeze({
+		fbx = "model/fbx",
+		gltf = "model/gltf+json",
+		glb = "model/gltf-binary",
+		rbxm = "model/x-rbxm",
+		rbxmx = "model/x-rbxm",
+	}),
+})
+
+-- Largest file Create Asset accepts ("up to 20 MB").
+OpenCloud.MAX_ASSET_BYTES = 20_000_000
+
+-- The content type for `path` as an asset of `kind`, or nil if the API takes no such file.
+function OpenCloud.assetContentType(kind: string, path: string): string?
+	local types = OpenCloud.ASSET_CONTENT_TYPES[kind]
+	local extension = string.match(path, "%.(%w+)$")
+	return if types and extension then types[string.lower(extension)] else nil
+end
+
+-- Why the Assets API would refuse `bytes` bytes named `fileName` as a `kind`, or nil.
+function OpenCloud.assetUploadProblem(kind: string, fileName: string, bytes: number): string?
+	if not OpenCloud.ASSET_TYPES[kind] then
+		return `{kind} is not an asset kind (image, audio, model)`
+	elseif not OpenCloud.assetContentType(kind, fileName) then
+		return `the Assets API takes no {kind} file named {fileName}`
+	elseif bytes > OpenCloud.MAX_ASSET_BYTES then
+		return `{fileName} is {bytes} bytes; the Assets API accepts {OpenCloud.MAX_ASSET_BYTES}`
+	end
+	return nil
+end
+
 -- A request as it would be sent, with the key redacted. For --dry-run.
 function OpenCloud.describe(request: Request): string
 	local lines = { `{request.method} {request.url}` }

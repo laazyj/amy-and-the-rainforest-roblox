@@ -60,7 +60,8 @@ function Mock.stderr(self: Mock): string
 end
 
 -- A context whose HTTP is `handler` (records every request), whose sleep does
--- not wait (unless `sleep` is given), and whose filesystem is `files`.
+-- not wait (unless `sleep` is given), and whose filesystem is `files`
+-- (path -> contents; directories are implied by the paths).
 function Fixtures.mock(options: {
 	args: { string },
 	env: { [string]: string }?,
@@ -91,11 +92,13 @@ function Fixtures.mock(options: {
 		readFile = function(path)
 			return files[path]
 		end,
+		-- The files and subdirectories directly in `path`.
 		listDir = function(path)
-			local entries = nil
+			local entries, seen = nil, {}
 			for name in files do
-				local entry = string.match(name, `^{path}/([^/]+)$`)
-				if entry then
+				local entry = string.match(name, `^{path}/([^/]+)`)
+				if entry and not seen[entry] then
+					seen[entry] = true
 					entries = entries or {}
 					table.insert(entries, entry)
 				end

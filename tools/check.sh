@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Tier 0 static checks: StyLua formatting, Selene lint, luau-lsp type checking,
-# and actionlint and zizmor (see tools/install-workflow-linters.sh) over .github.
+# the asset manifest (docs/ASSETS.md), and actionlint and zizmor (see
+# tools/install-workflow-linters.sh) over .github.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p build
@@ -28,6 +29,9 @@ fi
 
 echo "== StyLua"
 stylua --check src tests tools
+
+echo "== Assets: the manifest, and every rbxassetid:// in src/ is in it"
+lune run tools/check-assets
 
 echo "== Selene"
 selene src tests tools # selene.toml excludes tests/engine, which has its own config
