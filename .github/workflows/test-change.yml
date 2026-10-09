@@ -42,6 +42,8 @@ jobs:
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
-          CHANGED_FILES="$(git diff --name-only HEAD^1 HEAD)"
+          # --no-renames lists both paths of a move, so moving a module out
+          # of src/core counts as changing src/core.
+          CHANGED_FILES="$(git diff --no-renames --name-only HEAD^1 HEAD)"
           export CHANGED_FILES
           lune run tools/guard test-change
