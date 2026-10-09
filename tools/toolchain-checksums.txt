@@ -3,9 +3,10 @@
 # installs from these zips and checks each hash before unpacking. A pin in
 # rokit.toml with no line here for the platform is an error.
 #
-# The weekly toolchain job (tools/toolchain-check.luau) rewrites the lines of
-# a bumped tool with the new release's assets and their hashes, in the same
-# PR as the pin. By hand: change the tag, the asset name and the hash together.
+# The weekly toolchain job (tools/lib/toolchain.luau) rewrites the lines of a
+# bumped tool, in the same PR as the pin, with the new release's assets and
+# the SHA-256 digests GitHub records for them. By hand: change the tag, the
+# asset name and the hash together, taking the hash from the release page.
 #
 # tool    tag     platform       asset                           sha256
 rojo      v7.7.1  linux-x86_64   rojo-7.7.1-linux-x86_64.zip     00feb4fa0829a1dd72b49df2639da519a352bfe13cadcd83969e2ba2bb5693c4

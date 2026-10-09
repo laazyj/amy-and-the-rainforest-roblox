@@ -1,7 +1,8 @@
 # Weekly: compares each pin in rokit.toml (and any Wally dependency) with the
-# latest release and opens or updates one "Toolchain updates" PR with the new
-# pins, so CI runs the full check, test and build against them. Nothing
-# merges automatically. Dependabot covers the `uses:` lines (dependabot.yml).
+# latest release, regenerates Selene's Roblox standard library (roblox.yml),
+# and opens or updates one "Toolchain updates" PR with the new pins, their
+# checksums and roblox.yml, so CI runs the full check, test and build against
+# them. Nothing merges automatically. Dependabot covers the `uses:` lines (dependabot.yml).
 # See docs/MAINTENANCE.md.
 #
 # Two jobs, so no write token is ever in a job that runs fetched tools: `check`
@@ -45,6 +46,18 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/toolchain"
           lune run tools/toolchain-check > "$RUNNER_TEMP/toolchain/pr-body.md"
+          # Regenerate roblox.yml with the Selene that will lint with it: when
+          # the pins moved, install them (checked against their new checksums)
+          # outside the cached tool directory.
+          selene=selene
+          if ! git diff --quiet rokit.toml; then
+            tools/bootstrap-agent.sh "$RUNNER_TEMP/new-tools"
+            selene="$RUNNER_TEMP/new-tools/selene"
+          fi
+          "$selene" generate-roblox-std # rewrites roblox.yml from Roblox's current API dump
+          if ! git diff --quiet roblox.yml; then
+            printf '\n\n%s\n' "Selene's Roblox standard library (\`roblox.yml\`) is regenerated from Roblox's current API dump." >> "$RUNNER_TEMP/toolchain/pr-body.md"
+          fi
           git diff --binary > "$RUNNER_TEMP/toolchain/pins.patch"
           if [ -s "$RUNNER_TEMP/toolchain/pins.patch" ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -84,7 +97,10 @@ jobs:
       # The patch came from a job that ran fetched tools, so it is applied to
       # the pin files only; add-paths below limits the commit the same way.
       - name: Apply the new pins
-        run: git apply --include=rokit.toml --include=wally.toml --include=.luaurc "$RUNNER_TEMP/toolchain/pins.patch"
+        run: >-
+          git apply --include=rokit.toml --include=wally.toml --include=.luaurc
+          --include=tools/toolchain-checksums.txt --include=roblox.yml
+          "$RUNNER_TEMP/toolchain/pins.patch"
 
       # A PR opened with the job token does not trigger CI, so the
       # TOOLCHAIN_PR_TOKEN secret (a fine-grained token, see
@@ -102,4 +118,6 @@ jobs:
             rokit.toml
             wally.toml
             .luaurc
+            tools/toolchain-checksums.txt
+            roblox.yml
           delete-branch: true

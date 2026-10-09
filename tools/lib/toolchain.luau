@@ -1,6 +1,7 @@
 --!strict
 -- Checks the toolchain pins in rokit.toml (and any Wally dependency) against
--- the latest releases and rewrites the pins that are behind. Entry point:
+-- the latest releases and rewrites the pins that are behind, with their lines
+-- in tools/toolchain-checksums.txt. Entry point:
 -- tools/toolchain-check.luau, run weekly by .github/workflows/toolchain-check.yml,
 -- which opens a "Toolchain updates" PR so CI proves each bump.
 --
@@ -12,11 +13,14 @@ local serde = require("@lune/serde")
 
 export type Pin = { name: string, repo: string, version: string }
 export type Update = { name: string, from: string, to: string }
+-- A release as GitHub's API returns it; `digest` is "sha256:<hex>".
+export type Release = { tag_name: string, assets: { { name: string, digest: string? } } }
 
 local Toolchain = {}
 
 Toolchain.GITHUB_API = "https://api.github.com"
 Toolchain.WALLY_API = "https://api.wally.run"
+Toolchain.CHECKSUMS = "tools/toolchain-checksums.txt"
 
 -- Lines `name = "source@version"` in the sections `inSection` accepts.
 local function parsePins(text: string, inSection: (header: string) -> boolean): { Pin }
@@ -69,6 +73,33 @@ function Toolchain.updateLuaurc(text: string, luneVersion: string): string
 	return updated
 end
 
+-- Rewrites the lines of tool `name` in the checksums file (columns: tool,
+-- tag, platform, asset, sha256) for `release`. Each asset keeps its name with
+-- the version replaced, and takes the SHA-256 GitHub records for it.
+function Toolchain.updateChecksums(text: string, name: string, release: Release): string
+	local digests: { [string]: string } = {}
+	for _, asset in release.assets do
+		digests[asset.name] = if asset.digest then string.match(asset.digest, "^sha256:(%x+)$") else nil
+	end
+	local newVersion = Toolchain.versionFromTag(release.tag_name)
+	return (
+		string.gsub(text, "[^\n]+", function(line): string?
+			local tool, tag, platform, asset = string.match(line, "^(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+%x+$")
+			if tool ~= name or not (tag and platform and asset) then
+				return nil -- keep the line
+			end
+			local old = Toolchain.versionFromTag(tag)
+			local first, last = string.find(asset, old, 1, true)
+			local newAsset = if first and last
+				then string.sub(asset, 1, first - 1) .. newVersion .. string.sub(asset, last + 1)
+				else asset
+			local digest = digests[newAsset]
+				or error(`{name} {release.tag_name} has no asset {newAsset} with a SHA-256 digest`, 0)
+			return string.format("%-9s %-7s %-14s %-31s %s", name, release.tag_name, platform, newAsset, digest)
+		end)
+	)
+end
+
 -- The markdown body of the "Toolchain updates" PR.
 function Toolchain.summary(updates: { Update }): string
 	local lines = {
@@ -92,14 +123,13 @@ local function getJson(ctx: Cli.Context, url: string, headers: { [string]: strin
 	return serde.decode("json", response.body)
 end
 
-local function latestRelease(ctx: Cli.Context, pin: Pin): string
+local function latestRelease(ctx: Cli.Context, pin: Pin): Release
 	local headers = { accept = "application/vnd.github+json", ["user-agent"] = "toolchain-check" }
 	local token = ctx.env.GITHUB_TOKEN
 	if token and token ~= "" then
 		headers.authorization = `Bearer {token}`
 	end
-	local release = getJson(ctx, `{Toolchain.GITHUB_API}/repos/{pin.repo}/releases/latest`, headers)
-	return Toolchain.versionFromTag(release.tag_name)
+	return getJson(ctx, `{Toolchain.GITHUB_API}/repos/{pin.repo}/releases/latest`, headers)
 end
 
 local function wantedRequirement(ctx: Cli.Context, pin: Pin): string
@@ -142,13 +172,24 @@ function Toolchain.check(ctx: Cli.Context): ({ [string]: string }, { Update })
 	end
 
 	local rokit = ctx.readFile("rokit.toml") or error("rokit.toml not found", 0)
-	bump("rokit.toml", Toolchain.parseRokit(rokit), rokit, latestRelease)
+	local releases: { [string]: Release } = {}
+	bump("rokit.toml", Toolchain.parseRokit(rokit), rokit, function(_, pin)
+		local release = latestRelease(ctx, pin)
+		releases[pin.name] = release
+		return Toolchain.versionFromTag(release.tag_name)
+	end)
 	local wally = ctx.readFile("wally.toml")
 	if wally then
 		bump("wally.toml", Toolchain.parseWally(wally), wally, wantedRequirement)
 	end
 
+	local checksums = ctx.readFile(Toolchain.CHECKSUMS)
 	for _, update in updates do
+		local release = releases[update.name]
+		if release and checksums then
+			checksums = Toolchain.updateChecksums(checksums, update.name, release)
+			changed[Toolchain.CHECKSUMS] = checksums
+		end
 		if update.name == "lune" then
 			local luaurc = ctx.readFile(".luaurc") or error(".luaurc not found", 0)
 			changed[".luaurc"] = Toolchain.updateLuaurc(luaurc, update.to)
