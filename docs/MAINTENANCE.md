@@ -85,13 +85,17 @@ Result of brief 008's spike, 2026-10-09:
 
 - **Lune 0.10.5 cannot.** `luau.compile` accepts `coverageLevel`, but
   nothing reads the counters back, and `lune run` has no coverage flag.
-- **The Luau CLI can.** `luau --coverage <script>` (luau-lang/luau's
-  `luau-ubuntu.zip` release asset) writes lcov to `coverage.out` for
-  every module the script requires. The core specs import nothing from
-  Lune, so they ran under it with a minimal stand-in for the runner. They
-  cover 593 of 594 executable lines of `src/core` (99.8%); the one line
-  missed, an Ending with no Lines, is now covered by a test in
-  `StoryEngine.spec`.
+- **The Luau CLI can.** `luau --coverage <script>` writes lcov to
+  `coverage.out` for every module the script requires. The core specs
+  import nothing from Lune, so they run under it with
+  `tools/coverage-spike.luau`, a stand-in for the runner's test API. To
+  reproduce, take `luau` from luau-lang/luau release **0.741**
+  (`luau-ubuntu.zip`, SHA-256
+  `134dc762ad26232af83e43f98dec03ff6030dd3a4452f9408b9d50ccea025503`) and
+  run `tools/coverage-spike.sh path/to/luau`. It prints each core module's
+  lines reached and the total. The spike measured 593 of 594 lines of
+  `src/core`; the one line missed (an Ending with no Lines) now has a
+  test in `StoryEngine.spec`, and the script reports 594 of 594 (100%).
 - **Not wired in yet.** The content, place and tools specs need `@lune/*`,
   which the CLI lacks, so only the core can be measured this way. Doing it
   for real means pinning the CLI in `rokit.toml` and
