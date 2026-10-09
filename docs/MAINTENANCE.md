@@ -65,9 +65,13 @@ start CI by closing and reopening it.
 
 The guards of plan section 4 are `tools/guard coverage` (tier 0),
 `.github/workflows/test-change.yml` and the nightly
-`.github/workflows/mutation.yml`. Owner, once: create the label
-`no-test-change` (Issues → Labels). A PR carrying it also needs a line
-"No test change: <why>" in its body.
+`.github/workflows/mutation.yml`. They are structural: they prove a spec
+exists and names what it should (in code or strings, not comments), not
+that it tests anything. A spec that is trivial on purpose passes them;
+review and the mutation check are what catch that.
+
+Owner, once: create the label `no-test-change` (Issues → Labels). A PR
+carrying it also needs a line "No test change: <why>" in its body.
 
 The canned faults live in `tools/lib/mutate.luau`. `tools/guard faults`
 (tier 0) fails a PR that leaves a fault no longer matching the code; update

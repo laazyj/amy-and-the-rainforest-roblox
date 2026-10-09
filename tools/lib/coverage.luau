@@ -11,12 +11,16 @@
 	- every Chapter of the Story has a Walkthrough spec,
 	  tests/lune/content/walkthrough/<chapter id>.spec.luau, that walks it.
 
+	Names count in a spec's code and strings, never its comments. These are
+	structural checks: a spec that is trivial on purpose still passes them.
+
 	And the rule for a pull request: one that changes src/core changes
 	tests/ too, unless it carries the `no-test-change` label and its body
 	says why on a line "No test change: <reason>".
 ]]
 
 local Glossary = require("./glossary")
+local Lex = require("./lex")
 
 export type Input = {
 	-- paths under src/core
@@ -35,8 +39,22 @@ Coverage.NAMED = { "Quest kinds", "Hook names", "World commands", "Player events
 
 Coverage.LABEL = "no-test-change"
 
+-- A spec's code and strings without its comments: its tokens joined by
+-- spaces, each string quoted ('Chapter . walk ( "chapter1" )').
+local function code(source: string): string
+	local parts = {}
+	for _, token in Lex.tokens(source) do
+		table.insert(parts, if token.kind == "string" then `"{token.text}"` else token.value)
+	end
+	return table.concat(parts, " ")
+end
+
 function Coverage.check(input: Input): { string }
 	local violations = {}
+	local specs: { [string]: string } = {}
+	for path, source in input.specs do
+		specs[path] = code(source)
+	end
 	for _, module in input.core do
 		local spec = `core/{string.gsub(module, "%.luau$", ".spec.luau")}`
 		if not input.specs[spec] then
@@ -49,7 +67,7 @@ function Coverage.check(input: Input): { string }
 		for _, entry in glossary.inUse(heading) do
 			local pattern = `%f[%w_]{entry.name}%f[^%w_]`
 			local named = false
-			for _, text in input.specs do
+			for _, text in specs do
 				if string.find(text, pattern) then
 					named = true
 					break
@@ -63,8 +81,8 @@ function Coverage.check(input: Input): { string }
 
 	for _, id in input.chapters do
 		local spec = `content/walkthrough/{id}.spec.luau`
-		local text = input.specs[spec]
-		if not text or not string.find(text, `Chapter.walk("{id}")`, 1, true) then
+		local text = specs[spec]
+		if not text or not string.find(text, `Chapter . walk ( "{id}" )`, 1, true) then
 			table.insert(violations, `{id} has no Walkthrough: add tests/lune/{spec}, walking Chapter.walk("{id}")`)
 		end
 	end

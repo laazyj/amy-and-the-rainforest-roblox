@@ -1,6 +1,6 @@
 --!strict
 --[[
-	A small Luau lexer for the source guards (tools/lib/purity.luau): names,
+	A small Luau lexer for the guards (tools/lib/purity.luau, coverage.luau): names,
 	strings and symbols with their line, comments dropped. An interpolated
 	string's text segments are strings and the code in its braces is lexed
 	as code, so nothing can hide in a `{...}`. A string token keeps its

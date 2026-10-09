@@ -76,6 +76,17 @@ return function(t: any)
 			})
 		end)
 
+		it("count names and Chapter.walk in code and strings, never in comments", function()
+			local given = input()
+			given.specs["core/Beat.spec.luau"] = '-- it("plays a Beat at onStart: SetLighting")\nlocal x = 1'
+			given.specs["content/walkthrough/chapter1.spec.luau"] = '-- Chapter.walk("chapter1")'
+			expect(Coverage.check(given)).toEqual({
+				"onStart (Hook names, docs/GLOSSARY.md) appears in no spec under tests/lune",
+				"SetLighting (World commands, docs/GLOSSARY.md) appears in no spec under tests/lune",
+				'chapter1 has no Walkthrough: add tests/lune/content/walkthrough/chapter1.spec.luau, walking Chapter.walk("chapter1")',
+			})
+		end)
+
 		it("leave *later* names out", function()
 			expect(table.concat(Coverage.check(input()), "\n")).never.toContain("FoundCollectible")
 		end)
