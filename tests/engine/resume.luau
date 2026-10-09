@@ -69,7 +69,15 @@ describe("Resume", function()
 			if os.clock() - started > TIME_LIMIT then
 				error(`stuck at Quest {questId or "(none)"}`)
 			end
-			if questId and not saved[questId] and server.idle(player) then
+			-- A Quest is played only once it is saved, so none can finish between
+			-- two polls unsaved. (A `reach` Quest could also finish with the player
+			-- already standing in its Zone; no Quest starts that way today, as
+			-- Sam's catch moves Amy out of the gate.)
+			if questId and not saved[questId] then
+				if not server.idle(player) then
+					task.wait(0.1)
+					continue
+				end
 				saved[questId] = { progress = HttpService:JSONEncode(server.progress(player)), world = observe() }
 				table.insert(order, questId)
 			end
