@@ -331,6 +331,7 @@ position or raw coordinate.
 | Asset: UI frame, motif or screen | `ui:<snake_case>` | `ui:dialogue_frame`, `ui:title_screen` |
 | Asset: store page art | `store:<snake_case>` | `store:icon`, `store:thumbnail_1` |
 | Asset: reference for building a Character or Prop | `ref:<the Character's or Prop's PascalCase name>` | `ref:Sam`, `ref:Machine` |
+| Asset: a Prop's model or a Cue's sound | the Prop's or Cue's own id | `prop:Machine`, `cue:sam_bark` |
 | Collectible | `collectible:<snake_case>` | `collectible:maroon_acorn` |
 
 Inside content files the prefix is dropped where the field already says
