@@ -40,4 +40,7 @@ the canon Lines are narrated, as plan section 7 describes.
 
 ## Owner inputs
 
-Narration recordings (or a decision to defer narration to a later PR).
+Narration recordings, specified in the GitHub issue "Narration recordings
+needed for Phase 1 (brief 013)". If they are not available when this brief
+starts, build everything else and ship narration in a follow-up PR when
+the files arrive; the text-only fallback is the default until then.
