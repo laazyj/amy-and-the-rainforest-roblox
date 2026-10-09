@@ -52,3 +52,9 @@ luau-lsp analyze --platform=standard tests/lune tools
 
 echo "== Content schema (derived from docs/GLOSSARY.md)"
 lune run tools/guard schema
+
+echo "== Purity: src/core and src/content"
+lune run tools/guard purity
+
+echo "== No external links in content, core or client text"
+lune run tools/guard links

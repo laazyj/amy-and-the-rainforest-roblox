@@ -4,19 +4,23 @@
 
 	  lune run tools/guard schema   every file under src/content against the
 	                                content schema derived from docs/GLOSSARY.md
+	  lune run tools/guard purity   src/core and src/content touch no engine
+	                                global and require only each other
+	  lune run tools/guard links    no http:// or https:// in the text of
+	                                content, the core or the client binder
 
 	Prints each violation and fails when there is any. Run from
 	tools/check.sh; the logic is in tools/lib and tested in tier 1.
 ]]
 
 local Cli = require("./lib/cli")
+local Files = require("./lib/files")
+local Purity = require("./lib/purity")
 local Schema = require("./lib/schema")
 
-local ROOT = assert(string.match(debug.info(1, "s"), "^(.*)[/\\]tools[/\\]"), "cannot locate the repo")
-
-local GUARDS: { [string]: (Cli.Context) -> { string } } = {
-	schema = function(ctx)
-		local schema = Schema.fromGlossary((assert(ctx.readFile(`{ROOT}/docs/GLOSSARY.md`), "no docs/GLOSSARY.md")))
+local GUARDS: { [string]: () -> { string } } = {
+	schema = function()
+		local schema = Schema.fromGlossary(Files.read("docs/GLOSSARY.md"))
 		local violations = {}
 		for _, file in Schema.content() do
 			local found = if file.ok
@@ -25,6 +29,12 @@ local GUARDS: { [string]: (Cli.Context) -> { string } } = {
 			table.move(found, 1, #found, #violations + 1, violations)
 		end
 		return violations
+	end,
+	purity = function()
+		return Files.each(Purity.PURE, Purity.check)
+	end,
+	links = function()
+		return Files.each(Purity.LINKED, Purity.links)
 	end,
 }
 
@@ -39,7 +49,7 @@ Cli.main(function(ctx)
 		table.sort(names)
 		error(`usage: lune run tools/guard <{table.concat(names, "|")}>`, 0)
 	end
-	local violations = guard(ctx)
+	local violations = guard()
 	for _, violation in violations do
 		ctx.log(violation)
 	end

@@ -18,6 +18,7 @@
 ]]
 
 local Events = require("../../src/core/Events")
+local Files = require("./files")
 local Glossary = require("./glossary")
 
 type Set = { [string]: boolean }
@@ -474,25 +475,13 @@ export type Loaded = { path: string, ok: boolean, value: any }
 -- Every .luau file under src/content, by its path there, sorted, with what
 -- requiring it returned (or the error, when it does not load under Lune).
 function Schema.content(): { Loaded }
-	local fs = require("@lune/fs")
-	local root = assert(string.match(debug.info(1, "s"), "^(.*)[/\\]tools[/\\]"), "cannot locate the repo")
 	-- Content paths are only known at runtime, which the type checker cannot follow.
 	local dynamicRequire: any = require
 	local loaded = {}
-	local function walk(dir: string)
-		local entries = fs.readDir(`{root}/src/content/{dir}`)
-		table.sort(entries)
-		for _, entry in entries do
-			local path = dir .. entry
-			if fs.isDir(`{root}/src/content/{path}`) then
-				walk(path .. "/")
-			elseif string.match(entry, "%.luau$") then
-				local ok, value = pcall(dynamicRequire, `../../src/content/{string.gsub(path, "%.luau$", "")}`)
-				table.insert(loaded, { path = path, ok = ok, value = value })
-			end
-		end
+	for _, path in Files.luau("src/content") do
+		local ok, value = pcall(dynamicRequire, `../../src/content/{string.gsub(path, "%.luau$", "")}`)
+		table.insert(loaded, { path = path, ok = ok, value = value })
 	end
-	walk("")
 	return loaded
 end
 
