@@ -20,8 +20,9 @@ local SAMPLE_SECONDS = 5
 
 -- Measured on Saved Dev version 27 (PR #25, 2026-10-09): Workspace
 -- descendants, BaseParts among them, and the mean Stats.HeartbeatTime of an
--- idle server (worst frame 0.27 ms). Budgets round up to a whole number, so
--- the Heartbeat budget is 1 ms, well inside the plan's 8 ms (section 8).
+-- idle server (worst frame 0.27 ms). Budgets round up to 0.01, so the
+-- Heartbeat budget is 0.1 ms and catches a slowdown well before the plan's
+-- 8 ms (section 8).
 local MEASURED = {
 	instances = 1593,
 	parts = 1533,
@@ -33,8 +34,8 @@ local descendants = Workspace:GetDescendants()
 
 -- Reports `value` against its budget, then holds it to the budget.
 local function within(name: string, value: number)
-	local budget = math.ceil(MEASURED[name] * HEADROOM)
-	print(string.format("  %-12s %10.2f  budget %d (%.0f%% used)", name, value, budget, 100 * value / budget))
+	local budget = math.ceil(MEASURED[name] * HEADROOM * 100) / 100
+	print(string.format("  %-12s %10.2f  budget %.2f (%.0f%% used)", name, value, budget, 100 * value / budget))
 	expect(value <= budget).toBe(true)
 end
 
