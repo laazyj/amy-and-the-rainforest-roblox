@@ -36,6 +36,7 @@ function World.build(withMap: boolean)
 		StoryEngine = (require :: any)(ReplicatedStorage:WaitForChild("core"):WaitForChild("StoryEngine")),
 		StoryHost = StoryHost,
 		CharacterHost = server("CharacterHost"),
+		DevShortcuts = (require :: any)(ServerScriptService:WaitForChild("Dev"):WaitForChild("DevShortcuts")),
 		Convert = Convert,
 		LightingHost = server("LightingHost"),
 	}

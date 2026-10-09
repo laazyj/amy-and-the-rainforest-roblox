@@ -295,6 +295,16 @@ Never add DataStore permissions to the Release key.
    other 4xx, including any other 409, fails at once. The engine-test run
    deadline allows for this wait.
 
+9. **Release builds have no Dev shortcuts.** With `RELEASE_JOB=1`,
+   `tools/publish` strips `ServerScriptService.Dev` (`src/server/Dev`: the
+   `/chapter` and `/quest` chat commands and the jump-to-Quest entry point,
+   plan section 5.3; `tools/lib/release.luau`) from the place before
+   uploading it, and refuses a place without that folder, so moving it
+   fails the release rather than shipping it. The release job publishes the
+   artifact CI built, so the strip happens at publish, not at build. A
+   tier 1 spec (`tests/lune/tools/release.spec.luau`) builds the place and
+   checks both sides of the flag.
+
 ### What the guard is, and what it is not
 
 The guard lives in code a pull request can change. A same-repository PR,

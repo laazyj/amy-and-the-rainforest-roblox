@@ -4,7 +4,8 @@
 -- StoryHost, two kinds of player, each playing QUESTS_EACH Quests:
 --
 --   from a fresh start, in Chapter One
---   resumed at chapter3.meet_squirrel, in Chapter Three
+--   jumped to Chapter Three with the Dev shortcut "/chapter 3"
+--   (DevShortcuts: a Resume at chapter3.meet_squirrel)
 --
 -- First each plays alone (Amy, Amy2); then two new players start the same
 -- way and play at the same time (Amy3, Amy4). No cross-talk means the
@@ -24,11 +25,10 @@ local golden = Golden.lines(fixture("tests/fixtures/golden/walkthrough.json"))
 
 local TIME_LIMIT = 60 -- for each run
 local QUESTS_EACH = 3
-local RESUME_AT = "chapter3.meet_squirrel"
+local JUMP = "/chapter 3"
 
 local world = include("tests/engine/_world.luau").build(false)
 local server = world.StoryHost
-local story = world.story
 local play = Driver.new(server, world.CharacterHost)
 
 -- Each player's messages, as golden file lines.
@@ -44,17 +44,19 @@ local function completed(player: any): { string }
 	return (server.progress(player) :: any).completed
 end
 
--- A new player, started fresh or resumed at RESUME_AT, and the number of
+-- A new player, started fresh or jumped with JUMP, and the number of
 -- Quests she must have completed when she has played QUESTS_EACH.
-local function join(userId: number, resumed: boolean): (any, number)
-	local player = FakePlayer.new(world.spawn + Vector3.new(-6 * userId, 0, 0), userId)
+local function join(userId: number, jumped: boolean): (any, number)
+	-- behind the house, outside every Zone, so the Zone poll moves no one
+	-- on by itself
+	local player = FakePlayer.new(world.spawn + Vector3.new(-6 * userId, 0, -60), userId)
 	sent[player] = {}
-	if resumed then
-		server.resume(player, world.StoryEngine.progressAt(story, RESUME_AT))
+	if jumped then
+		assert(world.DevShortcuts.onCommand(player, JUMP) == "chapter3.meet_squirrel", JUMP)
 	else
 		server.onClientReady(player)
 	end
-	return player, (if resumed then #completed(player) else 0) + QUESTS_EACH
+	return player, (if jumped then #completed(player) else 0) + QUESTS_EACH
 end
 
 -- Plays `players` at the same time until each has completed her Quests
@@ -64,10 +66,11 @@ local function playTogether(players: { { player: any, target: number } })
 	while true do
 		local done = true
 		for _, entry in players do
-			if #completed(entry.player) < entry.target then
-				play(entry.player)
+			local player = entry.player
+			if #completed(player) < entry.target then
+				play(player)
 				done = false
-			elseif not server.idle(entry.player) then
+			elseif not server.idle(player) then
 				done = false
 			end
 		end
@@ -105,15 +108,23 @@ describe("two players at different Chapters", function()
 		expect(amy4.Character:GetPivot().Position).toBe(amy4Stands)
 	end)
 
-	it("sends the fresh start exactly the golden file's messages, from its start", function()
-		for i, line in sent[amy] do
-			assert(line == golden[i], `Amy's message {i}:\n  expected: {golden[i]}\n  actual:   {line}`)
+	-- `actual` is `expected` line for line, or (`prefix`) its start.
+	local function sameLines(label: string, expected: { string }, actual: { string }, prefix: boolean?)
+		for i = 1, if prefix then #actual else math.max(#expected, #actual) do
+			assert(
+				expected[i] == actual[i],
+				`{label}, message {i}:\n  expected: {expected[i]}\n  actual:   {actual[i]}`
+			)
 		end
+	end
+
+	it("sends the fresh start exactly the golden file's messages, from its start", function()
+		sameLines("Amy against the golden file", golden, sent[amy], true)
 	end)
 
 	it("sends each player together exactly what she got alone", function()
-		expect(sent[amy3]).toEqual(sent[amy])
-		expect(sent[amy4]).toEqual(sent[amy2])
+		sameLines("Amy3 against Amy", sent[amy], sent[amy3])
+		sameLines("Amy4 against Amy2", sent[amy2], sent[amy4])
 	end)
 
 	it("leaves each player together with the Progress she had alone", function()
