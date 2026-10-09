@@ -37,5 +37,6 @@ Rules every build session follows, regardless of brief:
 | 014 Characters and Sam's chase | Phase 1 | after 006; Mac for the look |
 | 015 Settings, accessibility, store page, compliance | Phase 1 | after 011 and 012 |
 | 016 Visual pass | Phase 1 | after 011, 012, 014; Mac required |
+| 017 Agent bootstrap and Selene standard library | tooling | independent; alongside 006 |
 | mac-001 Runner bootstrap | Phase 1 | on the MacBook, any time |
 | mac-002 Studio bridge, emulation and asset spikes | Phase 1 | after mac-001 |
