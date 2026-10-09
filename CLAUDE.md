@@ -50,9 +50,20 @@ documented at the top of `tests/lune/runner.luau`.
 - Canon Lines are Clara's exact words, spelling included, and are never
   changed.
 
-The current `src/` is the proof of concept, before the Checkpoint B
-restructure: its four files opt out of strict typing with a `--!nonstrict`
-header. New code is strict (`.luaurc`).
+Where things live (plan section 2.2), all strict (`.luaurc`):
+
+| Path | Built into | Holds |
+|---|---|---|
+| `src/core` | `ReplicatedStorage.core` | the pure core: `StoryEngine`, Quest Kinds, events, the Net contract |
+| `src/content` | `ReplicatedStorage.content` | the Story as data and hooks, Characters, Scenes |
+| `src/shared` | `ReplicatedStorage.shared` | the remote instances |
+| `src/server` | `ServerScriptService` | the server adapters, started by one-line Scripts |
+| `src/client` | `StarterPlayerScripts` | the client binder |
+
+Core and content require each other by relative string path
+(`require("../core/Story")`), which resolves the same under Lune and in
+the engine. A Script in `src/server` only requires and starts a module,
+so engine tests can require the module where Scripts do not run.
 
 ## Rules
 

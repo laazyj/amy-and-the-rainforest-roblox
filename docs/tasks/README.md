@@ -26,7 +26,7 @@ Rules every build session follows, regardless of brief:
 | 003 Open Cloud tooling | A | done |
 | 004 Golden walkthrough on Dev | A | done |
 | 005 Integrate toolchain and Open Cloud tooling | A | done |
-| 006 Core and content (the refactor) | B | after the village respelling PR merges |
+| 006 Core and content (the refactor) | B | in review (#20) |
 | 007 Client view-model and engine suite | B | after 006 |
 | 008 Content schema, purity and coverage guards | B | after 007 |
 | 009 Asset pipeline | Phase 1 | independent; may run alongside 006 |

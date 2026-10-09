@@ -3,16 +3,18 @@
 -- Execution has no client and Players spawns no one. A test gets it with
 -- include("tests/engine/_fakeplayer.luau").
 --
--- It is a table, not an Instance: StoryServer only keys its per-player state
--- by it and reads its Character, and the test replaces StoryServer's send,
--- since FireClient needs a real Player. Each field, and why:
+-- It is a table, not an Instance: StoryHost (src/server/StoryHost.luau)
+-- only keys its per-player sessions by it and reads its fields, and the test
+-- replaces StoryHost's send, since FireClient needs a real Player. Each
+-- field, and why:
 --
---   Character  a Model with an anchored HumanoidRootPart, the one field the
---              current StoryServer (src/ServerScriptService/StoryServer/Server.lua)
---              reads. The Zone poll reads its position to complete `reach`
---              Quests, and Sam's catch (samCatches) moves it back into the garden.
---   UserId     not read by StoryServer today; every Player has them, and a
---   Name       negative UserId can never be a real account.
+--   Character  a Model with an anchored HumanoidRootPart. The Zone poll
+--              (src/server/PromptBridge.luau) reads its position to raise
+--              EnteredZone, and TeleportPlayer (Sam's catch) moves it back
+--              into the garden.
+--   UserId     the id the player's StoryEngine is made with; a negative
+--              UserId can never be a real account.
+--   Name       every Player has one.
 
 export type FakePlayer = {
 	UserId: number,

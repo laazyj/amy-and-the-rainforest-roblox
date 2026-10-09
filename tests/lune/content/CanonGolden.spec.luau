@@ -7,32 +7,8 @@
 ]]
 
 local bootstrap = require("../bootstrap")
+local canonTable = require("./canonTable")
 local serde = require("@lune/serde")
-
-type CanonRow = { number: number, quest: string, line: string }
-
--- The rows of the "Canon Lines" table: number, Quest and the backticked Line
--- (canon.md: "the Line is the only backticked text in its row"). Also
--- returns every numbered row the pattern cannot read, so such a row fails
--- the test instead of vanishing.
-local function canonRows(markdown: string): ({ CanonRow }, { string })
-	local section = assert(string.match(markdown, "\n## Canon Lines\n(.-)\n## "), "no Canon Lines section")
-	local rows, unreadable = {}, {}
-	for text in string.gmatch(section, "[^\n]+") do
-		if string.match(text, "^|%s*%d+%s*|") then
-			local number, quest, line = string.match(text, "^|%s*(%d+)%s*|%s*([^|]-)%s*|[^`]*`([^`]+)`")
-			if number then
-				table.insert(
-					rows,
-					{ number = tonumber(number) :: number, quest = quest :: string, line = line :: string }
-				)
-			else
-				table.insert(unreadable, text)
-			end
-		end
-	end
-	return rows, unreadable
-end
 
 type ShownLine = { quest: string?, text: string }
 
@@ -49,7 +25,7 @@ local function shownLines(golden: { any }): { ShownLine }
 	return shown
 end
 
-local canon, unreadable = canonRows(bootstrap.readSource("docs/story/canon.md"))
+local canon, unreadable = canonTable.rows("Canon Lines")
 local shown = shownLines(serde.decode("json", bootstrap.readSource("tests/fixtures/golden/walkthrough.json")))
 
 -- Where each canon Line is shown in its Quest, searching on from the previous

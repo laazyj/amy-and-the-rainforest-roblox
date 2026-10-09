@@ -27,21 +27,20 @@
 	Requiring modules from src/ under Lune
 	--------------------------------------
 	Lune resolves a require path relative to the file that requires it, so
-	a pure module (no Roblox globals, no services) is required directly
-	from a spec, and Lune finds `Thing.luau` or `Thing.lua`:
+	the pure core and the content (src/core, src/content: no Roblox
+	globals, no services, positions and colours as plain tables) are
+	required directly from a spec, and Lune finds `Thing.luau`:
 
-		local Thing = require("../../src/core/Thing")
+		local StoryEngine = require("../../../src/core/StoryEngine")
+		local Story = require("../../../src/content/Story")
 
-	A module that uses Roblox datatypes as globals (Vector3, Color3, ...),
-	like today's StoryData, cannot be required directly because Lune has
-	no such globals. Load it through the bootstrap, which runs the file
-	with those datatypes injected from @lune/roblox:
+	They require each other by relative string paths too, which the engine
+	resolves the same way in the built place.
 
-		local bootstrap = require("./bootstrap")
-		local StoryData = bootstrap.loadSource("src/ReplicatedStorage/StoryData.lua")
-
-	Modules that touch `game`, Instances or services do not run under Lune
-	at all; they belong to the engine tests (tier 2).
+	Modules that touch `game`, Instances or services (src/server,
+	src/shared, src/client) do not run under Lune; they belong to the
+	engine tests (tier 2), and a spec may read their source as text with
+	bootstrap.readSource.
 ]]
 
 local fs = require("@lune/fs")
