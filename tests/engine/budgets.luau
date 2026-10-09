@@ -18,11 +18,14 @@ local Workspace = game:GetService("Workspace")
 local HEADROOM = 1.2
 local SAMPLE_SECONDS = 5
 
--- Provisional: replaced by the values the first engine-tests run measures.
+-- Measured on Saved Dev version 27 (PR #25, 2026-10-09): Workspace
+-- descendants, BaseParts among them, and the mean Stats.HeartbeatTime of an
+-- idle server (worst frame 0.27 ms). Budgets round up to a whole number, so
+-- the Heartbeat budget is 1 ms, well inside the plan's 8 ms (section 8).
 local MEASURED = {
-	instances = 20000,
-	parts = 10000,
-	heartbeatMs = 40,
+	instances = 1593,
+	parts = 1533,
+	heartbeatMs = 0.08,
 }
 
 include("tests/engine/_world.luau").build(true)
