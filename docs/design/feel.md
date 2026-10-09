@@ -223,7 +223,7 @@ whatever its scores. Then each criterion scores 0 (fails),
 **Pass:** no criterion at 0 and a total of at least 11 out of 14. The
 PR lists the scores for every changed baseline.
 
-**Clara's palette** (from the current `WorldBuilder`): deep green
+**Clara's palette** (`src/content/palette.luau`): deep green
 `#23401d`, moss `#5a8a44`, bark `#6b4426`, gold `#e7b53a`, red
 `#c2402f`, grape `#7c4dff`, bubblegum `#ff5da2`, cream sky, and the grass
 and canopy greens.

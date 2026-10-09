@@ -108,7 +108,8 @@ finish()
   scripts do not start on their own. The DataModel is a fresh copy of the
   place version, and changes are not saved. So `Touched` never fires, and
   game code a test needs must be a ModuleScript it can `require` (the
-  StoryServer Script only requires its `Server` module for this reason).
+  StoryServer Script only requires and starts the `StoryHost` module for
+  this reason).
 - A task cannot read the repository. A script names the files it needs with
   string literals, and the runner embeds them in the task
   (`EngineTests.EMBED_FUNCTIONS`):

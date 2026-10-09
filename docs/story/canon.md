@@ -17,17 +17,16 @@ approve new Lines in her voice is in the [style guide](style-guide.md).
    of the adaptations listed below ("Adapted"). A Line that mixes her
    words with game text is split into a canon Line and a game Line. Any
    new adaptation needs Clara's approval.
-3. **A future tier 1 test checks canon byte for byte.** From the Phase 0
-   refactor on, every Line marked `canon` in content must equal a row of
-   the "Canon Line" column below, and every row must appear in content as
-   a Line marked `canon`. In every table here the Line is the only
-   backticked text in its row. Until the refactor the source is
-   `src/content/StoryData.lua`, and
-   `tests/lune/content/CanonGolden.spec.luau` checks the half of this rule
-   that applies today: every row must be shown in the walkthrough's
-   [golden file](../GLOSSARY.md), in its Quest and in story order, byte
-   for byte with no spelling differences. Its single "vilage" allowance
-   was removed in PR #17.
+3. **Tier 1 tests check canon byte for byte.** Every Line marked `canon`
+   in content (`src/content/chapters/<n>/data.luau`) must match a row of
+   the "Canon Line" column below, with the same Quest, Dialogue, Speaker
+   and order, and every row must be in content as a canon Line.
+   `tests/lune/content/Canon.spec.luau` checks this, and checks the other
+   Lines against the Game Lines table the same way;
+   `tests/lune/content/CanonGolden.spec.luau` checks every row is shown in
+   the walkthrough's
+   [golden file](../../tests/fixtures/golden/walkthrough.json). In every
+   table here the Line is the only backticked text in its row.
 4. **Never "corrected".** Spell checkers, formatters and translation must
    not touch canon Lines, which is why automatic translation stays off
    (see the [release checklist](../RELEASE_CHECKLIST.md)).
@@ -55,7 +54,7 @@ they are.
 | 6 | chapter2.walk_to_forest | outro | Narrator | `Then suddenly a dark forest loomed infront of her.` | Exact. |
 | 7 | chapter2.enter_forest | outro | Narrator | `As soon as she went in Amy saw it was a world parallel to thier own!` | Exact. |
 | 8 | chapter2.enter_forest | outro | Narrator | `It was a bautyfull paradise!` | Exact. |
-| 9 | chapter3.meet_squirrel | intro | Narrator | `Amy discoverd so many animals! Something maroon was hopping between the roots...` | Mixed: only "Amy discoverd so many animals!" is Clara's; "Something maroon was hopping between the roots..." was written for the game. The Phase 0 refactor splits it (rule 2). |
+| 9 | chapter3.meet_squirrel | intro | Narrator | `Amy discoverd so many animals! Something maroon was hopping between the roots...` | Mixed: only "Amy discoverd so many animals!" is Clara's; "Something maroon was hopping between the roots..." was written for the game. Rule 2 splits it, in a PR of its own that re-records the golden file; until then the whole Line is marked canon. |
 | 10 | chapter3.rush_home | intro | Narrator | `She rushed Home...` | Adapted: the start of her sentence, ending in "..."; it continues in the next canon Line. |
 | 11 | chapter3.tell_mum | dialogue | Narrator | `...and told her mum who told her dad who told the village.` | Adapted: continues "She rushed Home"; her sentence goes on "— who made", the Line ends with a full stop. |
 | 12 | chapter4.stand_in_front | intro | Narrator | `The village made a giant tree-chopping machine and they decided to chop down the forest because they thought it was a thret to humankind.` | Adapted: her text reads "who made"; the Line starts "The village made". |
