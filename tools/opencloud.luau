@@ -396,14 +396,21 @@ local function isBusy(response: Response): boolean
 		and string.find(string.lower(body.message), "try again", 1, true) ~= nil
 end
 
+export type SendOptions = {
+	-- false for a request that creates something new each time and takes no
+	-- idempotency key (Create Asset): one that reached Roblox before the
+	-- connection dropped would be done twice. Default true.
+	retryTransport: boolean?,
+}
+
 -- Sends a request with the retry policy from the plan:
--- - a transport error is retried once;
+-- - a transport error is retried once, unless `options.retryTransport` is false;
 -- - a 5xx is retried once only for GET, because a POST that failed with a 5xx
 --   may still have been accepted (a second publish or a duplicate task);
 -- - a "server busy" 409 is retried with BUSY_BACKOFF, then returned;
 -- - any other 4xx is returned at once.
 -- Returns the response, or raises.
-function OpenCloud.send(http: Http, sleep: Sleep, request: Request): Response
+function OpenCloud.send(http: Http, sleep: Sleep, request: Request, options: SendOptions?): Response
 	local retried = false
 	local busyRetries = 0
 	while true do
@@ -411,6 +418,9 @@ function OpenCloud.send(http: Http, sleep: Sleep, request: Request): Response
 		local failure
 		if not ok then
 			failure = `transport error: {result}`
+			if options and options.retryTransport == false then
+				error(`{request.method} {request.url} failed, not retried ({failure})`, 0)
+			end
 		else
 			local response = result :: Response
 			if isBusy(response) and busyRetries < #OpenCloud.BUSY_BACKOFF then
@@ -439,8 +449,8 @@ function OpenCloud.expectOk(request: Request, response: Response): Response
 end
 
 -- `send`, then `expectOk`.
-function OpenCloud.call(http: Http, sleep: Sleep, request: Request): Response
-	return OpenCloud.expectOk(request, OpenCloud.send(http, sleep, request))
+function OpenCloud.call(http: Http, sleep: Sleep, request: Request, options: SendOptions?): Response
+	return OpenCloud.expectOk(request, OpenCloud.send(http, sleep, request, options))
 end
 
 return OpenCloud

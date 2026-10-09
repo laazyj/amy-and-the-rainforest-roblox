@@ -12,7 +12,7 @@ a real key are for the owner, when debugging a CI failure. Everyone else uses
 
 | File | What it does |
 |---|---|
-| `tools/opencloud.luau` | Builds every Open Cloud request and parses every response. HTTP is injected, so tests mock it. Retry policy: a transport error is retried once; a 5xx is retried once for GET only, never for a POST (publish, create task) that may already have been accepted; Roblox's "server busy" 409 is retried with backoff (safety rule 8); any other 4xx is never retried. |
+| `tools/opencloud.luau` | Builds every Open Cloud request and parses every response. HTTP is injected, so tests mock it. Retry policy: a transport error is retried once, except for Create Asset (safety rule 7); a 5xx is retried once for GET only, never for a POST (publish, create task) that may already have been accepted; Roblox's "server busy" 409 is retried with backoff (safety rule 8); any other 4xx is never retried. |
 | `tools/publish.luau` | Publishes a `.rbxl` as a `Saved` or `Published` version and prints the version number on stdout. |
 | `tools/upload-assets.luau` | Uploads the pending assets in `assets/manifest.json` through the Assets API and writes their ids back. See [`ASSETS.md`](ASSETS.md). |
 | `tools/run-engine-tests.luau` | Runs engine test scripts as Luau Execution tasks, up to 4 at once, and fails unless every one passes. |
@@ -260,7 +260,10 @@ Never add DataStore permissions to the Release key.
    twice or start a duplicate task. Only a transport error is retried once,
    as the plan and brief require. A transport error can, rarely, also follow
    an accepted request. The worst case is one extra Saved version, or one
-   extra task under the same `RUN_ID`.
+   extra task under the same `RUN_ID`. Create Asset is the exception: a
+   transport error there is not retried either, because an extra asset
+   would sit in moderation on the owner's account; the run fails, and the
+   next run uploads the entry again.
 8. **"Server busy" is the one 4xx that is retried.** Roblox sometimes answers
    a publish with HTTP 409 `{"code":"Conflict","message":"Save failed. Server
    is busy ... Please try again in a couple minutes."}`. That is a request to

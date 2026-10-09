@@ -245,6 +245,37 @@ return function(t: any)
 			expect(#mock.calls).toBe(1)
 		end)
 
+		it("never retries a Create Asset that failed with a transport error", function()
+			local mock = repo({
+				handler = function(): OpenCloud.Response
+					error("connection reset")
+				end,
+			})
+			expectError(function()
+				UploadAssets.main(mock.ctx)
+			end, "failed, not retried (transport error")
+			expect(#mock.calls).toBe(1)
+			expect(written(mock).assets[1].assetId).toBeNil()
+		end)
+
+		it("retries a poll that failed with a transport error once", function()
+			local polls = 0
+			local upstream = server()
+			local mock = repo({
+				handler = function(request)
+					if request.method == "GET" then
+						polls += 1
+						if polls == 1 then
+							error("connection reset")
+						end
+					end
+					return upstream(request)
+				end,
+			})
+			UploadAssets.main(mock.ctx)
+			expect(written(mock).assets[1].assetId).toBe("9001")
+		end)
+
 		it("updates the moderation status of assets in review", function()
 			local m = M.manifest(M.entry(M.UPLOADED))
 			local mock = repo({ manifest = m, handler = server({ moderation = "Approved" }) })

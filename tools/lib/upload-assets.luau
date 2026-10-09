@@ -45,7 +45,9 @@ end
 
 -- Sends the upload and polls its operation until it is done; returns the result.
 local function upload(ctx: Cli.Context, apiKey: string, request: OpenCloud.Request): OpenCloud.Operation
-	local operation = OpenCloud.parseOperation(OpenCloud.call(ctx.http, ctx.sleep, request))
+	-- Not retried on a transport error: a second create could duplicate the
+	-- asset. The next run uploads the entry again.
+	local operation = OpenCloud.parseOperation(OpenCloud.call(ctx.http, ctx.sleep, request, { retryTransport = false }))
 	local polls = 0
 	while not operation.done do
 		if polls >= UploadAssets.MAX_POLLS then
