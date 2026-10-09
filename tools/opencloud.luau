@@ -48,6 +48,8 @@ OpenCloud.RETRY_DELAY = 2
 
 -- Longest a Luau Execution task may run, and the server default.
 OpenCloud.MAX_TASK_TIMEOUT = 300
+-- Largest task script Luau Execution accepts ("up to 4 MB").
+OpenCloud.MAX_TASK_SCRIPT_BYTES = 4_000_000
 
 -- Task states that mean the task will not change again.
 OpenCloud.TERMINAL_STATES = table.freeze({
@@ -100,7 +102,8 @@ end
 
 -- Luau Execution. POST /cloud/v2/universes/{u}/places/{p}[/versions/{v}]/luau-execution-session-tasks
 -- Scope: universe.place.luau-execution-session:write. `timeoutSeconds` maps to
--- the task's `timeout` duration field.
+-- the task's `timeout` duration field. A script over MAX_TASK_SCRIPT_BYTES is
+-- refused here, since the server would refuse it.
 function OpenCloud.createTaskRequest(
 	apiKey: string,
 	universeId: string,
@@ -109,6 +112,9 @@ function OpenCloud.createTaskRequest(
 	script: string,
 	timeoutSeconds: number
 ): Request
+	if #script > OpenCloud.MAX_TASK_SCRIPT_BYTES then
+		error(`the task script is {#script} bytes; Luau Execution accepts {OpenCloud.MAX_TASK_SCRIPT_BYTES}`, 0)
+	end
 	local parent = `universes/{universeId}/places/{placeId}`
 	if versionId then
 		parent ..= `/versions/{versionId}`

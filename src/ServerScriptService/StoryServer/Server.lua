@@ -19,6 +19,11 @@
 
 	This is a solo, story-driven experience: each player runs through
 	the story at their own pace with their own state.
+
+	This is a ModuleScript that the StoryServer Script requires, so that
+	the golden walkthrough (tests/engine/walkthrough.luau) can start it in
+	a Luau Execution task, where Scripts do not run. It returns the
+	handlers the walkthrough's fake player drives (see the end of this file).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -52,6 +57,13 @@ local ShowEnding = makeRemote("ShowEnding") -- server -> client (title, subtitle
 local ClientReady = makeRemote("ClientReady") -- client -> server
 
 remotes.Parent = ReplicatedStorage
+
+-- Every server -> client message goes through send. A real player gets it
+-- over the remote. The golden walkthrough replaces it (setSend, at the end of
+-- this file), because its fake player is not a Player and FireClient needs one.
+local send = function(player, remote, ...)
+	remote:FireClient(player, ...)
+end
 
 ----------------------------------------------------------------
 -- Character construction
@@ -423,19 +435,21 @@ local function playDialogue(player, lines)
 		return
 	end
 	state.dialogueDone = false
-	ShowDialogue:FireClient(player, lines)
+	send(player, ShowDialogue, lines)
 	local waited = 0
 	while playerStates[player] and not state.dialogueDone and waited < 300 do
 		waited = waited + task.wait(0.1)
 	end
 end
 
-DialogueFinished.OnServerEvent:Connect(function(player)
+local function onDialogueFinished(player)
 	local state = getState(player)
 	if state then
 		state.dialogueDone = true
 	end
-end)
+end
+
+DialogueFinished.OnServerEvent:Connect(onDialogueFinished)
 
 ----------------------------------------------------------------
 -- Pickups (collect quests -- none in the base story, but the
@@ -854,7 +868,7 @@ local function startQuest(player, quest)
 		startHook(player)
 	end
 
-	SetObjective:FireClient(player, questObjectiveText(state, quest))
+	send(player, SetObjective, questObjectiveText(state, quest))
 
 	if quest.intro then
 		playDialogue(player, quest.intro)
@@ -921,7 +935,7 @@ advanceStory = function(player)
 		state.questIndex = 1
 		chapter = StoryData.Chapters[state.chapterIndex]
 		if chapter then
-			ShowChapter:FireClient(player, chapter.title, chapter.subtitle)
+			send(player, ShowChapter, chapter.title, chapter.subtitle)
 			task.wait(3.2) -- let the title card breathe
 		end
 	end
@@ -931,29 +945,33 @@ advanceStory = function(player)
 		startQuest(player, quest)
 	else
 		-- Story complete!
-		SetObjective:FireClient(player, nil)
+		send(player, SetObjective, nil)
 		playDialogue(player, StoryData.Ending.lines)
-		ShowEnding:FireClient(player, StoryData.Ending.title, StoryData.Ending.subtitle)
+		send(player, ShowEnding, StoryData.Ending.title, StoryData.Ending.subtitle)
 	end
 end
 
 ----------------------------------------------------------------
 -- Interactions
 ----------------------------------------------------------------
+local function onTalkPromptTriggered(npcId, player)
+	local state = getState(player)
+	if not state or state.busy then
+		return
+	end
+	local quest = currentQuest(state)
+	if quest and quest.type == "talk" and quest.npc == npcId then
+		state.busy = true
+		npcPrompts[npcId].Enabled = false
+		playDialogue(player, quest.dialogue)
+		completeQuest(player)
+		state.busy = false
+	end
+end
+
 for npcId, prompt in pairs(npcPrompts) do
 	prompt.Triggered:Connect(function(player)
-		local state = getState(player)
-		if not state or state.busy then
-			return
-		end
-		local quest = currentQuest(state)
-		if quest and quest.type == "talk" and quest.npc == npcId then
-			state.busy = true
-			prompt.Enabled = false
-			playDialogue(player, quest.dialogue)
-			completeQuest(player)
-			state.busy = false
-		end
+		onTalkPromptTriggered(npcId, player)
 	end)
 end
 
@@ -985,7 +1003,7 @@ pickupFolder.ChildAdded:Connect(function(part)
 		part:Destroy()
 
 		state.collected = state.collected + 1
-		SetObjective:FireClient(player, questObjectiveText(state, quest))
+		send(player, SetObjective, questObjectiveText(state, quest))
 
 		if state.collected >= quest.count and not state.busy then
 			state.busy = true
@@ -1061,7 +1079,7 @@ local function beginStory(player)
 	state.started = true
 
 	local firstChapter = StoryData.Chapters[1]
-	ShowChapter:FireClient(player, firstChapter.title, firstChapter.subtitle)
+	send(player, ShowChapter, firstChapter.title, firstChapter.subtitle)
 	task.wait(3.2)
 
 	startQuest(player, firstChapter.quests[1])
@@ -1086,10 +1104,12 @@ for _, existing in ipairs(Players:GetPlayers()) do
 	initPlayer(existing)
 end
 
-ClientReady.OnServerEvent:Connect(function(player)
+local function onClientReady(player)
 	initPlayer(player)
 	task.spawn(beginStory, player)
-end)
+end
+
+ClientReady.OnServerEvent:Connect(onClientReady)
 
 Players.PlayerRemoving:Connect(function(player)
 	playerStates[player] = nil
@@ -1102,3 +1122,28 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 
 print("[StoryServer] Story engine ready: " .. StoryData.GameTitle)
+
+-- What the golden walkthrough's fake player drives: the handlers the remotes
+-- and talk prompts call for a real player, a replacement for send, and the
+-- active Quest with its id ("chapter1.ask_dad"; nothing once the Story is
+-- complete) for the golden file. Zones need no handler: the fallback poll
+-- above reads the fake Character's position.
+return {
+	onClientReady = onClientReady,
+	onDialogueFinished = onDialogueFinished,
+	onTalkPromptTriggered = onTalkPromptTriggered,
+	setSend = function(replacement)
+		send = replacement
+	end,
+	activeQuest = function(player)
+		local state = getState(player)
+		if not state then
+			return nil
+		end
+		local quest, chapter = currentQuest(state)
+		if quest then
+			return chapter.id .. "." .. quest.id, quest
+		end
+		return nil
+	end,
+}

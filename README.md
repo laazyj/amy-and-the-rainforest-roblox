@@ -64,7 +64,7 @@ and press **E** to talk; click / **E** / **Space** to advance dialogue.
 |---|---|
 | `src/ReplicatedStorage/StoryData.lua` | **The story**: chapters, quests, dialogue, positions |
 | `src/ServerScriptService/WorldBuilder.server.lua` | Builds the map: village, field, forest wall, paradise |
-| `src/ServerScriptService/StoryServer.server.lua` | Quest engine: characters, prompts, zones, Sam, the machine |
+| `src/ServerScriptService/StoryServer/Server.lua` | Quest engine: characters, prompts, zones, Sam, the machine (started by `StoryServer/init.server.lua`) |
 | `src/StarterPlayer/StarterPlayerScripts/StoryClient.client.lua` | Dialogue box, objective tracker, chapter cards |
 | `default.project.json` | [Rojo](https://rojo.space) project: the only build path |
 | `tools/build.sh` | Builds `build/AmyAndTheRainforest.rbxl` with Rojo |
