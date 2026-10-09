@@ -26,21 +26,22 @@ chapter cards and store page.
    opening a PR with the updated manifest and `AssetIds.luau`
    (SHA-pinned actions, minimal permissions, the composite action). The
    agent never holds a key; it changes the manifest and triggers the job.
-4. **Clara's illustrations.** The sources live in the owner's website
-   repository at
-   `https://github.com/laazyj/jasonduffett.net/tree/main/packages/clara/assets-src`.
-   The build session attaches that repository read-only (or asks the
-   owner to copy the files) and places the illustrations under
-   `assets/images/` with manifest entries and `card:` names for the four
-   chapter cards and the ending card. Record each file's origin path and
-   that the owner holds the rights. Apply the face rule: no image showing
-   Amy's face is used in game or on the store page.
+4. **Illustrations: assess, reuse where right, placeholder otherwise.**
+   The website's illustrations at
+   `https://github.com/laazyj/jasonduffett.net/tree/main/packages/clara/assets-src`
+   were drawn for the one-page story, not for the game. The build session
+   attaches that repository read-only (or asks the owner to copy the
+   files), reviews each image against the GitHub issue "Illustrations
+   needed for the game" (the list of cards, store art, UI pieces and
+   character references, with sizes and the face rule), and records in
+   the PR which pieces the existing art can serve as-is, which it can
+   serve after cropping, and which must be drawn. Reused pieces go under
+   `assets/images/` with manifest entries, origin paths and the owner's
+   rights noted; every piece still needed gets a plain placeholder
+   (palette-coloured card with no text) under the same name so the game
+   and the store page can be built now and swapped later. No image
+   showing Amy's face is used anywhere.
 
-## Owner inputs
-
-- Illustration sources: the website repository path above (provided).
-- Narration: tracked in the GitHub issue "Narration recordings needed for
-  Phase 1 (brief 013)"; not needed for this brief.
 5. **Docs.** `docs/ASSETS.md`: how to add an asset, the licence rules
    (free Creator Store, Clara's work, free-licence or synthesised audio),
    the audio upload limits, and the moderation-status workflow.
