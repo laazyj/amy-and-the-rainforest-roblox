@@ -103,7 +103,7 @@ Rules that keep this honest, and that the tests enforce:
   under Lune with no bootstrap tricks. A lint rule and a Lune smoke test
   fail the build on violations.
 - The server adapter drives the core through a small interface
-  (`StoryEngine.new(playerId, saveData)`, `:handle(event)`, `:snapshot()`),
+  (`StoryEngine.new(playerId, progress, story)`, `:start()`, `:step(event)`, `:snapshot()`),
   so a test can replace the player with a plain table.
 - **Client logic lives in core too.** The dialogue queue, line index,
   visible-grapheme count, speaker style, objective text and chapter-card
@@ -241,7 +241,7 @@ Scene (look + sound)                     Player
  └─ Cue, Shot, Lighting preset
 ```
 
-| Term | Meaning | Today's equivalent | Example |
+| Term | Meaning | Proof-of-concept name | Example |
 |---|---|---|---|
 | **Story** | The whole experience: ordered Chapters plus the Ending. There is one. | `StoryData` | Amy and the Rain Forest |
 | **Chapter** | A titled part of the Story with a card (title, subtitle), an ordered list of Quests, and a checkpoint at its start. | `StoryData.Chapters[i]` | `chapter2` "The Unexplored World" |
@@ -251,7 +251,7 @@ Scene (look + sound)                     Player
 | **Line** | One thing said: Speaker, text, optional narration audio. **Canon** Lines are Clara's exact words and are locked. | `{ speaker, text }` | Narrator: "She tryed again but Sam brang her back." |
 | **Speaker** | Who says a Line: Amy, the Narrator, or a Character. | `speaker` | `Narrator` |
 | **Beat** | A named, staged moment: a fixed sequence of World commands played at a Hook. Beats are how the story *moves the world*. | `samCatches`, `samGoesToFarm`, `paradiseReveal`, `machineArrives`, `machineStops` | `beat:sam_catches` |
-| **Hook** | A point in a Quest's life where Beats run: `onStart`, `onComplete`. Declared in the chapter's `hooks.luau`. | `questStartedHooks[...]`, `onComplete` | `chapter1.sneak_out_1.onComplete → sam_catches` |
+| **Hook** | A point in a Quest's life where Beats run: `onStart`, `onComplete`. A Quest names its Hooks' Beats in the chapter's `data.luau`; the Beats are in its `hooks.luau`. | `questStartedHooks[...]`, `onComplete` | `chapter1.sneak_out_1.onComplete → sam_catches` |
 | **Scene** | A region of the world with its own look and sound: terrain, Props, Spots, Zones, ambience, music. | implicit in `WorldBuilder` | Garden, Village, Field, Forest Wall, Paradise, Heart Glade |
 | **Spot** | A named position and facing inside a Scene. Content never holds raw coordinates; it names Spots. | `position`, `faceZ`, `spawnPoints` | `spot:GardenGateInside` |
 | **Zone** | A named invisible volume the player can enter. Entering one is a Player event. | `zone` | `zone:ForestGap` |
@@ -259,13 +259,13 @@ Scene (look + sound)                     Player
 | **Character** | A named being in the world with a Kind (human, dog, squirrel, fox, lion), a display name and a home Spot. Amy is the **Player Character**. | `NPCs` | `character:Sam` "Sam the Dog" |
 | **Companion** | A Character that can follow Amy, help her, and whose **Bond** with her grows. | Sam (partly) | Sam, later Squirrel, Fox, Lion |
 | **Bond** | A Companion's relationship level with Amy: `stranger` → `curious` → `friend` → `companion`. Persisted. | none | Fox at `friend` |
-| **Pickup** | A quest-bound thing to touch, spawned at Spots for a `collect` Quest and gone when the Quest ends. | pickups | three glowing flowers |
+| **Pickup** | A quest-bound thing to touch, spawned at Spots for a `collect` Quest and gone when touched or when the Quest ends. | pickups | three glowing flowers |
 | **Collectible** | A persistent discoverable with a Journal entry. Found once, remembered forever. | none | `collectible:maroon_acorn` |
 | **Journal** | The player's record of Collectibles found and Characters met, with entries in Clara's voice. | none | |
 | **Cue** | A named sound, music track or effect, resolved to an asset through the manifest. | none | `cue:sam_bark`, `music:paradise_theme` |
 | **Shot** | A named camera framing used by a Beat or a Dialogue. | none | `shot:ForestWallReveal` |
 | **Lighting preset** | A named look for a Scene. | `paradiseReveal` / `ordinaryWorld` | `lighting:paradise` |
-| **Progress** | Where a player is in the Story: current Chapter and Quest, completed Quest ids, Pickup counts, Collectibles, Bonds, Prop states that matter (machine present or not). This is what gets saved, on every Story event and on leave. | `getState(player)` | |
+| **Progress** | Where a player is in the Story: current Chapter and Quest, completed Quest ids, the Pickups touched, the Dialogue showing, Collectibles, Bonds, Prop states that matter (machine present or not). This is what gets saved, on every Story event and on leave. | `getState(player)` | |
 | **Resume** | Rebuilding the world for a returning player from Progress alone: `StoryEngine.resume(progress)` returns the World commands that put every Character, Prop, lighting preset and Pickup where the current Quest expects them, then shows the objective. "Continue" on the title screen is a Resume at the current Quest. | none | |
 | **Checkpoint** | The Progress snapshot taken at a Chapter start, kept alongside current Progress; "Play this chapter again" restarts from it. | none | |
 | **World** | The one interface the core uses to act on the engine. Every Beat is written against it. | scattered engine calls | `World.moveCharacter(id, spot)` |
@@ -287,9 +287,10 @@ StoryEngine.step(progress, playerEvent) → progress', storyEvents[], worldComma
   `CollectibleFound`, `BondChanged`, `StoryEnded`. Their names are also the
   analytics event names and the names used in test descriptions.
 - **World commands** go *out* as instructions to the engine:
-  `ShowDialogue`, `SetObjective`, `ShowChapterCard`, `MoveCharacter`,
-  `TeleportPlayer`, `SetPropState`, `PlayCue`, `SetLighting`, `FrameShot`,
-  `SpawnPickups`, `ClearPickups`, `SaveProgress`, `SaveCheckpoint`.
+  `ShowDialogue`, `SetObjective`, `ShowChapterCard`, `Wait`,
+  `MoveCharacter`, `TeleportPlayer`, `SetPropState`, `PlayCue`,
+  `SetLighting`, `FrameShot`, `OfferTalk`, `WithdrawTalk`, `SpawnPickups`,
+  `RemovePickup`, `ClearPickups`, `SaveProgress`, `SaveCheckpoint`.
 
 A Beat is a list of World commands with optional waits. A Hook maps a
 Quest moment to Beats. The server adapter's only jobs are to turn engine
