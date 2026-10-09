@@ -1,5 +1,6 @@
-# Toolchain pins, managed by Rokit (https://github.com/rojo-rbx/rokit).
-# Run `rokit install` after cloning or changing a version.
+# Toolchain pins. tools/bootstrap-agent.sh (which CI runs) installs them from
+# the release zips checksummed in tools/toolchain-checksums.txt; change a pin
+# and its checksum lines together. Rokit (`rokit install`) reads them too.
 
 [tools]
 rojo = "rojo-rbx/rojo@7.7.1"
