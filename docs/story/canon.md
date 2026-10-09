@@ -22,7 +22,7 @@ approve new Lines in her voice is in the [style guide](style-guide.md).
    the "Canon Line" column below, and every row must appear in content as
    a Line marked `canon`. In every table here the Line is the only
    backticked text in its row. Until the refactor the source is
-   `src/ReplicatedStorage/StoryData.lua`, and
+   `src/content/StoryData.lua`, and
    `tests/lune/content/CanonGolden.spec.luau` checks the half of this rule
    that applies today: every row must be shown in the walkthrough's
    [golden file](../GLOSSARY.md), in its Quest and in story order, byte

@@ -11,8 +11,8 @@
 
 local bootstrap = require("../bootstrap")
 
-local SCRIPT = "src/ServerScriptService/StoryServer/init.server.lua"
-local MODULE = "src/ServerScriptService/StoryServer/Server.lua"
+local SCRIPT = "src/server/StoryServer/init.server.lua"
+local MODULE = "src/server/StoryServer/Server.lua"
 
 local function collapsed(text: string): string
 	return (string.gsub(text, "%s+", " "))

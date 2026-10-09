@@ -26,7 +26,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
 
-local StoryData = require(ReplicatedStorage:WaitForChild("StoryData"))
+local StoryData = require(ReplicatedStorage:WaitForChild("content"):WaitForChild("StoryData"))
 local Map = StoryData.Map
 
 local rng = Random.new(20260702) -- deterministic layout

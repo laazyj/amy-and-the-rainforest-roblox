@@ -7,8 +7,8 @@
 
 local bootstrap = require("../bootstrap")
 
-local StoryData = bootstrap.loadSource("src/ReplicatedStorage/StoryData.lua")
-local serverSource = bootstrap.readSource("src/ServerScriptService/StoryServer/Server.lua")
+local StoryData = bootstrap.loadSource("src/content/StoryData.lua")
+local serverSource = bootstrap.readSource("src/server/StoryServer/Server.lua")
 
 local HOOK_TABLES = { "questStartedHooks", "questCompletedHooks" }
 

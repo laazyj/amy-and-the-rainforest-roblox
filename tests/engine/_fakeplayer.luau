@@ -8,7 +8,7 @@
 -- since FireClient needs a real Player. Each field, and why:
 --
 --   Character  a Model with an anchored HumanoidRootPart, the one field the
---              current StoryServer (src/ServerScriptService/StoryServer/Server.lua)
+--              current StoryServer (src/server/StoryServer/Server.lua)
 --              reads. The Zone poll reads its position to complete `reach`
 --              Quests, and Sam's catch (samCatches) moves it back into the garden.
 --   UserId     not read by StoryServer today; every Player has them, and a

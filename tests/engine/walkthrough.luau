@@ -95,7 +95,7 @@ local function goldenLines(text: string): { string }
 	return lines
 end
 
-local StoryData = (require :: any)(ReplicatedStorage:WaitForChild("StoryData"))
+local StoryData = (require :: any)(ReplicatedStorage:WaitForChild("content"):WaitForChild("StoryData"))
 
 -- Each message's line in the golden file, in the order sent.
 local recorded: { string } = {}

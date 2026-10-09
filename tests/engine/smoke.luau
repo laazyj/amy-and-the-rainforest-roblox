@@ -21,7 +21,8 @@ describe("place", function()
 		expect(storyServer and storyServer.ClassName).toBe("Script")
 		local server = storyServer and storyServer:FindFirstChild("Server")
 		expect(server and server.ClassName).toBe("ModuleScript")
-		expect(game:GetService("ReplicatedStorage"):FindFirstChild("StoryData")).toBeTruthy()
+		local content = game:GetService("ReplicatedStorage"):FindFirstChild("content")
+		expect(content and content:FindFirstChild("StoryData")).toBeTruthy()
 	end)
 
 	-- Lighting.Technology is not readable here (Luau Execution lacks the

@@ -33,7 +33,7 @@ local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 
-local StoryData = require(ReplicatedStorage:WaitForChild("StoryData"))
+local StoryData = require(ReplicatedStorage:WaitForChild("content"):WaitForChild("StoryData"))
 local Map = StoryData.Map
 
 ----------------------------------------------------------------

@@ -38,7 +38,7 @@
 	with those datatypes injected from @lune/roblox:
 
 		local bootstrap = require("./bootstrap")
-		local StoryData = bootstrap.loadSource("src/ReplicatedStorage/StoryData.lua")
+		local StoryData = bootstrap.loadSource("src/content/StoryData.lua")
 
 	Modules that touch `game`, Instances or services do not run under Lune
 	at all; they belong to the engine tests (tier 2).

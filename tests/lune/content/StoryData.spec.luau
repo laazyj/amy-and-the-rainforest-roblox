@@ -1,11 +1,11 @@
 --[[
-	Invariants of the story data in src/ReplicatedStorage/StoryData.lua.
+	Invariants of the story data in src/content/StoryData.lua.
 	StoryServer trusts these; a broken one means a stuck or crashing story.
 ]]
 
 local bootstrap = require("../bootstrap")
 
-local StoryData = bootstrap.loadSource("src/ReplicatedStorage/StoryData.lua")
+local StoryData = bootstrap.loadSource("src/content/StoryData.lua")
 
 local QUEST_TYPES = { talk = true, reach = true, collect = true }
 

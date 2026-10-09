@@ -62,10 +62,10 @@ and press **E** to talk; click / **E** / **Space** to advance dialogue.
 
 | Path | What it is |
 |---|---|
-| `src/ReplicatedStorage/StoryData.lua` | **The story**: chapters, quests, dialogue, positions |
-| `src/ServerScriptService/WorldBuilder.server.lua` | Builds the map: village, field, forest wall, paradise |
-| `src/ServerScriptService/StoryServer/Server.lua` | Quest engine: characters, prompts, zones, Sam, the machine (started by `StoryServer/init.server.lua`) |
-| `src/StarterPlayer/StarterPlayerScripts/StoryClient.client.lua` | Dialogue box, objective tracker, chapter cards |
+| `src/content/StoryData.lua` | **The story**: chapters, quests, dialogue, positions |
+| `src/server/WorldBuilder.server.lua` | Builds the map: village, field, forest wall, paradise |
+| `src/server/StoryServer/Server.lua` | Quest engine: characters, prompts, zones, Sam, the machine (started by `StoryServer/init.server.lua`) |
+| `src/client/StoryClient.client.lua` | Dialogue box, objective tracker, chapter cards |
 | `default.project.json` | [Rojo](https://rojo.space) project: the only build path |
 | `tools/build.sh` | Builds `build/AmyAndTheRainforest.rbxl` with Rojo |
 | `tools/check.sh`, `tools/test.sh` | Static checks (StyLua, Selene, luau-lsp) and unit tests |
@@ -73,7 +73,7 @@ and press **E** to talk; click / **E** / **Space** to advance dialogue.
 
 ## Editing the story
 
-Open `src/ReplicatedStorage/StoryData.lua`. The engine understands three
+Open `src/content/StoryData.lua`. The engine understands three
 quest types, so chapters are just data:
 
 ```lua
