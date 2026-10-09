@@ -251,6 +251,23 @@ return function(t: any)
 		end)
 	end)
 
+	describe("StoryEngine.progressAt", function()
+		local walk = Walker.walk(fixture)
+		for _, placed in Story.quests(fixture) do
+			it(`is the Progress the walk had once {placed.quest.id} was playable`, function()
+				expect(StoryEngine.progressAt(fixture, placed.quest.id)).toEqual(
+					walk.playable[placed.quest.id].progress
+				)
+			end)
+		end
+
+		it("refuses a Quest the Story does not have", function()
+			t.expectError(function()
+				StoryEngine.progressAt(fixture, "chapter9.fly")
+			end, "no Quest chapter9.fly")
+		end)
+	end)
+
 	describe("StoryEngine.new", function()
 		local engine = StoryEngine.new(-1, nil, fixture)
 

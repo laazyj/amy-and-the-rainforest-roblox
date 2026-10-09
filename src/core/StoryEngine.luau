@@ -214,6 +214,23 @@ function StoryEngine.step(
 	return result, out.events, out.commands
 end
 
+-- The Progress of a player who has just started Quest `questId`, its intro
+-- done: every Quest before it completed, nothing collected, no Dialogue
+-- showing. What the Dev shortcuts (src/server/DevShortcuts) jump to and engine tests
+-- resume at.
+function StoryEngine.progressAt(story: Story.Story, questId: string): Progress
+	local progress = StoryEngine.fresh()
+	for _, placed in Story.quests(story) do
+		if placed.quest.id == questId then
+			progress.chapter = placed.chapter.id
+			progress.quest = questId
+			return progress
+		end
+		table.insert(progress.completed, placed.quest.id)
+	end
+	error(`no Quest {questId}`, 2)
+end
+
 -- Resume (plan section 2.4): the World commands that rebuild, in a World
 -- freshly built from the scenes, the World the active Quest expects: every
 -- Beat of the Quests before it and its own onStart Beats, then its Objective
