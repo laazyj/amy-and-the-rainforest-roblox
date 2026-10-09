@@ -29,10 +29,30 @@ local zones: { [string]: Story.Zone } = {
 	MachineFront = zone(at(0, 5, 110), at(16, 10, 9)),
 }
 
-local props: { [string]: Story.Prop } = {
-	Machine = { states = { "absent", "advancing", "stopped", "retreating" } },
-	Villagers = { states = { "absent", "gathered", "cheering" } },
+-- Each Prop's states, and how PropHost places it: prop:Machine parks at
+-- its Spot and reverses away; prop:Villagers stand at theirs, in these
+-- shirts, and cheer with sparkles over the crowd.
+local machine = {
+	states = { "absent", "advancing", "stopped", "retreating" },
+	spot = "MachineBay",
+	retreatDistance = 34,
+	retreatSeconds = 6,
 }
+local villagers = {
+	states = { "absent", "gathered", "cheering" },
+	spots = { "Villager1", "Villager2", "Villager3", "Villager4" },
+	shirts = { rgb(180, 120, 70), rgb(96, 130, 170), rgb(170, 96, 96), rgb(120, 150, 96) },
+	sparkles = {
+		{ at = at(-10, 12, 100), colour = colours.bubblegum },
+		{ at = at(0, 12, 100), colour = colours.gold },
+		{ at = at(10, 12, 100), colour = colours.grape },
+	},
+	sparkleSeconds = 6,
+}
+export type Machine = typeof(machine)
+export type Villagers = typeof(villagers)
+
+local props: { [string]: Story.Prop } = { Machine = machine, Villagers = villagers }
 
 return {
 	id = "Field",
@@ -57,18 +77,5 @@ return {
 		{ at = at(-60, 85, 40), scale = 1.2 },
 		{ at = at(65, 92, 110), scale = 1.0 },
 		{ at = at(-20, 95, 170), scale = 1.4 },
-	},
-	-- Prop:Machine parks at its Spot; Prop:Villagers stand at theirs, in
-	-- these shirts, and cheer with sparkles over the crowd
-	machine = { spot = "MachineBay", retreatDistance = 34, retreatSeconds = 6 },
-	villagers = {
-		spots = { "Villager1", "Villager2", "Villager3", "Villager4" },
-		shirts = { rgb(180, 120, 70), rgb(96, 130, 170), rgb(170, 96, 96), rgb(120, 150, 96) },
-		sparkles = {
-			{ at = at(-10, 12, 100), colour = colours.bubblegum },
-			{ at = at(0, 12, 100), colour = colours.gold },
-			{ at = at(10, 12, 100), colour = colours.grape },
-		},
-		sparkleSeconds = 6,
 	},
 }

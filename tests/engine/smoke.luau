@@ -16,13 +16,29 @@ describe("place", function()
 		expect(string.sub(info.Name, 1, #prefix)).toBe(prefix)
 	end)
 
-	it("contains the story scripts built from src/", function()
-		local storyServer = game:GetService("ServerScriptService"):FindFirstChild("StoryServer")
-		expect(storyServer and storyServer.ClassName).toBe("Script")
-		local server = storyServer and storyServer:FindFirstChild("Server")
-		expect(server and server.ClassName).toBe("ModuleScript")
-		local content = game:GetService("ReplicatedStorage"):FindFirstChild("content")
-		expect(content and content:FindFirstChild("StoryData")).toBeTruthy()
+	it("contains the Story built from src/", function()
+		local scripts = game:GetService("ServerScriptService")
+		for _, name in { "StoryServer", "SceneServer" } do
+			local found = scripts:FindFirstChild(name)
+			expect(found and found.ClassName).toBe("Script")
+		end
+		for _, name in { "StoryHost", "SceneBuilder", "WorldImpl", "PromptBridge", "CharacterHost" } do
+			local found = scripts:FindFirstChild(name)
+			expect(found and found.ClassName).toBe("ModuleScript")
+		end
+		local storage = game:GetService("ReplicatedStorage")
+		for _, path in { { "core", "StoryEngine" }, { "content", "Story" }, { "shared", "Net" } } do
+			local folder = storage:FindFirstChild(path[1])
+			local found = folder and folder:FindFirstChild(path[2])
+			expect(found and found.ClassName).toBe("ModuleScript")
+		end
+	end)
+
+	it("requires the core and the content by string inside the engine", function()
+		local storage = game:GetService("ReplicatedStorage")
+		local content = (require :: any)(storage:WaitForChild("content"):WaitForChild("Story"))
+		expect(content.story.title).toBe("Amy and the Rain Forest")
+		expect(#content.story.chapters).toBe(4)
 	end)
 
 	-- Lighting.Technology is not readable here (Luau Execution lacks the

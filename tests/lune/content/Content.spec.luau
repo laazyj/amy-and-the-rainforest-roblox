@@ -69,12 +69,12 @@ return function(t: any)
 		end)
 
 		it("places the machine and the villagers at Spots that exist", function()
-			local Field = require("../../../src/content/scenes/Field")
-			expect(story.spots[Field.machine.spot]).never.toBeNil()
-			for _, spot in Field.villagers.spots do
+			local machine, villagers = story.props.Machine :: any, story.props.Villagers :: any
+			expect(story.spots[machine.spot]).never.toBeNil()
+			for _, spot in villagers.spots do
 				expect(story.spots[spot]).never.toBeNil()
 			end
-			expect(#Field.villagers.shirts).toBe(#Field.villagers.spots)
+			expect(#villagers.shirts).toBe(#villagers.spots)
 		end)
 
 		for _, character in story.characters do

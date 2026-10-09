@@ -9,6 +9,9 @@
       },
       "content": {
         "$path": "src/content"
+      },
+      "shared": {
+        "$path": "src/shared"
       }
     },
     "ServerScriptService": {

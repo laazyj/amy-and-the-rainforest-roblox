@@ -19,6 +19,6 @@ return {
 	props = {},
 	z = 150,
 	gapHalfWidth = 6,
-	-- which trees, counted out from the gap on each side, carry nests
-	nests = { 2, 5 },
+	-- which trees, counted out from the gap, carry nests on each side
+	nests = { right = { 2, 5 }, left = { 5 } },
 }

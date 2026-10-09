@@ -178,9 +178,9 @@ function StoryEngine.step(
 	event: PlayerEvent
 ): (Progress, { StoryEvent }, { WorldCommand })
 	local out: Out = { events = {}, commands = {} }
-	local result = copy(progress)
 
 	if event.kind == "DialogueFinished" then
+		local result = copy(progress)
 		local showing = result.showing
 		result.showing = nil
 		if showing == "intro" then
@@ -196,14 +196,15 @@ function StoryEngine.step(
 		return result, out.events, out.commands
 	end
 
-	local quest = Story.quest(story, result.quest)
-	if result.showing or not quest then
+	local quest = Story.quest(story, progress.quest)
+	if progress.showing or not quest then
 		return progress, out.events, out.commands
 	end
-	local outcome = kindOf(quest).handle(quest, result.collected, event)
+	local outcome = kindOf(quest).handle(quest, progress.collected, event)
 	if not outcome then
 		return progress, out.events, out.commands
 	end
+	local result = copy(progress)
 	result.collected = outcome.collected or result.collected
 	append(out, outcome.commands)
 	-- Once its Kind is satisfied, a Quest shows its `dialogue` (talk Quests).
