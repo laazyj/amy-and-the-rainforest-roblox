@@ -54,7 +54,7 @@ jobs:
             tools/bootstrap-agent.sh "$RUNNER_TEMP/new-tools"
             selene="$RUNNER_TEMP/new-tools/selene"
           fi
-          "$selene" generate-roblox-std # rewrites roblox.yml from Roblox's current API dump
+          tools/roblox-std.sh update "$selene"
           if ! git diff --quiet roblox.yml; then
             printf '\n\n%s\n' "Selene's Roblox standard library (\`roblox.yml\`) is regenerated from Roblox's current API dump." >> "$RUNNER_TEMP/toolchain/pr-body.md"
           fi

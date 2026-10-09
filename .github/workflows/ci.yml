@@ -45,26 +45,15 @@ jobs:
           path: build/AmyAndTheRainforest.rbxl
           if-no-files-found: error
 
-      # tools/check.sh lints with the committed roblox.yml (cloud sessions
-      # cannot generate it: Selene's HTTP client rejects their proxy). Here,
-      # where Selene can reach the API dump, it must match a fresh one.
       - name: Check roblox.yml against a freshly generated one
         id: roblox-std
-        run: |
-          mkdir -p "$RUNNER_TEMP/roblox-std"
-          (cd "$RUNNER_TEMP/roblox-std" && selene generate-roblox-std)
-          if ! cmp -s roblox.yml "$RUNNER_TEMP/roblox-std/roblox.yml"; then
-            echo "::error file=roblox.yml,title=Selene's Roblox standard library is out of date::roblox.yml differs from what 'selene generate-roblox-std' generates now. Merge the open Toolchain updates PR, or commit the roblox-std artifact of this run as roblox.yml."
-            diff -u roblox.yml "$RUNNER_TEMP/roblox-std/roblox.yml" | head -n 100 || true
-            sha256sum "$RUNNER_TEMP/roblox-std/roblox.yml" # TEMPORARY: carries the file to a session behind a proxy
-            echo "BEGIN-ROBLOX-STD"; gzip -9c "$RUNNER_TEMP/roblox-std/roblox.yml" | base64 -w 120; echo "END-ROBLOX-STD"
-            exit 1
-          fi
+        if: ${{ !cancelled() }} # also after a failed check, so the artifact is there to fix it
+        run: tools/roblox-std.sh check
 
       - name: Upload the generated roblox.yml
         if: failure() && steps.roblox-std.outcome == 'failure'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: roblox-std
-          path: ${{ runner.temp }}/roblox-std/roblox.yml
+          path: build/roblox-std/roblox.yml
           if-no-files-found: error

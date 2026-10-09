@@ -25,7 +25,7 @@ a real key are for the owner, when debugging a CI failure. Everyone else uses
 
 ## Running locally
 
-Run from the repository root, with the toolchain installed (`rokit install`).
+Run from the repository root, with the toolchain installed (`tools/bootstrap-agent.sh`).
 
 ```sh
 # Unit tests (no network); they run with every other tier 1 spec
@@ -182,10 +182,10 @@ refusal. Docs-only PRs (`docs/**`, `**/*.md`) skip the engine-tests
 workflow.
 
 The toolchain comes from the shared composite action
-`.github/actions/setup-tools` (as in `ci.yml`): Rokit from a release pinned
-by version and SHA-256, authenticated with the job token, and cached. The
-token is removed before any step that receives the key. Both workflows build
-with `tools/build.sh`, the same entry point CI uses.
+`.github/actions/setup-tools` (as in `ci.yml`), which runs
+`tools/bootstrap-agent.sh`: each tool from its release zip, checked against
+`tools/toolchain-checksums.txt`, and cached. It needs no token. Both
+workflows build with `tools/build.sh`, the same entry point CI uses.
 
 `publish-dev.yml` runs on `workflow_run`, so it checks out the exact commit
 the successful CI run tested and never publishes a newer, untested `main`.

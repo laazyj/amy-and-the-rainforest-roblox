@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/tools/bootstrap-agent.sh 2>&1 || echo \"warning: tools/bootstrap-agent.sh failed (see above)\"",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,5 +1,6 @@
 # Engine test scripts are linted on their own (see tools/check.sh): they see
 # the names the runner injects, declared in engine.yml, on top of Roblox's.
 std = "roblox+engine"
+roblox-std-source = "pinned" # the root roblox.yml, as in ../../selene.toml
 # Type declarations for luau-lsp, not code.
 exclude = ["*.d.luau"]

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Installs the GitHub Actions linters tools/check.sh runs, actionlint and
 # zizmor, into the directory given (default ~/.local/bin), skipping one that
-# is already there at its pinned version. Each is pinned by
-# version and by the SHA-256 of its release archive, checked before it is
-# unpacked. Neither is in rokit.toml because Rokit does not verify checksums.
+# is already there at its pinned version. Each is pinned by version and by
+# the SHA-256 of its release archive, checked before it is unpacked. Called
+# by tools/bootstrap-agent.sh.
 # To bump: change the version and both checksums together (actionlint
 # publishes a checksums file; zizmor does not, so hash the release assets).
 set -euo pipefail

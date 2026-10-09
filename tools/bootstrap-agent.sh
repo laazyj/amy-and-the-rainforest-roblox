@@ -51,9 +51,10 @@ has_version() {
 # The [tools] pins of rokit.toml, one `name repo version` per line.
 pins="$(sed -n 's/^\([A-Za-z0-9_-]*\) *= *"\([^"@]*\)@\([^"]*\)".*/\1 \2 \3/p' rokit.toml)"
 
+present=
 while read -r name repo version; do
 	if has_version "$name" "$version"; then
-		echo "$name $version: present"
+		present="$present${present:+, }$name $version"
 		continue
 	fi
 	read -r tag asset expected < <(awk -v t="$name" -v p="$platform" '$1 == t && $3 == p { print $2, $4, $5 }' tools/toolchain-checksums.txt) || true
@@ -73,6 +74,7 @@ while read -r name repo version; do
 	mv "$tmp/$name" "$bin/$name"
 	echo "$name $version: installed into $bin (SHA-256 verified)"
 done <<<"$pins"
+if [ -n "$present" ]; then echo "present: $present"; fi
 
 echo "luau-lsp Roblox types: $(tools/roblox-types.sh)"
 
@@ -88,7 +90,8 @@ tools/install-workflow-linters.sh "$bin"
 
 # Later commands of a Claude Code session see this PATH too.
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
-	echo "export PATH=\"$bin:\$PATH\"" >>"$CLAUDE_ENV_FILE"
+	line="export PATH=\"$bin:\$PATH\""
+	grep -qxF "$line" "$CLAUDE_ENV_FILE" 2>/dev/null || echo "$line" >>"$CLAUDE_ENV_FILE"
 fi
 if [ -z "$on_path" ] && [ -z "${CLAUDE_ENV_FILE:-}" ]; then
 	echo "note: $bin is not on PATH; add it before running tools/check.sh"
