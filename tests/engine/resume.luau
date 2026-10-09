@@ -93,6 +93,12 @@ describe("Resume", function()
 					table.insert(mismatches, `{questId} {key}: walked {value}, resumed {resumed[key]}`)
 				end
 			end
+			-- a Character only the Resume has is a mismatch too
+			for key, value in resumed do
+				if walked[key] == nil then
+					table.insert(mismatches, `{questId} {key}: walked nil, resumed {value}`)
+				end
+			end
 			print(`  {questId}: {if #mismatches == before then "the same world" else "a different world"}`)
 		end
 		for _, mismatch in mismatches do
