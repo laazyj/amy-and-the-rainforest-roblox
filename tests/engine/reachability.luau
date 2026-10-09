@@ -52,8 +52,15 @@ local start = ground(world.Convert.vector(story.spots.AmySpawn.at))
 -- A path from spawn to the ground under `target` succeeds; its end is
 -- within `reach` of `target` when given.
 local function expectReachable(name: string, target: Vector3, reach: number?)
+	local goal = ground(target)
+	-- Pathfinding answers NoPath for a path of no length (zone:HomeGarden
+	-- is centred on Amy's spawn); standing there is reaching it.
+	if (goal - start).Magnitude < AGENT.AgentRadius then
+		print(string.format("  %-28s at spawn", name))
+		return
+	end
 	local path = PathfindingService:CreatePath(AGENT)
-	path:ComputeAsync(start, ground(target))
+	path:ComputeAsync(start, goal)
 	if path.Status ~= Enum.PathStatus.Success then
 		print(string.format("  %-28s %s", name, path.Status.Name))
 	end
