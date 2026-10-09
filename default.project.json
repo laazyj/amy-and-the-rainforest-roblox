@@ -4,6 +4,9 @@
     "$className": "DataModel",
     "ReplicatedStorage": {
       "$className": "ReplicatedStorage",
+      "core": {
+        "$path": "src/core"
+      },
       "content": {
         "$path": "src/content"
       }
