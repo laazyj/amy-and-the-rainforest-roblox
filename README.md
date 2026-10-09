@@ -34,7 +34,7 @@ moss, gold, bubblegum pink and grape purple.
 
 ## Where this is going
 
-The game is an early proof of concept. The plan to take it to a public
+The game is an early version. The plan to take it to a public
 release with Dev/Release channels, an automated test harness and
 agent-driven feature development is in
 [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md).
@@ -63,30 +63,36 @@ and press **E** to talk; click / **E** / **Space** to advance dialogue.
 
 | Path | What it is |
 |---|---|
-| `src/ReplicatedStorage/StoryData.lua` | **The story**: chapters, quests, dialogue, positions |
-| `src/ServerScriptService/WorldBuilder.server.lua` | Builds the map: village, field, forest wall, paradise |
-| `src/ServerScriptService/StoryServer/Server.lua` | Quest engine: characters, prompts, zones, Sam, the machine (started by `StoryServer/init.server.lua`) |
-| `src/StarterPlayer/StarterPlayerScripts/StoryClient.client.lua` | Dialogue box, objective tracker, chapter cards |
+| `src/content/` | **The story** as data: `chapters/<n>/data.luau` (Quests, Objectives, Dialogue) and `hooks.luau` (Beats), `characters.luau`, `scenes/` (Spots, Zones, Props, layout) |
+| `src/core/` | The pure story engine: `StoryEngine`, the Quest Kinds, events and the Net contract; no Roblox instances |
+| `src/server/` | Engine adapters: `StoryHost` runs the Story, `SceneBuilder` builds the map, `CharacterHost`, `PropHost` (Sam's world, the machine) and friends |
+| `src/client/StoryClient.client.luau` | Dialogue box, objective tracker, chapter cards |
+| `src/shared/` | The remotes the server and client talk over |
 | `default.project.json` | [Rojo](https://rojo.space) project: the only build path |
 | `tools/build.sh` | Builds `build/AmyAndTheRainforest.rbxl` with Rojo |
 | `tools/check.sh`, `tools/test.sh` | Static checks (StyLua, Selene, luau-lsp) and unit tests |
 | `tests/lune/` | Unit tests, run under [Lune](https://lune-org.github.io/docs) |
+| `tests/engine/` | Engine tests, run in Roblox through Open Cloud by CI |
 
 ## Editing the story
 
-Open `src/ReplicatedStorage/StoryData.lua`. The engine understands three
-quest types, so chapters are just data:
+Each Chapter is `src/content/chapters/<n>/data.luau`, written in the
+words of [`docs/GLOSSARY.md`](docs/GLOSSARY.md). Quests come in three
+Kinds, so a Chapter is mostly data:
 
 ```lua
-{ id = "ask_dad",     type = "talk",  npc = "Dad",       dialogue = { ... } }
-{ id = "sneak_out_1", type = "reach", zone = "GardenGate" }
--- "collect" quests (touch N glowing pickups) are supported too
+{ id = "chapter1.ask_dad",     kind = "talk",  character = "Dad", dialogue = { ... } }
+{ id = "chapter1.sneak_out_1", kind = "reach", zone = "GardenGate", hooks = { onComplete = { "sam_catches" } } }
+-- "collect" Quests (touch N glowing Pickups) are supported too
 ```
 
-Change any `text = "..."` line to rewrite dialogue. Add or remove quests
-and chapters freely. After editing, run `tools/test.sh` to check the
-story data, then rebuild the place file with `tools/build.sh` (or let
-`rojo serve` sync it into Studio).
+The Beats a Hook names, such as Sam's catch, are lists of World commands
+in the Chapter's `hooks.luau`. Lines marked `canon = true` are Clara's
+words and are locked ([`docs/story/canon.md`](docs/story/canon.md)); any
+other Line may be rewritten, with canon.md's Game Lines table updated to
+match. After editing, run `tools/test.sh`, which walks the whole Story,
+then rebuild the place file with `tools/build.sh` (or let `rojo serve`
+sync it into Studio).
 
 ## First-draft limitations (known, deliberate)
 

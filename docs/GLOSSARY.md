@@ -60,17 +60,20 @@ Scene (look + sound)                     Player
 | **Prop** | A placed object with named states. See [enumeration](#props). | `prop:Machine` |
 | **Character** | A named being in the world with a kind, a display name and a home Spot. See [enumeration](#characters-and-speakers). | `character:Sam` "Sam the Dog" |
 | **Player Character** | The Character the player controls. The player **is Amy**. | `character:Amy` |
+| **Talk affordance** | How the player talks to a Character: a prompt on the Character, offered while a `talk` Quest waits for `TalkedTo` (World commands `OfferTalk`, `WithdrawTalk`). | "Say hello (bravely)" on the Lion |
+| **Talk label** | The words on a talk affordance; a `talk` Quest's `talkLabel`, "Talk" when it has none. | "Explain" |
 | **Companion** | A Character that can follow Amy, help her, and whose Bond with her grows. | Sam; later Squirrel, Fox, Lion |
 | **Bond** | A Companion's relationship level with Amy. Persisted. | Fox at `friend` |
-| **Pickup** | A Quest-bound thing to touch, spawned at Spots for a `collect` Quest and removed when the Quest ends. | three glowing flowers |
+| **Pickup** | A Quest-bound thing to touch, spawned at Spots for a `collect` Quest and removed when touched or when the Quest ends. Its id is the Spot it spawned at. | three glowing flowers |
 | **Collectible** | A persistent discoverable with a Journal entry. Found once, remembered forever. | `collectible:maroon_acorn` |
 | **Journal** | The player's record of Collectibles found and Characters met, with entries in Clara's voice. | |
 | **Cue** | A named sound, music track or effect, resolved to an asset id through `assets/manifest.json`. | `cue:sam_bark`, `music:paradise_theme` |
 | **Shot** | A named camera framing used by a Beat or a Dialogue. Specified in [`design/feel.md`](design/feel.md). See [enumeration](#shots). | `shot:ForestWallReveal` |
 | **Lighting preset** | A named look for a Scene. See [enumeration](#lighting-presets). | `lighting:paradise` |
-| **Progress** | Where a player is in the Story: current Chapter and Quest, completed Quest ids, Pickup counts, Collectibles, Bonds, and the Prop states that matter. Saved on every Story event and on leave. | |
+| **Progress** | Where a player is in the Story: current Chapter and Quest, completed Quest ids, the Pickups touched in the current Quest, which Dialogue is showing, and later Collectibles, Bonds, and the Prop states that matter. Saved on every Story event and on leave. | |
 | **Checkpoint** | The Progress snapshot taken at a Chapter start, kept alongside current Progress. "Play this chapter again" restarts from it. | |
 | **Resume** | Rebuilding the world for a returning player from Progress alone: `StoryEngine.resume(progress)` returns the World commands that put every Character, Prop, Lighting preset and Pickup where the current Quest expects them, then shows the Objective. "Continue" on the title screen is a Resume. | |
+| **World state** | What the World looks like to the Story, as plain data: where each Character stands, each Prop's state, the Lighting preset, the Pickups out, the Objective, the offered talk affordances. What the World commands mean without the engine (`src/core/WorldState.luau`); a Resume rebuilds it. | Sam at `spot:Farm`, `lighting:paradise` |
 | **World** | The one interface the core uses to act on the engine. Every Beat is written against it, one method per World command. | `World.moveCharacter(id, spot)` |
 | **Device class** | One of the three first-class targets, each with its own layout and touch rules: `PC`, `Phone`, `Tablet`. Defined in [`design/feel.md`](design/feel.md). | `Tablet` |
 | **Walkthrough** | A test that plays the Story, or one Chapter, from start to end by driving a player's inputs, and checks what the server sends back. | `tests/engine/walkthrough.luau` |
@@ -84,6 +87,13 @@ The core is a pure function of events:
 ```
 StoryEngine.step(progress, playerEvent) → progress', storyEvents[], worldCommands[]
 ```
+
+In code (`src/core/StoryEngine.luau`) the Story is passed too:
+`StoryEngine.step(story, progress, event)`, `StoryEngine.start(story,
+progress)` for the first Chapter card and Quest, and
+`StoryEngine.resume(story, progress)` for a Resume. `StoryEngine.new`
+keeps one player's Progress between steps. The types and payload schemas
+of all three lists below are in `src/core/Events.luau`.
 
 - **Player events** come *in* from the adapter, in the player's terms.
 - **Story events** go *out* as facts about the story. Their names are also
@@ -100,8 +110,8 @@ StoryEngine.step(progress, playerEvent) → progress', storyEvents[], worldComma
 | `TalkedTo` | `character` | The player uses the talk affordance on a Character |
 | `TouchedPickup` | `pickup` | The Player Character touches a Pickup |
 | `DialogueFinished` | none | The client has shown the last Line of the current Dialogue and the player advanced past it |
-| `FoundCollectible` | `collectible` | The Player Character finds a Collectible |
-| `SolvedStep` | `puzzle`, `step` | The player completes one step of a puzzle |
+| `FoundCollectible` *later* | `collectible` | The Player Character finds a Collectible |
+| `SolvedStep` *later* | `puzzle`, `step` | The player completes one step of a puzzle |
 
 ### Story events
 
@@ -112,30 +122,43 @@ StoryEngine.step(progress, playerEvent) → progress', storyEvents[], worldComma
 | `QuestCompleted` | `quest` | A Quest became `completed` |
 | `ChapterCompleted` | `chapter` | A Chapter became `completed` |
 | `BeatPlayed` | `beat` | A Beat ran at a Hook |
-| `CollectibleFound` | `collectible` | A Collectible went from `hidden` to `found` |
-| `BondChanged` | `character`, `from`, `to` | A Companion's Bond moved one level |
+| `CollectibleFound` *later* | `collectible` | A Collectible went from `hidden` to `found` |
+| `BondChanged` *later* | `character`, `from`, `to` | A Companion's Bond moved one level |
 | `StoryEnded` | none | The Ending finished |
 
 ### World commands
 
 | Command | Arguments | Does |
 |---|---|---|
-| `ShowDialogue` | `lines` | Shows a Dialogue; the client replies with `DialogueFinished` |
+| `ShowDialogue` | `lines` | Shows a Dialogue; the client replies with `DialogueFinished`. Ends the commands of a step: the Story waits for the reply |
 | `SetObjective` | `text` or none | Shows or clears the Objective |
-| `ShowChapterCard` | `title`, `subtitle` | Shows a Chapter card (also used for the end card) |
+| `ShowChapterCard` | `title`, `subtitle`, `ending` | Shows a Chapter card, or the end card when `ending` is true |
+| `Wait` | `seconds` | Pauses `seconds` before the next command |
 | `MoveCharacter` | `character`, `spot` | Puts a Character at a Spot |
 | `TeleportPlayer` | `spot` | Puts the Player Character at a Spot |
 | `SetPropState` | `prop`, `state` | Moves a Prop to one of its declared states |
-| `PlayCue` | `cue` | Plays a Cue |
+| `PlayCue` *later* | `cue` | Plays a Cue |
 | `SetLighting` | `preset` | Applies a Lighting preset |
-| `FrameShot` | `shot` | Frames a Shot; the follow camera returns when the Shot ends |
+| `FrameShot` *later* | `shot` | Frames a Shot; the follow camera returns when the Shot ends |
+| `OfferTalk` | `character`, `label` | Offers the Character's talk affordance, with its Talk label |
+| `WithdrawTalk` | `character` | Withdraws the Character's talk affordance |
 | `SpawnPickups` | `quest` | Spawns the Quest's Pickups at their Spots |
+| `RemovePickup` | `pickup` | Removes one touched Pickup |
 | `ClearPickups` | `quest` | Removes the Quest's remaining Pickups |
-| `SaveProgress` | none | Writes Progress |
-| `SaveCheckpoint` | `chapter` | Writes the Checkpoint for a Chapter |
+| `SaveProgress` *later* | none | Writes Progress |
+| `SaveCheckpoint` *later* | `chapter` | Writes the Checkpoint for a Chapter |
 
 If a Beat needs something these commands cannot do, the World interface
-grows by one named command, recorded here in the same PR.
+grows by one named command, recorded here in the same PR. *Later*:
+reserved, not yet implemented.
+
+**On the wire.** `src/core/Net.luau` is the contract between server and
+client. Three World commands reach the client, over remotes whose names
+predate this glossary and are kept so the golden file still matches:
+`ShowDialogue`, `SetObjective`, and `ShowChapterCard` as `ShowChapter`
+(or `ShowEnding` for the end card). The client sends `DialogueFinished`,
+and `ClientReady` once it has loaded, which starts the Story; that is an
+adapter detail, not a Player event.
 
 ## 4. Enumerations
 
@@ -161,25 +184,27 @@ A Speaker is `Narrator` or a Character id. Display names come from the
 Character, never from the Line. Character kinds are the values of the
 Kind column.
 
-| Character | Kind | Display name | Notes |
-|---|---|---|---|
-| `Narrator` | none | Narrator | Speaker only; not a Character, never in the world |
-| `character:Amy` | `human` | Amy | The Player Character; spawns in the garden |
-| `character:Dad` | `human` | Dad | Home in the garden |
-| `character:Mum` | `human` | Mum | Home in the garden |
-| `character:Sam` | `dog` | Sam the Dog | Companion; home in the garden, by the gate |
-| `character:Squirrel` | `squirrel` | the Maroon Squirrel | Home in the paradise |
-| `character:Fox` | `fox` | the Orange Fox | Home in the paradise |
-| `character:Lion` | `lion` | the Golden Lion | Home in the paradise, deep glade |
-
-Home Spot ids are named in the Phase 0 refactor and added here then.
+| Character | Kind | Display name | Home Spot | Notes |
+|---|---|---|---|---|
+| `Narrator` | none | Narrator | none | Speaker only; not a Character, never in the world |
+| `character:Amy` | `human` | Amy | `spot:AmySpawn` | The Player Character; spawns in the garden |
+| `character:Dad` | `human` | Dad | `spot:DadHome` | Home in the garden |
+| `character:Mum` | `human` | Mum | `spot:MumHome` | Home in the garden |
+| `character:Sam` | `dog` | Sam the Dog | `spot:SamHome` | Companion; home in the garden, by the gate |
+| `character:Squirrel` | `squirrel` | the Maroon Squirrel | `spot:SquirrelHome` | Home in the paradise |
+| `character:Fox` | `fox` | the Orange Fox | `spot:FoxHome` | Home in the paradise |
+| `character:Lion` | `lion` | the Golden Lion | `spot:LionHome` | Home in the paradise, deep glade |
 
 ### Hook names
 
 | Hook | Runs when |
 |---|---|
 | `onStart` | The Quest becomes `active`, before its Objective and intro Dialogue are shown |
-| `onComplete` | The Quest becomes `completed`, after its outro Dialogue is queued |
+| `onComplete` | The Quest becomes `completed`, after its outro Dialogue has finished |
+
+In a Chapter's `data.luau` a Quest names the Beats each Hook plays,
+`hooks = { onComplete = { "sam_catches" } }`; the Beats themselves are in
+its `hooks.luau`.
 
 ### Beats
 
@@ -192,16 +217,40 @@ Home Spot ids are named in the Phase 0 refactor and added here then.
 | `beat:machine_arrives` | `chapter3.tell_mum.onComplete` | The machine and villagers arrive; Dad, Mum and Sam move to the field |
 | `beat:machine_stops` | `chapter4.explain.onComplete` | The blade stops, sparkles over the crowd, the machine reverses away |
 
+### Spots
+
+| Spot | Scene | Used for |
+|---|---|---|
+| `spot:AmySpawn` | `scene:Garden` | Amy's home Spot: where she spawns |
+| `spot:DadHome` | `scene:Garden` | Dad's home Spot |
+| `spot:MumHome` | `scene:Garden` | Mum's home Spot |
+| `spot:SamHome` | `scene:Garden` | Sam's home Spot, by the gate |
+| `spot:GateOutside` | `scene:Garden` | `beat:sam_catches`: Sam bounds to just outside the gate |
+| `spot:GardenInside` | `scene:Garden` | `beat:sam_catches`: Amy lands back in the garden |
+| `spot:SamGuardPost` | `scene:Garden` | `beat:sam_catches`: Sam settles beside her |
+| `spot:Farm` | `scene:Village` | `beat:sam_goes_to_farm` |
+| `spot:MachineBay` | `scene:Field` | Where `prop:Machine` parks |
+| `spot:DadAtMachine` | `scene:Field` | `beat:machine_arrives` |
+| `spot:MumAtMachine` | `scene:Field` | `beat:machine_arrives` |
+| `spot:SamAtMachine` | `scene:Field` | `beat:machine_arrives` |
+| `spot:Villager1` | `scene:Field` | Where `prop:Villagers` stand, one each |
+| `spot:Villager2` | `scene:Field` | |
+| `spot:Villager3` | `scene:Field` | |
+| `spot:Villager4` | `scene:Field` | |
+| `spot:SquirrelHome` | `scene:Paradise` | The Squirrel's home Spot |
+| `spot:FoxHome` | `scene:Paradise` | The Fox's home Spot |
+| `spot:LionHome` | `scene:Paradise` | The Lion's home Spot, in the deep glade |
+
 ### Zones
 
 | Zone | Scene | Used by |
 |---|---|---|
-| `zone:GardenGate` | Garden | `chapter1.sneak_out_1`, `chapter1.sneak_out_2` |
-| `zone:ForestEdge` | Field | `chapter2.walk_to_forest` |
-| `zone:ForestGap` | Forest Wall | `chapter2.enter_forest` |
-| `zone:HeartGlade` | Heart Glade | `chapter2.heart_glade` |
-| `zone:HomeGarden` | Garden | `chapter3.rush_home` |
-| `zone:MachineFront` | Field | `chapter4.stand_in_front` |
+| `zone:GardenGate` | `scene:Garden` | `chapter1.sneak_out_1`, `chapter1.sneak_out_2` |
+| `zone:ForestEdge` | `scene:Field` | `chapter2.walk_to_forest` |
+| `zone:ForestGap` | `scene:ForestWall` | `chapter2.enter_forest` |
+| `zone:HeartGlade` | `scene:HeartGlade` | `chapter2.heart_glade` |
+| `zone:HomeGarden` | `scene:Garden` | `chapter3.rush_home` |
+| `zone:MachineFront` | `scene:Field` | `chapter4.stand_in_front` |
 
 ### Scenes
 
@@ -219,6 +268,7 @@ Home Spot ids are named in the Phase 0 refactor and added here then.
 | Prop | States, in order |
 |---|---|
 | `prop:Machine` | `absent`, `advancing`, `stopped`, `retreating` |
+| `prop:Villagers` | `absent`, `gathered`, `cheering` |
 
 ### Lighting presets
 
@@ -288,33 +338,6 @@ PRs, use the prefixed form.
 | Quest | mission |
 | Line | message |
 | Shot | camera angle |
-
-## 8. Migration from today's code
-
-The proof of concept predates this language. Where the code and this
-glossary disagree, **the glossary wins** and the Phase 0 refactor renames
-the code. Until then, read the old name as the new one. This table is
-the only map from old names to new; delete it once the refactor lands.
-
-| Today (`src/`) | Becomes |
-|---|---|
-| `StoryData` module | Story: `content/chapters/<n>/data.luau` and friends |
-| `StoryData.Ending` | Ending |
-| `StoryData.NPCs` | `content/characters.luau` (Characters) |
-| `npc = "Dad"` on a Quest | `character = "Dad"` |
-| `npcModels`, `pivotNPC`, `NpcController` (in the plan's diagram) | `CharacterHost`, `World.moveCharacter` |
-| `type = "talk"` on a Quest | `kind = "talk"` |
-| `onComplete = { ...lines }` on a Quest | `outro = { ...lines }`; `onComplete` is reserved for the Hook |
-| `speaker = "Sam the Dog"` (display name) | `speaker = "Sam"` (Character id) |
-| `questStartedHooks[id]` / `questCompletedHooks[id]` | `onStart` / `onComplete` in `hooks.luau` |
-| `samCatches`, `samGoesToFarm`, `paradiseReveal`, `ordinaryWorld`, `machineArrives`, `machineStops` | the [Beats](#beats) |
-| the colour grades in `paradiseReveal` / `ordinaryWorld` | the [Lighting presets](#lighting-presets) |
-| "Trigger zones" comment on `StoryData.Zones` | Zones |
-| `ShowChapter` / `ShowEnding` remotes | `ShowChapterCard` |
-| `ClientReady` remote | adapter detail, not a Player event |
-| `promptText` | the talk affordance label, kept as content |
-| `getState(player)` | Progress |
-| `Map.*` coordinates, `position`, `faceZ`, `spawnPoints` | Spots |
 
 ## Invariants
 
