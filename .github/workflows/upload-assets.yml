@@ -1,0 +1,154 @@
+# Uploads every asset in assets/manifest.json that has no Roblox id yet (or
+# whose file changed) to the owner's account with the Dev key, then opens or
+# updates one "Asset ids" PR with the ids written back to the manifest and
+# src/shared/AssetIds.luau. Also records moderation results for assets still
+# in review. Run by hand from main, after a PR that adds or changes an asset
+# merges. Never touches Release. See docs/ASSETS.md.
+#
+# Two jobs, so no write token is ever in a job that holds the Roblox key or
+# runs fetched tools: `upload` runs the uploader with a read-only token;
+# `pull-request` runs no fetched tools, applies the two files and opens the PR.
+#
+# Inert until ROBLOX_DEV_API_KEY exists: without it the job skips with a notice.
+name: Upload assets
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upload-assets
+  cancel-in-progress: false
+
+jobs:
+  # A job-level `if:` cannot read secrets, so a tiny job checks for the key.
+  gate:
+    name: Check for the Dev key
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+    steps:
+      - id: gate
+        env:
+          HAS_KEY: ${{ secrets.ROBLOX_DEV_API_KEY != '' }}
+        run: |
+          if [ "$HAS_KEY" = "true" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=Upload skipped, no key::ROBLOX_DEV_API_KEY is not set up yet. Nothing was uploaded."
+            echo "Upload skipped, no key: ROBLOX_DEV_API_KEY is not set up yet. Nothing was uploaded." >> "$GITHUB_STEP_SUMMARY"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  upload:
+    name: Upload pending assets
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.patch.outputs.changed }}
+    env:
+      DEV_UNIVERSE_ID: ${{ vars.DEV_UNIVERSE_ID }}
+      DEV_PLACE_ID: ${{ vars.DEV_PLACE_ID }}
+      RELEASE_UNIVERSE_ID: ${{ vars.RELEASE_UNIVERSE_ID }}
+      RELEASE_PLACE_ID: ${{ vars.RELEASE_PLACE_ID }}
+      ROBLOX_CREATOR_USER_ID: ${{ vars.ROBLOX_CREATOR_USER_ID }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Make the output directory
+        run: mkdir -p "$RUNNER_TEMP/assets"
+
+      - name: Install the pinned toolchain
+        uses: ./.github/actions/setup-tools
+
+      - name: Upload
+        env:
+          ROBLOX_DEV_API_KEY: ${{ secrets.ROBLOX_DEV_API_KEY }}
+        run: |
+          lune run tools/upload-assets --universe "$DEV_UNIVERSE_ID" --place "$DEV_PLACE_ID" \
+            --creator-user "$ROBLOX_CREATOR_USER_ID" > "$RUNNER_TEMP/assets/uploaded.md"
+
+      # Always, so ids from a run that failed part way are still recorded:
+      # the uploader writes the manifest after every upload.
+      - name: Write the patch and the PR body
+        id: patch
+        if: always()
+        run: |
+          git diff --binary -- assets/manifest.json src/shared/AssetIds.luau > "$RUNNER_TEMP/assets/ids.patch"
+          if [ -s "$RUNNER_TEMP/assets/ids.patch" ]; then
+            {
+              echo "Asset ids from [upload-assets run $GITHUB_RUN_ID]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID) on \`$GITHUB_SHA\`."
+              echo
+              cat "$RUNNER_TEMP/assets/uploaded.md" 2>/dev/null || true
+              echo
+              echo "Nothing here was published: the ids reach Dev when this PR merges. Check each asset's moderation in docs/ASSETS.md before Release."
+            } > "$RUNNER_TEMP/assets/pr-body.md"
+            cat "$RUNNER_TEMP/assets/pr-body.md" >> "$GITHUB_STEP_SUMMARY"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Nothing to upload, and no moderation changes." >> "$GITHUB_STEP_SUMMARY"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload the patch and the PR body
+        if: always() && steps.patch.outputs.changed == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: asset-ids
+          path: ${{ runner.temp }}/assets/
+          if-no-files-found: error
+          retention-days: 7
+
+  pull-request:
+    name: Open or update the Asset ids PR
+    needs: upload
+    # Also after a failed upload, to keep the ids already uploaded.
+    if: ${{ !cancelled() && needs.upload.outputs.changed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # push the asset-ids branch
+      pull-requests: write # open or update the PR
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Download the patch and the PR body
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: asset-ids
+          path: ${{ runner.temp }}/assets
+
+      # The patch came from a job that ran fetched tools, so it is applied to
+      # the two generated files only; add-paths below limits the commit the same way.
+      - name: Apply the ids
+        run: git apply --include=assets/manifest.json --include=src/shared/AssetIds.luau "$RUNNER_TEMP/assets/ids.patch"
+
+      # A PR opened with the job token does not trigger CI, so the
+      # TOOLCHAIN_PR_TOKEN secret (a fine-grained token, see
+      # docs/MAINTENANCE.md) is used when it exists.
+      - name: Open or update the PR
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ secrets.TOOLCHAIN_PR_TOKEN || github.token }}
+          branch: asset-ids
+          title: Asset ids
+          commit-message: Record uploaded asset ids
+          body-path: ${{ runner.temp }}/assets/pr-body.md
+          labels: assets
+          add-paths: |
+            assets/manifest.json
+            src/shared/AssetIds.luau
+          delete-branch: true
