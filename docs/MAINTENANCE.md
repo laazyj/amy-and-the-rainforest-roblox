@@ -24,8 +24,11 @@ and `tools/bootstrap-agent.sh` checks them when CI installs the new tools.
 
 `roblox.yml` is generated from Roblox's API dump, which changes with Roblox's
 weekly releases, not with this repository. CI regenerates it on every run
-(`tools/roblox-std.sh check`) and fails, saying how to fix it, when it
-differs from the committed file beyond its timestamps.
+(`tools/roblox-std.sh check`) and **warns**, without failing the PR, when it
+differs from the committed file beyond its timestamps: a stale file only
+means Selene lacks Roblox's newest globals. The warning's step uploads the
+fresh file as the `roblox-std` artifact. The weekly toolchain job keeps it
+current and fails hard if it cannot generate it.
 
 **A PR opened with the job's own token does not trigger CI** (a GitHub
 rule that stops workflows triggering workflows). So that the "Toolchain

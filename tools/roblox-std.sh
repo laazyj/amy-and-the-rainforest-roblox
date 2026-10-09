@@ -4,7 +4,7 @@
 # This compares it with a fresh `selene generate-roblox-std`, ignoring the two
 # lines that record when it was generated:
 #
-#   tools/roblox-std.sh check [selene]    fail if they differ (CI)
+#   tools/roblox-std.sh check [selene]    fail if they differ (CI warns)
 #   tools/roblox-std.sh update [selene]   replace roblox.yml if they differ
 #                                         (the weekly toolchain job)
 #
@@ -27,7 +27,7 @@ elif [ "$mode" = update ]; then
 	cp "$fresh" roblox.yml
 	echo "roblox.yml regenerated"
 else
-	echo "error: roblox.yml is missing or differs from what 'selene generate-roblox-std' generates now (diff below)." >&2
+	echo "roblox.yml is missing or differs from what 'selene generate-roblox-std' generates now (diff below)." >&2
 	echo "Merge the open Toolchain updates PR, run the toolchain job, or commit the roblox-std artifact of this CI run as roblox.yml." >&2
 	head -n 100 build/roblox-std/diff >&2
 	exit 1
