@@ -78,6 +78,29 @@ return function(t: any)
 			})
 		end)
 
+		it("fails on getfenv, setfenv, _G, shared, loadstring and rawget, where an engine global can hide", function()
+			local source = table.concat({
+				"local a = (getfenv(0) :: any).workspace",
+				'local b = (getfenv() :: any)["ga" .. "me"]',
+				"local c = _G.game",
+				"setfenv(1, {})",
+				"local d = shared.Story",
+				'local e = loadstring("return game")',
+				'local f = rawget(_G, "game")',
+			}, "\n")
+			local why = "the pure core and content never reach the global environment"
+			expect(check(source)).toEqual({
+				`src/core/Thing.luau:1: references getfenv; {why}`,
+				`src/core/Thing.luau:2: references getfenv; {why}`,
+				`src/core/Thing.luau:3: references _G; {why}`,
+				`src/core/Thing.luau:4: references setfenv; {why}`,
+				`src/core/Thing.luau:5: references shared; {why}`,
+				`src/core/Thing.luau:6: references loadstring; {why}`,
+				`src/core/Thing.luau:7: references rawget; {why}`,
+				`src/core/Thing.luau:7: references _G; {why}`,
+			})
+		end)
+
 		it("fails on a require outside src/core and src/content, or of anything but a string path", function()
 			expect(check('local a = require("../server/StoryHost")')).toEqual({
 				'src/core/Thing.luau:1: requires "../server/StoryHost", outside src/core and src/content',

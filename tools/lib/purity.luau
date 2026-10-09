@@ -4,10 +4,12 @@
 	never count, strings are only text):
 
 	Purity: src/core and src/content never reference `game`, `workspace`,
-	`Instance`, `script`, `plugin` or `GetService`, and `require` only a
-	string path that stays inside src/core and src/content. Content also
-	holds no engine datatype (`Vector3`, `Color3`, `CFrame`, `Enum`...):
-	positions and colours are plain tables.
+	`Instance`, `script`, `plugin` or `GetService`, never reach the global
+	environment where those can hide (`getfenv`, `setfenv`, `_G`, `shared`,
+	`loadstring`, `rawget`), and `require` only a string path that stays
+	inside src/core and src/content. Content also holds no engine datatype
+	(`Vector3`, `Color3`, `CFrame`, `Enum`...): positions and colours are
+	plain tables.
 
 	No external links: no string in content, the core or the client binder
 	(the UI's text) holds `http://` or `https://` (the Roblox compliance
@@ -22,7 +24,14 @@ local Purity = {}
 Purity.PURE = { "src/core", "src/content" }
 Purity.LINKED = { "src/core", "src/content", "src/client" }
 
-local ENGINE = { game = true, workspace = true, Instance = true, script = true, plugin = true }
+-- Name -> why the pure core and content never reference it.
+local FORBIDDEN: { [string]: string } = {}
+for _, name in { "game", "workspace", "Instance", "script", "plugin" } do
+	FORBIDDEN[name] = "never touch the engine"
+end
+for _, name in { "getfenv", "setfenv", "_G", "shared", "loadstring", "rawget" } do
+	FORBIDDEN[name] = "never reach the global environment"
+end
 local DATATYPES = {
 	Vector3 = true,
 	Vector2 = true,
@@ -80,8 +89,9 @@ function Purity.check(path: string, source: string): { string }
 		local before = tokens[i - 1]
 		local member = before and before.kind == "symbol" and (before.value == "." or before.value == ":")
 		local name = token.value
-		if name == "GetService" or (ENGINE[name] and not member) then
-			report(token.line, `references {name}; the pure core and content never touch the engine`)
+		local why = if name == "GetService" then "never touch the engine" elseif member then nil else FORBIDDEN[name]
+		if why then
+			report(token.line, `references {name}; the pure core and content {why}`)
 		elseif content and DATATYPES[name] and not member then
 			report(token.line, `references {name}; content stores positions and colours as plain tables`)
 		elseif name == "require" and not member then
