@@ -160,6 +160,20 @@ box, centred. Today's box at 62% of a 1376-unit-wide tablet holds about
 - A text size setting scales all text up by up to 1.5×; every rule here
   must still pass at the largest setting.
 
+### Title screen
+
+The title screen emulates the story website's title overlay (reference:
+[`reference/website-title-overlay.png`](reference/website-title-overlay.png),
+a phone screenshot of the website). Over the `ui:title_screen` image, Clara's
+scene of the forest wall:
+
+- a rounded pill label, "a little tale of the wild";
+- then "Amy", and below it "& the Rain Forest", in a hand-written script;
+- the words are white, except "Rain Forest", which is gold; each has a soft
+  dark shadow, so it reads over the canopy.
+
+The words are game-rendered text, never part of the image.
+
 ## 4. Touch targets
 
 - Every touch target is at least **48 × 48 units**, with 8 units between

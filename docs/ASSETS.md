@@ -196,7 +196,7 @@ the canopies.
 |---|---|---|
 | `hero.png` (2000 × 1320) | The coloured scene, Amy from behind | **Reused after cropping** to 16:9 as `card:chapter2` and `store:thumbnail_1` |
 | `figure-colourisation.png` (3880 × 2560) | The colour layer of Amy over the line art | **Reused after cropping** as the reference `ref:Amy` (from behind only) |
-| `background.png` (2000 × 1320) | The scene with Amy painted out | Not used: the painted-out area in the middle shows. It is the best start for `ui:title_screen` once retouched, with the canopy tops kept out of the title's upper third |
+| `background.png` (2000 × 1320) | The scene with Amy painted out | **Reused after retouching and cropping** as `ui:title_screen` (the owner's decision): the painted-out trunk and grass are patched from the same drawing, then cropped low to 16:9 |
 | `hero-original.png` (2000 × 1320) | An earlier colouring whose layers do not line up | Not used; `hero.png` replaces it |
 | `sketch-lines.png`, `sketch-tightened.png` (3880 × 2560) | Clara's pencil drawing, scanned and cleaned up | Not used in the game; the originals behind `hero.png` |
 | `figure-lines.png` (460 × 770) | The line art of Amy alone | Not used; `ref:Amy` has the colours too |
@@ -214,7 +214,7 @@ Against each piece the issue lists:
 | B `icon.png` | `store:icon` | Placeholder | Needs drawing. No square crop of the website art reads at thumbnail size without Amy |
 | B `thumbnail-1.png` | `store:thumbnail_1` | **Reused after cropping** | Shares `card:chapter2`'s file |
 | B `thumbnail-2.png`, `thumbnail-3.png` | `store:thumbnail_2`, `_3` | Placeholder | Share `card:chapter3`'s and `card:chapter4`'s files |
-| C `title.png` | `ui:title_screen` | Placeholder | `background.png` after retouching could serve; see above |
+| C `title.png` | `ui:title_screen` | **Reused after retouching** | `background.png`, retouched and cropped; the title text is game-rendered over it (see `design/feel.md`, "Title screen") |
 | C `dialogue-frame.png`, `objective-frame.png` | `ui:dialogue_frame`, `ui:objective_frame` | Placeholder | Needs drawing. The placeholder is a bark-coloured rounded border with a transparent middle |
 | C `bird.png`, `leaf.png`, `flower.png` | `ui:bird`, `ui:leaf`, `ui:flower` | Placeholder | Needs drawing. The birds in `hero.png` are too small and thin to cut out at 256 px |
 | D `ref-amy.png` | `ref:Amy` | **Reused after cropping** (partly) | From behind only; the side view is still needed |

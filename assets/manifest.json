@@ -73,11 +73,11 @@
       "assetId": null,
       "moderation": "pending",
       "upload": true,
-      "placeholder": true,
+      "placeholder": false,
       "amy": "absent",
-      "creator": "This repository",
+      "creator": "Clara (drawing); coloured for the story website",
       "licence": "owner",
-      "origin": "Placeholder for brief 009: a plain cream #f0edd9 card (1920x1080) with no text, until Clara's drawing replaces it (issue #21)."
+      "origin": "laazyj/jasonduffett.net@4940d10 packages/clara/assets-src/background.png (Amy painted out), retouched (the painted-out trunk and grass patched from the same drawing) and cropped from 2000x1320 to 2000x1125 (16:9, rows 195-1320). The owner's family's work, used with the owner's permission."
     },
     {
       "name": "ui:dialogue_frame",
