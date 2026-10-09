@@ -3,12 +3,15 @@
 	A small Luau lexer for the source guards (tools/lib/purity.luau): names,
 	strings and symbols with their line, comments dropped. An interpolated
 	string's text segments are strings and the code in its braces is lexed
-	as code, so nothing can hide in a `{...}`. Numbers are skipped; the
-	guards never look at them.
+	as code, so nothing can hide in a `{...}`. A string token keeps its
+	escapes as written; `Lex.decode` gives the text they stand for. Numbers
+	are skipped; the guards never look at them.
 ]]
 
 export type Kind = "name" | "string" | "symbol"
-export type Token = { kind: Kind, value: string, line: number }
+-- `value` is as written; `text` is what it stands for: a quoted or
+-- interpolated string's escapes decoded (Lex.decode), anything else as written.
+export type Token = { kind: Kind, value: string, text: string, line: number }
 
 local Lex = {}
 
@@ -17,14 +20,83 @@ for _, symbol in { "..", "::", "==", "~=", "<=", ">=", "->", "//" } do
 	SYMBOLS2[symbol] = true
 end
 
+local ESCAPES: { [string]: string } = {
+	n = "\n",
+	t = "\t",
+	r = "\r",
+	a = "\a",
+	b = "\b",
+	f = "\f",
+	v = "\v",
+}
+
+-- Each escape after a backslash: its pattern (ending in the position after
+-- it) and what it decodes to. Tried in order; the last matches any character.
+local DECODERS: { { pattern: string, decode: (string) -> string } } = {
+	{
+		pattern = "^(%d%d?%d?)()",
+		decode = function(digits)
+			return string.char(math.min(tonumber(digits) :: number, 255))
+		end,
+	},
+	{
+		pattern = "^x(%x%x)()",
+		decode = function(hex)
+			return string.char(tonumber(hex, 16) :: number)
+		end,
+	},
+	{
+		pattern = "^u{(%x+)}()",
+		decode = function(code)
+			return utf8.char(math.min(tonumber(code, 16) :: number, 0x10FFFF))
+		end,
+	},
+	{
+		pattern = "^(z)%s*()",
+		decode = function()
+			return ""
+		end,
+	},
+	{
+		pattern = "^(.)()",
+		decode = function(c)
+			return ESCAPES[c] or c
+		end,
+	},
+}
+
+-- The text a quoted string's escapes stand for: `\65`, `\x41` and `\u{41}`
+-- are all "A"; `\z` skips the whitespace after it.
+function Lex.decode(raw: string): string
+	local out, i = {}, 1
+	while i <= #raw do
+		local slash = string.find(raw, "\\", i, true)
+		if not slash then
+			table.insert(out, string.sub(raw, i))
+			break
+		end
+		table.insert(out, string.sub(raw, i, slash - 1))
+		i = slash + 1
+		for _, decoder in DECODERS do
+			local captured, after = string.match(raw, decoder.pattern, i)
+			if captured then
+				table.insert(out, decoder.decode(captured))
+				i = after :: any
+				break
+			end
+		end
+	end
+	return table.concat(out)
+end
+
 function Lex.tokens(source: string): { Token }
 	local tokens: { Token } = {}
 	local i, line, n = 1, 1, #source
 	-- one entry per interpolated string we are inside: the brace depth of its code
 	local interpolations: { number } = {}
 
-	local function add(kind: Kind, value: string, at: number)
-		table.insert(tokens, { kind = kind, value = value, line = at })
+	local function add(kind: Kind, value: string, at: number, text: string?)
+		table.insert(tokens, { kind = kind, value = value, text = text or value, line = at })
 	end
 
 	-- Moves past `text`, counting its lines.
@@ -56,7 +128,8 @@ function Lex.tokens(source: string): { Token }
 			consume(chunk)
 			local stop = string.sub(source, found, found)
 			if stop ~= "\\" then
-				add("string", table.concat(text), start)
+				local raw = table.concat(text)
+				add("string", raw, start, Lex.decode(raw))
 				return if stop == "" then nil else stop
 			end
 			local escape = string.sub(source, found, found + 1)

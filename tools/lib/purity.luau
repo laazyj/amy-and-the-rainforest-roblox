@@ -99,9 +99,9 @@ function Purity.check(path: string, source: string): { string }
 			local open, inner, close = tokens[i + 1], tokens[i + 2], tokens[i + 3]
 			local argument: string? = nil
 			if open and open.kind == "string" then
-				argument = open.value
+				argument = open.text
 			elseif open and open.value == "(" and inner and inner.kind == "string" and close and close.value == ")" then
-				argument = inner.value
+				argument = inner.text
 			end
 			if not argument then
 				report(token.line, "requires something other than a string path")
@@ -116,12 +116,34 @@ function Purity.check(path: string, source: string): { string }
 	return violations
 end
 
--- The strings in `source` (the file at `path`) that hold a link.
+-- The texts in `source` (the file at `path`) that hold a link. Escapes are
+-- decoded, and string literals joined by `..` are read as one text, so
+-- "https:/" .. "/x" and "https\58//x" count too.
 function Purity.links(path: string, source: string): { string }
 	local violations = {}
-	for _, token in Lex.tokens(source) do
-		if token.kind == "string" and string.find(string.lower(token.value), "https?://") then
-			table.insert(violations, `{path}:{token.line}: a link in text ({token.value}); the game links to nothing`)
+	local tokens = Lex.tokens(source)
+	local i = 1
+	while i <= #tokens do
+		local token = tokens[i]
+		if token.kind ~= "string" then
+			i += 1
+			continue
+		end
+		local parts = { token.text }
+		i += 1
+		while
+			tokens[i]
+			and tokens[i].kind == "symbol"
+			and tokens[i].value == ".."
+			and tokens[i + 1]
+			and tokens[i + 1].kind == "string"
+		do
+			table.insert(parts, tokens[i + 1].text)
+			i += 2
+		end
+		local text = table.concat(parts)
+		if string.find(string.lower(text), "https?://") then
+			table.insert(violations, `{path}:{token.line}: a link in text ({text}); the game links to nothing`)
 		end
 	end
 	return violations

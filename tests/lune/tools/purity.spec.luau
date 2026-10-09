@@ -52,6 +52,16 @@ return function(t: any)
 			})
 		end)
 
+		it("decodes a string's escapes", function()
+			expect(Lex.decode('A\\66\\x43\\u{44}\\n\\"\\z   E')).toBe('ABCD\n"E')
+		end)
+
+		it("decodes quoted strings into a token's text, and keeps long-bracket strings as written", function()
+			local lexed = Lex.tokens('local a, b = "\\x41", [[\\x41]]')
+			expect({ lexed[6].value, lexed[6].text }).toEqual({ "\\x41", "A" })
+			expect({ lexed[8].value, lexed[8].text }).toEqual({ "\\x41", "\\x41" })
+		end)
+
 		it("keeps counting lines after an escaped newline in any string", function()
 			expect(names('local a = "x\\\ny" b `p\\\nq` c')).toEqual({ "local@1", "a@1", "b@2", "c@3" })
 		end)
@@ -116,6 +126,12 @@ return function(t: any)
 			})
 		end)
 
+		it("decodes a require's path before resolving it", function()
+			expect(check('local a = require("..\\x2F..\\x2Fserver/StoryHost")')).toEqual({
+				'src/core/Thing.luau:1: requires "../../server/StoryHost", outside src/core and src/content',
+			})
+		end)
+
 		it("passes a require of the core or content, in either call form", function()
 			expect(check('local a = require("./Events")\nlocal b = require "./quests/talk"')).toEqual({})
 			expect(check('local a = require("../../../core/Story")', "src/content/chapters/1/data.luau")).toEqual({})
@@ -145,6 +161,21 @@ return function(t: any)
 			expect(Purity.links("src/client/StoryClient.client.luau", source)).toEqual({
 				"src/client/StoryClient.client.luau:1: a link in text (see https://example.com); the game links to nothing",
 				"src/client/StoryClient.client.luau:2: a link in text (go to HTTP://x/); the game links to nothing",
+			})
+		end)
+
+		it("fails on a link split across string literals joined by .., or hidden in escapes", function()
+			local source = table.concat({
+				'local a = "https:/" .. "/example.com"',
+				'local b = "https\\u{3A}//example.com"',
+				'local c = "https\\58//example.com"',
+				'local d = "http\\x3A\\x2F/example.com"',
+			}, "\n")
+			expect(Purity.links("src/content/x.luau", source)).toEqual({
+				"src/content/x.luau:1: a link in text (https://example.com); the game links to nothing",
+				"src/content/x.luau:2: a link in text (https://example.com); the game links to nothing",
+				"src/content/x.luau:3: a link in text (https://example.com); the game links to nothing",
+				"src/content/x.luau:4: a link in text (http://example.com); the game links to nothing",
 			})
 		end)
 
