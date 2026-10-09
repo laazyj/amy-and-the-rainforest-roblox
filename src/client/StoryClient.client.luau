@@ -1,17 +1,14 @@
---!nonstrict
--- Legacy untyped code from the proof of concept. The project default is strict
--- (.luaurc); this file opts out until the Checkpoint B restructure gives it
--- types. Under strict mode luau-lsp reports only type-inference errors here,
--- no real bugs; non-strict mode reports nothing.
+--!strict
 --[[
-	StoryClient
-	===========
-	Everything the player sees on screen:
-	  * the dialogue box with a typewriter effect
-	  * the objective tracker (top right)
-	  * chapter title cards and the ending card
+	StoryClient: the client binder. It renders what the server sends over
+	Net (src/shared/Net, contract in src/core/Net) and sends DialogueFinished
+	back:
+	  * ShowDialogue: the dialogue box with a typewriter effect
+	  * SetObjective: the Objective tracker (top right)
+	  * ShowChapter / ShowEnding: the Chapter card and the end card
 
-	Click, press E, Space or Enter to advance dialogue.
+	Click, press E, Space or Enter to advance dialogue. The view-model that
+	will hold this logic in the core is brief 007's work.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -22,13 +19,16 @@ local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
-local remotes = ReplicatedStorage:WaitForChild("StoryRemotes")
-local ShowDialogue = remotes:WaitForChild("ShowDialogue")
-local DialogueFinished = remotes:WaitForChild("DialogueFinished")
-local SetObjective = remotes:WaitForChild("SetObjective")
-local ShowChapter = remotes:WaitForChild("ShowChapter")
-local ShowEnding = remotes:WaitForChild("ShowEnding")
-local ClientReady = remotes:WaitForChild("ClientReady")
+local Events = require(ReplicatedStorage:WaitForChild("core"):WaitForChild("Events"))
+local Net = require(ReplicatedStorage:WaitForChild("shared"):WaitForChild("Net"))
+
+local remotes = Net.waitForRemotes()
+local ShowDialogue = remotes.ShowDialogue
+local DialogueFinished = remotes.DialogueFinished
+local SetObjective = remotes.SetObjective
+local ShowChapter = remotes.ShowChapter
+local ShowEnding = remotes.ShowEnding
+local ClientReady = remotes.ClientReady
 
 ----------------------------------------------------------------
 -- Build the UI
@@ -40,7 +40,7 @@ screenGui.IgnoreGuiInset = true
 screenGui.DisplayOrder = 10
 screenGui.Parent = playerGui
 
-local function addCorner(guiObject, radius)
+local function addCorner(guiObject: GuiObject, radius: number)
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, radius)
 	corner.Parent = guiObject
@@ -199,7 +199,7 @@ subtitleLabel.Parent = titleOverlay
 ----------------------------------------------------------------
 -- Dialogue playback
 ----------------------------------------------------------------
-local dialogueQueue = {}
+local dialogueQueue: { { Events.ShownLine } } = {}
 local dialogueActive = false
 local advanceRequested = false
 
@@ -231,7 +231,7 @@ local function waitForAdvance()
 	end
 end
 
-local function typewrite(label, text)
+local function typewrite(label: TextLabel, text: string)
 	label.Text = text
 	local total = utf8.len(text) or string.len(text)
 	label.MaxVisibleGraphemes = 0
@@ -248,7 +248,7 @@ local function typewrite(label, text)
 	label.MaxVisibleGraphemes = -1
 end
 
-local function playLines(lines)
+local function playLines(lines: { Events.ShownLine })
 	dialogueActive = true
 	dialogueFrame.Visible = true
 	clickCatcher.Visible = true
@@ -279,15 +279,14 @@ local function playLines(lines)
 	DialogueFinished:FireServer()
 end
 
-ShowDialogue.OnClientEvent:Connect(function(lines)
+ShowDialogue.OnClientEvent:Connect(function(lines: { Events.ShownLine })
 	table.insert(dialogueQueue, lines)
 end)
 
 task.spawn(function()
 	while true do
 		if #dialogueQueue > 0 and not dialogueActive then
-			local lines = table.remove(dialogueQueue, 1)
-			playLines(lines)
+			playLines(table.remove(dialogueQueue, 1) :: { Events.ShownLine })
 		end
 		task.wait(0.1)
 	end
@@ -296,7 +295,7 @@ end)
 ----------------------------------------------------------------
 -- Objective tracker
 ----------------------------------------------------------------
-SetObjective.OnClientEvent:Connect(function(text)
+SetObjective.OnClientEvent:Connect(function(text: string?)
 	if text and text ~= "" then
 		objectiveFrame.Visible = true
 		objectiveText.Text = text
@@ -311,7 +310,7 @@ end)
 ----------------------------------------------------------------
 -- Chapter cards / ending
 ----------------------------------------------------------------
-local function showCard(title, subtitle, holdTime, keepDark)
+local function showCard(title: string, subtitle: string, holdTime: number, keepDark: boolean)
 	titleOverlay.Visible = true
 	titleLabel.Text = title or ""
 	subtitleLabel.Text = subtitle or ""
@@ -335,11 +334,11 @@ local function showCard(title, subtitle, holdTime, keepDark)
 	end
 end
 
-ShowChapter.OnClientEvent:Connect(function(title, subtitle)
+ShowChapter.OnClientEvent:Connect(function(title: string, subtitle: string)
 	task.spawn(showCard, title, subtitle, 2.4, false)
 end)
 
-ShowEnding.OnClientEvent:Connect(function(title, subtitle)
+ShowEnding.OnClientEvent:Connect(function(title: string, subtitle: string)
 	task.spawn(function()
 		showCard(title, subtitle, 6, false)
 		-- after the card fades, the player is free to wander in the rain
