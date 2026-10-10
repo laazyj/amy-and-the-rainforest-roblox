@@ -110,6 +110,23 @@ return function(t: any)
 			expect(world.characters.Sam).toBe("SamGuardPost")
 		end)
 
+		it(
+			"plays beat sam_catches in order: Sam bounds to spot GateOutside before Amy is put at spot GardenInside",
+			function()
+				local commands = assert(stepPlaying("sam_catches"), "never played").commands :: { any }
+				local function at(kind: string, spot: string): number?
+					for i, command in commands do
+						if command.kind == kind and command.spot == spot then
+							return i
+						end
+					end
+					return nil
+				end
+				local bounds, caught = at("MoveCharacter", "GateOutside"), at("TeleportPlayer", "GardenInside")
+				expect(bounds and caught and bounds < caught).toBe(true)
+			end
+		)
+
 		it("plays beat sam_catches after both sneak-outs, waiting 0.5 s and 0.4 s each time", function()
 			local waits = {}
 			for _, step in walk.steps do

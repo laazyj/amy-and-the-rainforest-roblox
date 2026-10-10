@@ -509,9 +509,10 @@ Design notes:
   justified case. A nightly **mutation check** applies a dozen canned
   faults (rename a quest, drop a hook, break a migration, blank a canon
   line) and asserts the suite fails for each, so the tests are proven to
-  bite. A non-blocking spike looks at exposing Luau VM coverage through
-  Lune for the pure core tests; if it stabilises, the number is reported
-  in PRs and only then considered as a gate. These guards arrive with the
+  bite. Luau VM line coverage of the pure core tests is possible through
+  the Luau CLI, not Lune (decided by brief 008's spike; the evidence is in
+  `docs/MAINTENANCE.md`); once wired in, the number is reported in PRs and
+  only then considered as a gate. These guards arrive with the
   Checkpoint B refactor, when `src/core` comes into being.
 - **Flake policy.** Open Cloud is beta. Tier 2 retries once on transport
   errors only, never on assertion failures. Outages are reported in the PR.

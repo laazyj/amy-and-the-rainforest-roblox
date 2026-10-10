@@ -16,19 +16,23 @@ to Release has its own [release checklist](RELEASE_CHECKLIST.md).
 Bring the branch up to date with `main` first, so the tiers run on what
 will land.
 
-- [ ] **Tier 0 (static) is green**: format, lint, strict types, core and
-      content purity, content schema, no `http` strings in content or UI
-      text.
-- [ ] **Tier 1 (unit, Lune) is green**, including the canon test and a
-      walkthrough of every Chapter from a fresh save, from every
-      Checkpoint and from a Resume at every Quest.
+- [ ] **Tier 0 (static) is green** (`tools/check.sh`): format, lint, strict
+      types, and the guards of `tools/guard.luau`: core and content purity,
+      the content schema derived from the glossary, no `http` strings in
+      content or UI text, the coverage guards, and the mutation check's
+      canned faults still applying.
+- [ ] **Tier 1 (unit, Lune) is green** (`tools/test.sh`), including the
+      canon test and a walkthrough of every Chapter from a fresh save, from
+      every Checkpoint and from a Resume at every Quest.
 - [ ] **Tier 2 (engine) is green** on the Saved Dev version built from
       this PR's head. Open Cloud outages are reported in the PR, never
       retried into green.
 - [ ] **Tier 3 (Studio, Mac)**: result attached, or "skipped: runner
       offline" stated.
 - [ ] New behaviour has new tests, named in the glossary's language
-      ("plays beat sam_catches on EnteredZone(GardenGate)").
+      ("plays beat sam_catches on EnteredZone(GardenGate)"). Enforced in
+      part by `tools/guard coverage` and `.github/workflows/test-change.yml`
+      (the `no-test-change` opt-out is in [MAINTENANCE.md](MAINTENANCE.md#coverage-guards-and-the-mutation-check)).
 - [ ] **Budgets** (instance, part, triangle, texture, server Heartbeat,
       client frame time) are within limits, once tiers 2 and 3 measure
       them. Until then: n/a.
@@ -42,9 +46,11 @@ Phase 0 PR that adds them; from then on they are required.
       tests and this PR's description is in [`GLOSSARY.md`](GLOSSARY.md);
       new terms follow
       [How to propose a new term](GLOSSARY.md#how-to-propose-a-new-term).
+      For content, `tools/guard schema` enforces it.
 - [ ] **Canon rule.** No canon Line is changed
-      ([the rule](story/canon.md#the-rule)); the tier 1 canon test
-      enforces it.
+      ([the rule](story/canon.md#the-rule)); the tier 1 canon tests
+      (`tests/lune/content/Canon.spec.luau`, `CanonGolden.spec.luau`)
+      enforce it.
 - [ ] New Lines in Clara's voice follow the
       [style guide](story/style-guide.md) and are listed in the PR as
       "new Lines, not canon, for approval".

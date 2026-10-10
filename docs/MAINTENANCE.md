@@ -62,6 +62,47 @@ start CI by closing and reopening it. The `upload-assets` workflow opens its
   [`OPEN_CLOUD.md`](OPEN_CLOUD.md#ci), which relies on it for the Dev
   publish.
 
+## Coverage guards and the mutation check
+
+The guards of plan section 4 are `tools/guard coverage` (tier 0),
+`.github/workflows/test-change.yml` and the nightly
+`.github/workflows/mutation.yml`. They are structural: they prove a spec
+exists and names what it should (in code or strings, not comments), not
+that it tests anything. A spec that is trivial on purpose passes them;
+review and the mutation check are what catch that.
+
+Owner, once: create the label `no-test-change` (Issues → Labels). A PR
+carrying it also needs a line "No test change: <why>" in its body.
+
+The canned faults live in `tools/lib/mutate.luau`. `tools/guard faults`
+(tier 0) fails a PR that leaves a fault no longer matching the code; update
+the fault's edit in the same PR. When core/Save and its migrations arrive
+(brief 010), add a "break a save migration" fault; until then "break a
+Resume" stands in for it.
+
+### Luau line coverage (spike, not a gate)
+
+Result of brief 008's spike, 2026-10-09:
+
+- **Lune 0.10.5 cannot.** `luau.compile` accepts `coverageLevel`, but
+  nothing reads the counters back, and `lune run` has no coverage flag.
+- **The Luau CLI can.** `luau --coverage <script>` writes lcov to
+  `coverage.out` for every module the script requires. The core specs
+  import nothing from Lune, so they run under it with
+  `tools/coverage-spike.luau`, a stand-in for the runner's test API. To
+  reproduce, take `luau` from luau-lang/luau release **0.741**
+  (`luau-ubuntu.zip`, SHA-256
+  `134dc762ad26232af83e43f98dec03ff6030dd3a4452f9408b9d50ccea025503`) and
+  run `tools/coverage-spike.sh path/to/luau`. It prints each core module's
+  lines reached and the total. The spike measured 593 of 594 lines of
+  `src/core`; the one line missed (an Ending with no Lines) now has a
+  test in `StoryEngine.spec`, and the script reports 594 of 594 (100%).
+- **Not wired in yet.** The content, place and tools specs need `@lune/*`,
+  which the CLI lacks, so only the core can be measured this way. Doing it
+  for real means pinning the CLI in `rokit.toml` and
+  `tools/toolchain-checksums.txt`, then a `tools/coverage.sh` that reports
+  the percentage in the job summary.
+
 ## Workflow security checks
 
 `tools/check.sh` runs actionlint and zizmor (pedantic persona) on every PR;
