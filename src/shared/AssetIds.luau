@@ -5,6 +5,17 @@
 -- (tools/check-assets) fails when this file and the manifest disagree.
 
 local AssetIds: { [string]: string } = {
+	["card:chapter1"] = "rbxassetid://117177643502308",
+	["card:chapter2"] = "rbxassetid://90949924305452",
+	["card:chapter3"] = "rbxassetid://125569849015804",
+	["card:chapter4"] = "rbxassetid://117880602133448",
+	["card:end"] = "rbxassetid://135729777348831",
+	["ui:bird"] = "rbxassetid://99134325585676",
+	["ui:dialogue_frame"] = "rbxassetid://133396231055259",
+	["ui:flower"] = "rbxassetid://124956058701309",
+	["ui:leaf"] = "rbxassetid://101515197512717",
+	["ui:objective_frame"] = "rbxassetid://107026325248323",
+	["ui:title_screen"] = "rbxassetid://75286639295165",
 }
 
 return table.freeze(AssetIds)
