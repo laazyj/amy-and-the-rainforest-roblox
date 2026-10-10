@@ -12,15 +12,17 @@ a real key are for the owner, when debugging a CI failure. Everyone else uses
 
 | File | What it does |
 |---|---|
-| `tools/opencloud.luau` | Builds every Open Cloud request and parses every response. HTTP is injected, so tests mock it. Retry policy: a transport error is retried once; a 5xx is retried once for GET only, never for a POST (publish, create task) that may already have been accepted; Roblox's "server busy" 409 is retried with backoff (safety rule 8); any other 4xx is never retried. |
+| `tools/opencloud.luau` | Builds every Open Cloud request and parses every response. HTTP is injected, so tests mock it. Retry policy: a transport error is retried once, except for Create Asset (safety rule 7); a 5xx is retried once for GET only, never for a POST (publish, create task) that may already have been accepted; Roblox's "server busy" 409 is retried with backoff (safety rule 8); any other 4xx is never retried. |
 | `tools/publish.luau` | Publishes a `.rbxl` as a `Saved` or `Published` version and prints the version number on stdout. |
+| `tools/upload-assets.luau` | Uploads the pending assets in `assets/manifest.json` through the Assets API and writes their ids back. See [`ASSETS.md`](ASSETS.md). |
 | `tools/run-engine-tests.luau` | Runs engine test scripts as Luau Execution tasks, up to 4 at once, and fails unless every one passes. |
-| `tools/lib/` | Shared argument parsing and the Release guard (`cli.luau`), and the logic behind the two tools. |
+| `tools/lib/` | Shared argument parsing and the Release guard (`cli.luau`), and the logic behind the tools. |
 | `tests/engine/_prelude.luau` | `describe` / `it` / `expect`, `storeName`, `finish` for engine test scripts. |
 | `tests/engine/*.luau` | Engine tests. Files starting with `_` are helpers and are not run. |
 | `tests/fixtures/` | Files engine tests read through `fixture()`, such as the golden file of the walkthrough. |
 | `tests/lune/tools/` | Unit tests for all of the above, against a mocked HTTP function. |
 | `.github/workflows/publish-dev.yml` | After CI succeeds on a push to `main` (or a manual run from `main`): build the commit CI tested, publish it to Dev as `Published`. |
+| `.github/workflows/upload-assets.yml` | By hand from `main`: upload pending assets with the Dev key and open the "Asset ids" PR. |
 | `.github/workflows/engine-tests.yml` | Every PR: build, publish to Dev as `Saved`, run `tests/engine/` against that exact version. |
 
 ## Running locally
@@ -156,7 +158,7 @@ version 27 (PR #25) over two seconds:
 | `RunService.Stepped` | never fires |
 | An unanchored part 20 studs above a floor | does not fall (0.00 studs) |
 | `Touched` when it would land | never fires |
-| An R15 rig (`CreateHumanoidModelFromDescription`) told to `MoveTo` 10 studs | does not move (0.00 studs); its state reads `Running` |
+| An R15 rig (`CreateHumanoidModelFromDescriptionAsync`) told to `MoveTo` 10 studs | does not move (0.00 studs); its state reads `Running` |
 | `PathfindingService:ComputeAsync` | works (`tests/engine/reachability.luau`) |
 
 **Decision.** The engine's scheduler runs in a task (Heartbeat, so
@@ -212,7 +214,9 @@ Both workflows read the repository secret `ROBLOX_DEV_API_KEY` and the
 repository variables `DEV_UNIVERSE_ID`, `DEV_PLACE_ID`,
 `RELEASE_UNIVERSE_ID` and `RELEASE_PLACE_ID`. The last two arm the Release
 refusal. Docs-only PRs (`docs/**`, `**/*.md`) skip the engine-tests
-workflow.
+workflow. `upload-assets.yml` also reads the repository variable
+`ROBLOX_CREATOR_USER_ID`, the owner's Roblox user id, which the assets are
+created under.
 
 The toolchain comes from the shared composite action
 `.github/actions/setup-tools` (as in `ci.yml`), which runs
@@ -246,11 +250,15 @@ Create keys at create.roblox.com/credentials. Set the IP restriction to
 |---|---|---|---|
 | Dev (`ROBLOX_DEV_API_KEY`) | The Dev experience only | **universe-places**: Write | `universe-places:write` |
 | | | **universe.place.luau-execution-session**: Read, Write | `universe.place.luau-execution-session:read`, `…:write` (create needs write; get and logs accept either) |
+| | | **assets**: Read, Write (for `upload-assets`) | `asset:read`, `asset:write` |
 | | | **universe-datastores** (for the test-store cleanup): list stores, list entries, read, delete | `universe-datastores.control:list`, `universe-datastores.objects:list`, `…:read`, `…:delete` |
 | Release (`ROBLOX_RELEASE_API_KEY`, `release` environment) | The Release experience only | **universe-places**: Write | `universe-places:write` |
 
-Asset upload permissions for the Dev key come with the asset-upload brief.
-The publish and engine-test tools use no DataStore permission.
+The Assets API guide says to add **assets** to the key's access
+permissions with Read and Write for the selected experience; pick the Dev
+experience. Assets are created on the owner's account
+(`ROBLOX_CREATOR_USER_ID`, see [CI](#ci)), not in the experience. Never add asset permissions to the Release key. The
+publish and engine-test tools use no DataStore permission.
 
 **Before the test-store cleanup is built, confirm the Dev key can list.** It
 already has DataStore read and delete for the Dev experience; the cleanup must also find
@@ -259,7 +267,7 @@ Never add DataStore permissions to the Release key.
 
 ## Safety rules
 
-1. **The Release refusal.** Both tools refuse to run when `--universe`
+1. **The Release refusal.** Every Open Cloud tool refuses to run when `--universe`
    equals `RELEASE_UNIVERSE_ID`, or `--place` equals `RELEASE_PLACE_ID` when
    that is set, unless `RELEASE_JOB=1` is also set. Ids are compared as
    numbers, so `0123` matches `123`. The release workflow (not
@@ -284,7 +292,10 @@ Never add DataStore permissions to the Release key.
    twice or start a duplicate task. Only a transport error is retried once,
    as the plan and brief require. A transport error can, rarely, also follow
    an accepted request. The worst case is one extra Saved version, or one
-   extra task under the same `RUN_ID`.
+   extra task under the same `RUN_ID`. Create Asset is the exception: a
+   transport error there is not retried either, because an extra asset
+   would sit in moderation on the owner's account; the run fails, and the
+   next run uploads the entry again.
 8. **"Server busy" is the one 4xx that is retried.** Roblox sometimes answers
    a publish with HTTP 409 `{"code":"Conflict","message":"Save failed. Server
    is busy ... Please try again in a couple minutes."}`. That is a request to
@@ -349,6 +360,18 @@ Verified:
   (FLAT view, one string per `print`), paginated with `maxPageSize` (up to
   10000), `pageToken` and `nextPageToken`.
 - **Stability.** The spec marks Luau Execution `STABLE` and place publishing `BETA`.
+- **Assets** (`content/en-us/reference/cloud/assets/v1.json` and
+  `cloud/guides/usage-assets.md`, commit `9dc22ac`, 2026-10-08).
+  `POST https://apis.roblox.com/assets/v1/assets`, `multipart/form-data`
+  with a JSON `request` part (`assetType`, `displayName`, `description`,
+  `creationContext.creator.userId`) and the file as `fileContent`; the
+  response is an Operation `{path: "operations/{id}", done, response}`,
+  polled with `GET /assets/v1/operations/{id}`. `GET
+  /assets/v1/assets/{id}?readMask=...` reads `moderationResult`. Scopes
+  `asset:read` and `asset:write`. 20 MB per file. Images and audio cannot
+  be updated in place. Marked `BETA`. The schema gives `assetId` as an
+  integer and states as `Approved`; the guide's example shows a string
+  and `MODERATION_STATE_APPROVED`. `tools/opencloud.luau` reads both.
 
 Proven against Dev (brief 004, engine-tests on PR #15):
 
@@ -359,6 +382,11 @@ Proven against Dev (brief 004, engine-tests on PR #15):
   returns "Amy and the Rain Forest (Dev)" for the Dev place.
 
 Not verified:
+
+- **Uploading as `Image`.** The guide's table lists "Decal, Image" and its
+  examples use `Decal`. The uploader sends `assetType: "Image"`, whose id an
+  ImageLabel takes directly. The first real run on Dev proves it; if it is
+  refused, `OpenCloud.ASSET_TYPES.image` is the one line to change.
 
 - **The 429 `Retry-After` header.** Whether Open Cloud sends it is unknown.
   The tool falls back to 15 seconds.

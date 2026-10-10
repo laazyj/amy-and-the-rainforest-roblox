@@ -51,8 +51,12 @@ export type DialogueViewModel = {
 
 local DialogueViewModel = {}
 
--- How long each grapheme takes to type.
-DialogueViewModel.SECONDS_PER_GRAPHEME = 0.022
+-- How long each grapheme takes to type: about 30 a second, the pace players
+-- saw before the view-model. The old binder waited task.wait(0.022) per
+-- grapheme, which resumes on the first frame after the wait, so at 60 fps
+-- each grapheme took two frames. A different pace is a feel decision
+-- (briefs 011 and 016), not a refactor's.
+DialogueViewModel.SECONDS_PER_GRAPHEME = 1 / 30
 
 local DEFAULT_STYLE: Style = table.freeze({
 	tag = table.freeze({ r = 94, g = 160, b = 80 }),

@@ -60,7 +60,7 @@ The same rules apply to every class; only the numbers differ.
   the safe area allows, minus 24 units of padding each side, but never
   wider than **60 characters** at the current text size (see
   [§3](#3-text-and-readability)).
-- **Objective panel** at the top right; on phone it collapses to an icon
+- **Objective tracker** at the top right; on phone it collapses to an icon
   while a Dialogue is shown.
 - **Touch control zones** are the bottom-left and bottom-right corners:
   35% of the width by 40% of the height on phone, 25% by 35% on tablet.
@@ -159,6 +159,20 @@ box, centred. Today's box at 62% of a 1376-unit-wide tablet holds about
   a second tap advances.
 - A text size setting scales all text up by up to 1.5×; every rule here
   must still pass at the largest setting.
+
+### Title screen
+
+The title screen emulates the story website's title overlay (reference:
+[`reference/website-title-overlay.png`](reference/website-title-overlay.png),
+a phone screenshot of the website). Over the `ui:title_screen` image, Clara's
+scene of the forest wall:
+
+- a rounded pill label, "a little tale of the wild";
+- then "Amy", and below it "& the Rain Forest", in a hand-written script;
+- the words are white, except "Rain Forest", which is gold; each has a soft
+  dark shadow, so it reads over the canopy.
+
+The words are game-rendered text, never part of the image.
 
 ## 4. Touch targets
 

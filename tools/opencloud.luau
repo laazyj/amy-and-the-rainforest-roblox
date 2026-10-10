@@ -164,6 +164,183 @@ function OpenCloud.parseLogsPage(response: Response): ({ string }, string?)
 	return messages, if token and token ~= "" then token else nil
 end
 
+-- Assets API: upload an image, sound or model to the creator's account.
+-- Verified against content/en-us/reference/cloud/assets/v1.json and
+-- cloud/guides/usage-assets.md; see docs/OPEN_CLOUD.md.
+
+-- The Roblox asset type for each manifest kind. Images go up as `Image`, whose
+-- id an ImageLabel takes directly (a `Decal` id would need resolving first).
+OpenCloud.ASSET_TYPES = table.freeze({
+	image = "Image",
+	audio = "Audio",
+	model = "Model",
+})
+
+-- The file extensions the Assets API accepts for each kind, and the content
+-- type each is sent with.
+OpenCloud.ASSET_CONTENT_TYPES = table.freeze({
+	image = table.freeze({
+		png = "image/png",
+		jpg = "image/jpeg",
+		jpeg = "image/jpeg",
+		bmp = "image/bmp",
+		tga = "image/tga",
+	}),
+	audio = table.freeze({ mp3 = "audio/mpeg", ogg = "audio/ogg", wav = "audio/wav", flac = "audio/flac" }),
+	model = table.freeze({
+		fbx = "model/fbx",
+		gltf = "model/gltf+json",
+		glb = "model/gltf-binary",
+		rbxm = "model/x-rbxm",
+		rbxmx = "model/x-rbxm",
+	}),
+})
+
+-- Largest file Create Asset accepts ("up to 20 MB").
+OpenCloud.MAX_ASSET_BYTES = 20_000_000
+
+-- The content type for `path` as an asset of `kind`, or nil if the API takes no such file.
+function OpenCloud.assetContentType(kind: string, path: string): string?
+	local types = OpenCloud.ASSET_CONTENT_TYPES[kind]
+	local extension = string.match(path, "%.(%w+)$")
+	return if types and extension then types[string.lower(extension)] else nil
+end
+
+-- Why the Assets API would refuse `bytes` bytes named `fileName` as a `kind`, or nil.
+function OpenCloud.assetUploadProblem(kind: string, fileName: string, bytes: number): string?
+	if not OpenCloud.ASSET_TYPES[kind] then
+		return `{kind} is not an asset kind (image, audio, model)`
+	elseif not OpenCloud.assetContentType(kind, fileName) then
+		return `the Assets API takes no {kind} file named {fileName}`
+	elseif bytes > OpenCloud.MAX_ASSET_BYTES then
+		return `{fileName} is {bytes} bytes; the Assets API accepts {OpenCloud.MAX_ASSET_BYTES}`
+	end
+	return nil
+end
+
+export type AssetUpload = {
+	kind: string,
+	displayName: string,
+	description: string,
+	creatorUserId: string,
+	fileName: string,
+	file: string,
+}
+
+-- POST /assets/v1/assets, multipart/form-data with a JSON `request` part and
+-- the file as `fileContent`. Scopes asset:read and asset:write. The response
+-- is an Operation to poll.
+function OpenCloud.createAssetRequest(apiKey: string, upload: AssetUpload): Request
+	local problem = OpenCloud.assetUploadProblem(upload.kind, upload.fileName, #upload.file)
+	if problem then
+		error(problem, 0)
+	end
+	local contentType = OpenCloud.assetContentType(upload.kind, upload.fileName)
+	local request = serde.encode("json", {
+		assetType = OpenCloud.ASSET_TYPES[upload.kind],
+		displayName = upload.displayName,
+		description = upload.description,
+		creationContext = { creator = { userId = upload.creatorUserId } },
+	})
+	-- A boundary that occurs nowhere in the parts.
+	local boundary = "amy-asset-boundary"
+	while string.find(upload.file, boundary, 1, true) or string.find(request, boundary, 1, true) do
+		boundary ..= "-x"
+	end
+	local body = table.concat({
+		`--{boundary}`,
+		'Content-Disposition: form-data; name="request"',
+		"Content-Type: application/json",
+		"",
+		request,
+		`--{boundary}`,
+		`Content-Disposition: form-data; name="fileContent"; filename="{upload.fileName}"`,
+		`Content-Type: {contentType}`,
+		"",
+		upload.file,
+		`--{boundary}--`,
+		"",
+	}, "\r\n")
+	return {
+		method = "POST",
+		url = `{OpenCloud.BASE_URL}/assets/v1/assets`,
+		headers = headers(apiKey, `multipart/form-data; boundary={boundary}`),
+		body = body,
+	}
+end
+
+export type Operation = {
+	path: string,
+	done: boolean,
+	assetId: string?,
+	moderation: string?,
+	error: string?,
+}
+
+-- "Approved", "MODERATION_STATE_APPROVED" -> "approved". The spec and the
+-- guide's example disagree on the form, so both are read.
+local function moderationState(asset: any): string?
+	local result = type(asset) == "table" and asset.moderationResult
+	local state = type(result) == "table" and result.moderationState
+	return if type(state) == "string" then string.lower((string.gsub(state, "^MODERATION_STATE_", ""))) else nil
+end
+
+-- The asset id as digits; the spec says integer, the guide's example a string.
+local function assetIdOf(asset: any): string?
+	local id = type(asset) == "table" and asset.assetId
+	if type(id) == "number" then
+		return string.format("%d", id)
+	end
+	return if type(id) == "string" and string.match(id, "^%d+$") then id else nil
+end
+
+-- An Operation from a create or get-operation response. Its path is checked,
+-- because it is used to build the next URL.
+function OpenCloud.parseOperation(response: Response): Operation
+	local decoded = serde.decode("json", response.body)
+	local path = decoded.path
+	if type(path) ~= "string" or not string.match(path, "^operations/[%w%-]+$") then
+		error(`unexpected operation path in response: {response.body}`, 0)
+	end
+	local failure = decoded.error
+	return {
+		path = path,
+		done = decoded.done == true,
+		assetId = assetIdOf(decoded.response),
+		moderation = moderationState(decoded.response),
+		error = if type(failure) == "table" then `{failure.code or "?"} {failure.message or ""}` else nil,
+	}
+end
+
+-- GET /assets/v1/{operation.path}. Scope asset:read.
+function OpenCloud.getOperationRequest(apiKey: string, operationPath: string): Request
+	return {
+		method = "GET",
+		url = `{OpenCloud.BASE_URL}/assets/v1/{operationPath}`,
+		headers = headers(apiKey, "application/json"),
+	}
+end
+
+-- GET /assets/v1/assets/{assetId}, for its moderation state. Scope asset:read.
+function OpenCloud.getAssetRequest(apiKey: string, assetId: string): Request
+	assert(string.match(assetId, "^%d+$"), `not an asset id: {assetId}`)
+	return {
+		method = "GET",
+		url = `{OpenCloud.BASE_URL}/assets/v1/assets/{assetId}?readMask=moderationResult`,
+		headers = headers(apiKey, "application/json"),
+	}
+end
+
+-- The moderation state in a get-asset response ("reviewing", "approved", "rejected").
+function OpenCloud.parseAssetModeration(response: Response): string?
+	return moderationState(serde.decode("json", response.body))
+end
+
+-- What happens after an asset is created, for --dry-run (the operation path is not known yet).
+function OpenCloud.describeOperationPolling(): string
+	return `then GET {OpenCloud.BASE_URL}/assets/v1/\{operation.path\} until done`
+end
+
 -- A request as it would be sent, with the key redacted. For --dry-run.
 function OpenCloud.describe(request: Request): string
 	local lines = { `{request.method} {request.url}` }
@@ -219,14 +396,21 @@ local function isBusy(response: Response): boolean
 		and string.find(string.lower(body.message), "try again", 1, true) ~= nil
 end
 
+export type SendOptions = {
+	-- false for a request that creates something new each time and takes no
+	-- idempotency key (Create Asset): one that reached Roblox before the
+	-- connection dropped would be done twice. Default true.
+	retryTransport: boolean?,
+}
+
 -- Sends a request with the retry policy from the plan:
--- - a transport error is retried once;
+-- - a transport error is retried once, unless `options.retryTransport` is false;
 -- - a 5xx is retried once only for GET, because a POST that failed with a 5xx
 --   may still have been accepted (a second publish or a duplicate task);
 -- - a "server busy" 409 is retried with BUSY_BACKOFF, then returned;
 -- - any other 4xx is returned at once.
 -- Returns the response, or raises.
-function OpenCloud.send(http: Http, sleep: Sleep, request: Request): Response
+function OpenCloud.send(http: Http, sleep: Sleep, request: Request, options: SendOptions?): Response
 	local retried = false
 	local busyRetries = 0
 	while true do
@@ -234,6 +418,9 @@ function OpenCloud.send(http: Http, sleep: Sleep, request: Request): Response
 		local failure
 		if not ok then
 			failure = `transport error: {result}`
+			if options and options.retryTransport == false then
+				error(`{request.method} {request.url} failed, not retried ({failure})`, 0)
+			end
 		else
 			local response = result :: Response
 			if isBusy(response) and busyRetries < #OpenCloud.BUSY_BACKOFF then
@@ -262,8 +449,8 @@ function OpenCloud.expectOk(request: Request, response: Response): Response
 end
 
 -- `send`, then `expectOk`.
-function OpenCloud.call(http: Http, sleep: Sleep, request: Request): Response
-	return OpenCloud.expectOk(request, OpenCloud.send(http, sleep, request))
+function OpenCloud.call(http: Http, sleep: Sleep, request: Request, options: SendOptions?): Response
+	return OpenCloud.expectOk(request, OpenCloud.send(http, sleep, request, options))
 end
 
 return OpenCloud

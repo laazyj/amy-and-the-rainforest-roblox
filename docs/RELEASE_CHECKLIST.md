@@ -52,6 +52,10 @@ Check these on the **Release** experience's settings page, not on Dev.
       Clara's deliberate spellings (see [canon](story/canon.md#the-rule)).
 - [ ] No in-game purchases, paid items or Robux prompts.
 - [ ] Icon, thumbnails and description pass a moderation pre-check.
+- [ ] Every Asset the game shows (`upload: true` in
+      `assets/manifest.json`) has Moderation status `approved`, and no
+      `placeholder: true` entry ships unless the owner accepted it
+      ([`ASSETS.md`](ASSETS.md#moderation)).
 - [ ] **Amy's face is never shown** in the icon, thumbnails, chapter
       cards or any illustration used in game.
 
