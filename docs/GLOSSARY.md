@@ -67,7 +67,11 @@ Scene (look + sound)                     Player
 | **Pickup** | A Quest-bound thing to touch, spawned at Spots for a `collect` Quest and removed when touched or when the Quest ends. Its id is the Spot it spawned at. | three glowing flowers |
 | **Collectible** | A persistent discoverable with a Journal entry. Found once, remembered forever. | `collectible:maroon_acorn` |
 | **Journal** | The player's record of Collectibles found and Characters met, with entries in Clara's voice. | |
-| **Cue** | A named sound, music track or effect, resolved to an asset id through `assets/manifest.json`. | `cue:sam_bark`, `music:paradise_theme` |
+| **Cue** | A named sound, music track or effect, resolved to an Asset through the Manifest. | `cue:sam_bark`, `music:paradise_theme` |
+| **Asset** | An image, sound or model the game or its store page uses, listed in the Manifest and uploaded to Roblox by CI when the game shows it. Known by its Asset name, an id of the forms in [Ids](#6-ids). See [`ASSETS.md`](ASSETS.md). | `card:chapter2` |
+| **Manifest** | `assets/manifest.json`: every Asset with its file, Roblox asset id, creator, licence, origin and Moderation status. | |
+| **Moderation status** | Where Roblox moderation is with an Asset. See [Lifecycles](#5-lifecycles). | `approved` |
+| **Placeholder** | A plain palette-coloured stand-in with no text for an illustration not drawn yet, until the real piece replaces it. | `card:chapter1` |
 | **Shot** | A named camera framing used by a Beat or a Dialogue. Specified in [`design/feel.md`](design/feel.md). See [enumeration](#shots). | `shot:ForestWallReveal` |
 | **Lighting preset** | A named look for a Scene. See [enumeration](#lighting-presets). | `lighting:paradise` |
 | **Progress** | Where a player is in the Story: current Chapter and Quest, completed Quest ids, the Pickups touched in the current Quest, which Dialogue is showing, and later Collectibles, Bonds, and the Prop states that matter. Saved on every Story event and on leave. | |
@@ -313,6 +317,7 @@ are added here with their manifest entry.
 | Bond | `stranger`, `curious`, `friend`, `companion` |
 | Prop | declared per Prop in [Props](#props) |
 | Collectible (per player) | `hidden`, `found` |
+| Moderation status (per Asset) | `pending`, `reviewing`, then `approved` or `rejected` |
 
 ## 6. Ids
 
@@ -332,6 +337,11 @@ position or raw coordinate.
 | Beat | `beat:<snake_case>` | `beat:sam_catches` |
 | Cue | `cue:<snake_case>`, `music:<snake_case>` | `cue:sam_bark` |
 | Lighting preset | `lighting:<snake_case>` | `lighting:paradise` |
+| Asset: Chapter card or end card | `card:<chapter id>`, `card:end` | `card:chapter2` |
+| Asset: UI frame, motif or screen | `ui:<snake_case>` | `ui:dialogue_frame`, `ui:title_screen` |
+| Asset: store page art | `store:<snake_case>` | `store:icon`, `store:thumbnail_1` |
+| Asset: reference for building a Character or Prop | `ref:<the Character's or Prop's PascalCase name>` | `ref:Sam`, `ref:Machine` |
+| Asset: a Prop's model or a Cue's sound | the Prop's or Cue's own id | `prop:Machine`, `cue:sam_bark` |
 | Collectible | `collectible:<snake_case>` | `collectible:maroon_acorn` |
 
 Inside content files the prefix is dropped where the field already says

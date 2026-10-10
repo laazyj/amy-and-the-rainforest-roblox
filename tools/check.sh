@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Tier 0 static checks: StyLua formatting, Selene lint, luau-lsp type checking,
-# and actionlint and zizmor (installed by tools/bootstrap-agent.sh) over .github.
+# the asset manifest (docs/ASSETS.md), and actionlint and zizmor (installed by
+# tools/bootstrap-agent.sh) over .github.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$PWD/build/bin:$PATH" # where tools/bootstrap-agent.sh installs
@@ -22,6 +23,9 @@ fi
 
 echo "== StyLua"
 stylua --check src tests tools
+
+echo "== Assets: the manifest, and every rbxassetid:// in src/ is in it"
+lune run tools/check-assets
 
 echo "== Selene"
 # Both configs use the committed roblox.yml in the working directory.

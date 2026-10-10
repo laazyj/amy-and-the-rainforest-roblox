@@ -22,12 +22,15 @@ rules:
       - engine-tests.yml
       - publish-dev.yml
       - toolchain-check.yml
+      - upload-assets.yml
 
   # Named by the brief; replacing it with gh calls means hand-rolled push and
   # PR-update logic holding a write token. SHA-pinned, kept current by Dependabot.
+  # upload-assets.yml opens its id PR the same way.
   superfluous-actions:
     ignore:
       - toolchain-check.yml
+      - upload-assets.yml
 
   # Shown only by `--persona=auditor`; listed so nothing is hidden. The keys
   # are repository secrets, passed only to the steps that need them. The
@@ -38,3 +41,4 @@ rules:
       - engine-tests.yml
       - publish-dev.yml
       - toolchain-check.yml
+      - upload-assets.yml

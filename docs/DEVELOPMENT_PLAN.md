@@ -424,13 +424,14 @@ a Studio publish would silently overwrite CI's version. This goes in
 |---|---|---|
 | `ROBLOX_DEV_API_KEY` | Repository secret | Dev universe only: place publish (write), Luau Execution, Assets (read/write) |
 | `ROBLOX_RELEASE_API_KEY` | `release` environment secret, required reviewer = you | Release universe only: place publish (write) |
-| `DEV_UNIVERSE_ID`, `DEV_PLACE_ID`, `RELEASE_UNIVERSE_ID`, `RELEASE_PLACE_ID` | Repository variables | Config |
+| `DEV_UNIVERSE_ID`, `DEV_PLACE_ID`, `RELEASE_UNIVERSE_ID`, `RELEASE_PLACE_ID`, `ROBLOX_CREATOR_USER_ID` | Repository variables | Config |
 
 - Two keys, so nothing that runs on a PR can touch Release. Both keys get
   an expiry date; rotation is a line in the release checklist.
 - **The agent never holds a key.** Publishing, engine tests and asset
-  uploads are CI jobs. The agent triggers asset uploads by pushing a
-  manifest change that a `workflow_dispatch` job acts on.
+  uploads are CI jobs. The agent adds assets to the manifest; once that
+  PR merges, the owner runs the `workflow_dispatch` upload job, which opens
+  a PR with the ids (`docs/ASSETS.md`).
 - Workflows use `pull_request`, never `pull_request_target`; PRs from forks
   do not get secrets.
 - Keys are created at create.roblox.com/credentials with IP restriction

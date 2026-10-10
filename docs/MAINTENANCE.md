@@ -36,7 +36,8 @@ updates" PR is tested, create a fine-grained personal access token limited
 to this repository with **Contents: read and write** and **Pull requests:
 read and write**, give it an expiry date, and save it as the repository
 secret `TOOLCHAIN_PR_TOKEN`. Without it the job still opens the PR, and you
-start CI by closing and reopening it.
+start CI by closing and reopening it. The `upload-assets` workflow opens its
+"Asset ids" PR with the same token, so keep it when rotating.
 
 ## By hand
 
@@ -84,7 +85,7 @@ checks this before every promotion.
 |---|---|---|---|
 | `ROBLOX_DEV_API_KEY` | Open Cloud key, Dev experience | _set when created_ | 30 days before |
 | `ROBLOX_RELEASE_API_KEY` | Open Cloud key, Release experience (`release` environment) | _not created yet_ | 30 days before |
-| `TOOLCHAIN_PR_TOKEN` | Fine-grained GitHub token for the toolchain PR | _set when created_ | 30 days before |
+| `TOOLCHAIN_PR_TOKEN` | Fine-grained GitHub token for the toolchain and Asset ids PRs | _set when created_ | 30 days before |
 
 To rotate a Roblox key: create the new key at
 create.roblox.com/credentials with the same permissions (see `OPEN_CLOUD.md`),
