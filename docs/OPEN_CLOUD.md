@@ -158,7 +158,7 @@ version 27 (PR #25) over two seconds:
 | `RunService.Stepped` | never fires |
 | An unanchored part 20 studs above a floor | does not fall (0.00 studs) |
 | `Touched` when it would land | never fires |
-| An R15 rig (`CreateHumanoidModelFromDescription`) told to `MoveTo` 10 studs | does not move (0.00 studs); its state reads `Running` |
+| An R15 rig (`CreateHumanoidModelFromDescriptionAsync`) told to `MoveTo` 10 studs | does not move (0.00 studs); its state reads `Running` |
 | `PathfindingService:ComputeAsync` | works (`tests/engine/reachability.luau`) |
 
 **Decision.** The engine's scheduler runs in a task (Heartbeat, so

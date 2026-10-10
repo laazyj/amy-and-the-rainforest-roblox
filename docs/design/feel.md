@@ -60,7 +60,7 @@ The same rules apply to every class; only the numbers differ.
   the safe area allows, minus 24 units of padding each side, but never
   wider than **60 characters** at the current text size (see
   [§3](#3-text-and-readability)).
-- **Objective panel** at the top right; on phone it collapses to an icon
+- **Objective tracker** at the top right; on phone it collapses to an icon
   while a Dialogue is shown.
 - **Touch control zones** are the bottom-left and bottom-right corners:
   35% of the width by 40% of the height on phone, 25% by 35% on tablet.

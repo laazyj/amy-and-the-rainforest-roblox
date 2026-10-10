@@ -84,6 +84,16 @@ return function(t: any)
 			expect(DialogueViewModel.view(vm).visibleGraphemes).toBe(-1)
 		end)
 
+		it("types about 30 graphemes a second at 60 frames a second, the pace before the view-model", function()
+			local vm = DialogueViewModel.new()
+			DialogueViewModel.enqueue(vm, lines(string.rep("a", 100)))
+			for _ = 1, 60 do
+				DialogueViewModel.tick(vm, 1 / 60)
+			end
+			local shown = DialogueViewModel.view(vm).visibleGraphemes
+			expect(shown >= 29 and shown <= 31).toBe(true)
+		end)
+
 		it("types ♥ and an emoji as one grapheme each", function()
 			local vm = DialogueViewModel.new()
 			DialogueViewModel.enqueue(vm, lines("♥️👍🏽!"))

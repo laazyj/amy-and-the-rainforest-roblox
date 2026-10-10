@@ -4,7 +4,8 @@
 -- the instance count, the part count and the mean server Heartbeat time
 -- over a 5-second sample (the worst frame is printed, not gated: one slow
 -- frame on a shared server is noise) must stay within budget: the value
--- MEASURED when the budget was set, plus 20% HEADROOM. A change that needs more raises
+-- MEASURED when the budget was set, plus 20% HEADROOM, or its FLOOR where a
+-- shared server's noise needs more. A change that needs more raises
 -- MEASURED in its own PR, with the new measurement, rather than slipping
 -- past.
 --
@@ -20,21 +21,26 @@ local SAMPLE_SECONDS = 5
 
 -- Measured on Saved Dev version 27 (PR #25, 2026-10-09): Workspace
 -- descendants, BaseParts among them, and the mean Stats.HeartbeatTime of an
--- idle server (worst frame 0.27 ms). Budgets round up to a whole number, so
--- the Heartbeat budget is 1 ms, well inside the plan's 8 ms (section 8).
+-- idle server (worst frame 0.27 ms). Budgets round up to 0.01, and never
+-- go below their FLOOR.
 local MEASURED = {
 	instances = 1593,
 	parts = 1533,
 	heartbeatMs = 0.08,
 }
 
+-- A shared server's idle frame time varies from run to run, so the Heartbeat
+-- budget is at least 0.25 ms; that still catches a regression of three times
+-- the measured 0.08 ms, well before the plan's 8 ms (section 8).
+local FLOOR = { heartbeatMs = 0.25 }
+
 include("tests/engine/_world.luau").build(true)
 local descendants = Workspace:GetDescendants()
 
 -- Reports `value` against its budget, then holds it to the budget.
 local function within(name: string, value: number)
-	local budget = math.ceil(MEASURED[name] * HEADROOM)
-	print(string.format("  %-12s %10.2f  budget %d (%.0f%% used)", name, value, budget, 100 * value / budget))
+	local budget = math.max(math.ceil(MEASURED[name] * HEADROOM * 100) / 100, FLOOR[name] or 0)
+	print(string.format("  %-12s %10.2f  budget %.2f (%.0f%% used)", name, value, budget, 100 * value / budget))
 	expect(value <= budget).toBe(true)
 end
 
