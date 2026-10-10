@@ -33,8 +33,9 @@ describe("physics in a Luau Execution task", function()
 		end)
 
 		-- an R15 rig from a default HumanoidDescription, told to walk 10 studs
-		local rig = game:GetService("Players")
-			:CreateHumanoidModelFromDescription(Instance.new("HumanoidDescription"), Enum.HumanoidRigType.R15)
+		local rig =
+			game:GetService("Players")
+				:CreateHumanoidModelFromDescriptionAsync(Instance.new("HumanoidDescription"), Enum.HumanoidRigType.R15)
 		rig:PivotTo(CFrame.new(10, 1004, 0))
 		rig.Parent = Workspace
 		local humanoid = rig:FindFirstChildOfClass("Humanoid") :: Humanoid
