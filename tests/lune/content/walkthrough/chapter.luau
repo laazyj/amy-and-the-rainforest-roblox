@@ -1,10 +1,12 @@
 --[[
-	Walks one Chapter as a player would, from its Checkpoint: a Resume at
-	its first Quest, then the walk (tests/lune/core/walker.luau) until the
+	Walks one Chapter as a player would, from its Checkpoint, as "Play this
+	chapter again" on the Title screen does: the Checkpoint a Save keeps
+	for it, a Resume there, then the walk (tests/lune/core/walker.luau) until the
 	Chapter completes. Each Chapter's walkthrough spec reads what happened.
 ]]
 
 local Events = require("../../../../src/core/Events")
+local Save = require("../../../../src/core/Save")
 local Story = require("../../../../src/content/Story")
 local StoryEngine = require("../../../../src/core/StoryEngine")
 local Walker = require("../../core/walker")
@@ -54,7 +56,8 @@ function Chapter.walk(id: string): ChapterWalk
 		end
 	end
 	assert(chapter, `no Chapter {id}`)
-	local checkpoint = StoryEngine.progressAt(story, chapter.quests[1].id)
+	local reached = Save.record(story, Save.new(), StoryEngine.progressAt(story, chapter.quests[1].id))
+	local checkpoint = Save.restore(story, reached.checkpoints[id])
 	local resume = StoryEngine.resume(story, checkpoint)
 	local walk = Walker.walk(story, checkpoint, Walker.rebuild(story, resume))
 

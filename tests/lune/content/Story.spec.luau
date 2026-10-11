@@ -1,21 +1,33 @@
 --[[
 	The Story walked through the core, as tier 1 (plan section 4): every
 	Chapter completable from a fresh start and from a Resume at every Quest,
-	the World a Resume rebuilds equal to the World the walk had there, no
-	dead ends, the Beats' World commands, and every message the client gets,
+	the World a Resume rebuilds equal to the World the walk had there, also
+	from the player's Save as a DataStore keeps it (core/Save through JSON),
+	a Save made at every Story event resumable to the end, no dead ends,
+	the Beats' World commands, and every message the client gets,
 	in order, equal to the golden file the engine walkthrough records
 	(tests/fixtures/golden/walkthrough.json).
 ]]
 
 local Net = require("../../../src/core/Net")
+local Save = require("../../../src/core/Save")
 local StoryEngine = require("../../../src/core/StoryEngine")
 local StoryModule = require("../../../src/core/Story")
 local Story = require("../../../src/content/Story")
 local Golden = require("../../engine/_golden")
 local Walker = require("../core/walker")
 local bootstrap = require("../bootstrap")
+local serde = require("@lune/serde")
 
 local story = Story.story
+
+-- The Progress a returning player resumes from: a Save of `progress`,
+-- stored as a DataStore keeps it (JSON), read back and restored.
+local function throughSave(progress: StoryEngine.Progress): StoryEngine.Progress
+	local stored = serde.decode("json", serde.encode("json", Save.write(Save.record(story, Save.new(), progress))))
+	local save = assert(Save.read(story, stored))
+	return Save.restore(story, save.progress)
+end
 
 local walk = Walker.walk(story)
 
@@ -96,8 +108,40 @@ return function(t: any)
 			it("completes the Story from there", function()
 				expect(Walker.walk(story, playable.progress, Walker.deepCopy(resumed)).progress.ended).toBe(true)
 			end)
+
+			it("rebuilds the same World from the player's Save", function()
+				local saved = throughSave(playable.progress)
+				expect(saved).toEqual(playable.progress)
+				expect(Walker.rebuild(story, StoryEngine.resume(story, saved))).toEqual(resumed)
+			end)
 		end)
 	end
+
+	describe("a Save made at every Story event", function()
+		it("resumes at the Quest being played, or as ended, and completes the Story from there", function()
+			local saves = 0
+			local walked: { [string]: boolean } = {} -- once per Quest resumed at is enough
+			for i, step in walk.steps do
+				if #step.events > 0 then
+					saves += 1
+					local resumed = throughSave(step.progress)
+					local expected = if step.progress.ended or step.progress.showing == "ending"
+						then nil
+						else step.quest
+					if resumed.quest ~= expected then
+						error(`step {i}: saved at {tostring(step.quest)}, resumed at {tostring(resumed.quest)}`)
+					end
+					local at = tostring(resumed.quest)
+					if not walked[at] then
+						walked[at] = true
+						local world = Walker.rebuild(story, StoryEngine.resume(story, resumed))
+						expect(Walker.walk(story, resumed, world).progress.ended).toBe(true)
+					end
+				end
+			end
+			expect(saves > #walk.progress.completed).toBe(true)
+		end)
+	end)
 
 	describe("the Beats", function()
 		it("plays beat sam_catches and teleports Amy to spot GardenInside on EnteredZone(GardenGate)", function()
