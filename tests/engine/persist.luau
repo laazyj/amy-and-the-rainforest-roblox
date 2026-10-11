@@ -75,10 +75,14 @@ local function leave(player: any)
 	end, 2)
 end
 
--- Plays until `questId` is active and the host waits on the player.
+-- Plays until `questId` is active and the host waits on the player. The
+-- player acts only while the host waits on them, as a real one can, so it
+-- never plays on into the Quest after `questId` during a Beat.
 local function playTo(player: any, questId: string)
 	waitFor(questId, 120, function()
-		if server.activeQuest(player) == questId and server.idle(player) then
+		if not server.idle(player) then
+			return false
+		elseif server.activeQuest(player) == questId then
 			return true
 		end
 		play(player)
