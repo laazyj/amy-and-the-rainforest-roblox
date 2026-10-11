@@ -30,7 +30,7 @@ Rules every build session follows, regardless of brief:
 | 007 Client view-model and engine suite | B | running (B2) |
 | 008 Content schema, purity and coverage guards | B | after 007 |
 | 009 Asset pipeline | Phase 1 | in review (#26) |
-| 010 Saves and resume | Phase 1 | after 006 |
+| 010 Saves and resume | Phase 1 | in review (#33) |
 | 011 Locked-behind camera and Shots | Phase 1 | after 007; Mac for the visual pass |
 | 012 Device classes, touch and onboarding | Phase 1 | after 007; Mac for emulation |
 | 013 Audio and narration | Phase 1 | after 009 and 006; owner's recordings |
