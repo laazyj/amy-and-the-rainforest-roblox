@@ -1,10 +1,15 @@
 --!strict
 -- The world as the place's Scripts build it, for an engine test. Luau
 -- Execution runs no Scripts, so a test that needs the world calls this:
--- include("tests/engine/_world.luau").build(withMap). It requires what
+-- include("tests/engine/_world.luau").build(withMap, saves). It requires what
 -- SceneServer and StoryServer require and starts them the same way: the
 -- map (SceneBuilder.build, when `withMap`), then the Story (StoryHost.start:
 -- the Zones, Characters at their home Spots, Props and Lighting).
+--
+-- First it points Persist at this run's test store: Config.storePrefix
+-- becomes storeName(`{saves}-`), so the Saves this test makes are in
+-- "test-<RUN_ID>-<saves>-Progress", apart from every other test's and from
+-- every player's. The cleanup step deletes them after the run.
 --
 -- Returns the Story, the core modules a test drives it with, and the server
 -- modules, which are the same instances
@@ -19,7 +24,8 @@ local function server(name: string): any
 	return (require :: any)(ServerScriptService:WaitForChild(name))
 end
 
-function World.build(withMap: boolean)
+function World.build(withMap: boolean, saves: string)
+	server("Config").storePrefix = storeName(`{saves}-`)
 	if withMap then
 		server("SceneBuilder").build()
 	end
@@ -39,6 +45,7 @@ function World.build(withMap: boolean)
 		DevShortcuts = (require :: any)(ServerScriptService:WaitForChild("Dev"):WaitForChild("DevShortcuts")),
 		Convert = Convert,
 		LightingHost = server("LightingHost"),
+		Persist = server("Persist"),
 	}
 end
 

@@ -20,7 +20,7 @@ local AGENT = { AgentRadius = 2, AgentHeight = 5, AgentCanJump = true }
 -- a roof or canopy over it) down to this far below.
 local ABOVE, BELOW = 8, 60
 
-local world = include("tests/engine/_world.luau").build(true)
+local world = include("tests/engine/_world.luau").build(true, "reachability")
 local story = world.story
 local prompts: { [string]: ProximityPrompt } = world.CharacterHost.prompts()
 

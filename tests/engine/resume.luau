@@ -26,7 +26,7 @@ local Workspace = game:GetService("Workspace")
 
 local TIME_LIMIT = 200
 
-local world = include("tests/engine/_world.luau").build(false)
+local world = include("tests/engine/_world.luau").build(false, "resume")
 local server = world.StoryHost
 local story = world.story
 local play = Driver.new(server, world.CharacterHost)

@@ -37,6 +37,7 @@ local Remotes = require(ReplicatedStorage:WaitForChild("shared"):WaitForChild("N
 
 local CharacterHost = require(script.Parent.CharacterHost)
 local LightingHost = require(script.Parent.LightingHost)
+local Persist = require(script.Parent.Persist)
 local PickupHost = require(script.Parent.PickupHost)
 local PromptBridge = require(script.Parent.PromptBridge)
 local PropHost = require(script.Parent.PropHost)
@@ -47,6 +48,7 @@ local WorldImpl = require(script.Parent.WorldImpl)
 local DIALOGUE_TIMEOUT = 300
 
 type Session = {
+	player: any,
 	engine: StoryEngine.Engine,
 	world: World.World,
 	busy: boolean,
@@ -85,8 +87,16 @@ local function awaitDialogue(session: Session)
 	end
 end
 
+-- After a step that raised Story events, the player's Save gets their Progress.
+local function recordAfter(session: Session, events: { Events.StoryEvent })
+	if #events > 0 then
+		Persist.record(session.player, session.engine:snapshot())
+	end
+end
+
 -- Carries out `commands`, and those of every step a finished Dialogue leads to.
-local function carryOut(session: Session, commands: { Events.WorldCommand })
+local function carryOut(session: Session, events: { Events.StoryEvent }, commands: { Events.WorldCommand })
+	recordAfter(session, events)
 	local pending: { Events.WorldCommand }? = commands
 	while pending and session.alive do
 		for _, command in pending do
@@ -102,7 +112,8 @@ local function carryOut(session: Session, commands: { Events.WorldCommand })
 		if session.engine.progress.showing then
 			awaitDialogue(session)
 			if session.alive then
-				local _, _, next = session.engine:step({ kind = "DialogueFinished" })
+				local _, nextEvents, next = session.engine:step({ kind = "DialogueFinished" })
+				recordAfter(session, nextEvents)
 				pending = next
 			end
 		end
@@ -111,7 +122,10 @@ end
 
 -- Runs `advance` on the player's engine and carries out what it returns,
 -- unless the host is already busy for them.
-local function run(player: any, advance: (engine: StoryEngine.Engine) -> { Events.WorldCommand })
+local function run(
+	player: any,
+	advance: (engine: StoryEngine.Engine) -> ({ Events.StoryEvent }, { Events.WorldCommand })
+)
 	local session = sessions[player]
 	if not session or session.busy then
 		return
@@ -124,8 +138,8 @@ end
 -- A Player event from `player`.
 function StoryHost.handle(player: any, event: Events.PlayerEvent)
 	run(player, function(engine)
-		local _, _, commands = engine:step(event)
-		return commands
+		local _, events, commands = engine:step(event)
+		return events, commands
 	end)
 end
 
@@ -138,6 +152,7 @@ local function newSession(player: any, progress: StoryEngine.Progress?)
 		PickupHost.clear(player)
 	end
 	sessions[player] = {
+		player = player,
 		engine = StoryEngine.new(player.UserId, progress, story),
 		world = WorldImpl.new(story, player, function(command)
 			toClient(player, command)
@@ -151,6 +166,7 @@ end
 local function initPlayer(player: any)
 	if not sessions[player] then
 		newSession(player, nil)
+		Persist.open(player)
 	end
 end
 
@@ -158,18 +174,19 @@ end
 function StoryHost.onClientReady(player: any)
 	initPlayer(player)
 	task.spawn(run, player, function(engine: StoryEngine.Engine)
-		local _, _, commands = engine:start()
-		return commands
+		local _, events, commands = engine:start()
+		return events, commands
 	end)
 end
 
 -- Resume (plan section 2.4): a new session for `player` at `progress`, and
--- the World rebuilt to what its Quest expects. Saves are brief 010's; today
--- the Dev shortcuts (DevShortcuts) and the engine tests resume.
+-- the World rebuilt to what its Quest expects. Their Save gets `progress`:
+-- a Dev shortcut's jump is saved as if played to there.
 function StoryHost.resume(player: any, progress: StoryEngine.Progress)
 	newSession(player, progress)
+	Persist.record(player, progress)
 	run(player, function()
-		return StoryEngine.resume(story, progress)
+		return {}, StoryEngine.resume(story, progress)
 	end)
 end
 
@@ -195,6 +212,7 @@ function StoryHost.onDialogueFinished(player: any)
 end
 
 StoryHost.onTalkPromptTriggered = PromptBridge.onTalkPromptTriggered
+StoryHost.onPlayerAdded = initPlayer
 
 -- The active Quest's id ("chapter1.ask_dad") and Quest; nil before the
 -- player has one and after the Story is complete.
@@ -228,7 +246,9 @@ local function playersToPoll(): { any }
 	return list
 end
 
-local function removePlayer(player: Player)
+-- The player has left: their Save gets their last Progress and is released.
+function StoryHost.onPlayerRemoving(player: any)
+	Persist.release(player, StoryHost.progress(player))
 	local session = sessions[player]
 	if session then
 		session.alive = false
@@ -244,6 +264,7 @@ function StoryHost.start()
 	local made = Remotes.createRemotes()
 	remotes = made
 
+	Persist.start(story, StoryHost.progress)
 	CharacterHost.build(story)
 	local zones = SceneBuilder.buildZones(story)
 	PropHost.build(story)
@@ -259,7 +280,7 @@ function StoryHost.start()
 		initPlayer(player)
 	end
 	made.ClientReady.OnServerEvent:Connect(fromClient("ClientReady", StoryHost.onClientReady))
-	Players.PlayerRemoving:Connect(removePlayer)
+	Players.PlayerRemoving:Connect(StoryHost.onPlayerRemoving)
 
 	print("[StoryServer] Story engine ready: " .. story.title)
 end

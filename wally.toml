@@ -6,3 +6,10 @@ realm = "shared"
 private = true
 
 [dependencies]
+
+# ProfileStore (MadStudioRoblox/ProfileStore, by loleris), pinned exactly.
+# Persist (src/server/Persist.luau) keeps each player's Save with it.
+# tools/build.sh runs `wally install` into ServerPackages/, which
+# default.project.json maps to ServerScriptService.ServerPackages.
+[server-dependencies]
+ProfileStore = "lm-loleris/profilestore@=1.0.3"

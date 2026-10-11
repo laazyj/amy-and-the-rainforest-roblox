@@ -27,7 +27,7 @@ local TIME_LIMIT = 60 -- for each run
 local QUESTS_EACH = 3
 local JUMP = "/chapter 3"
 
-local world = include("tests/engine/_world.luau").build(false)
+local world = include("tests/engine/_world.luau").build(false, "isolation")
 local server = world.StoryHost
 local play = Driver.new(server, world.CharacterHost)
 

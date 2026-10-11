@@ -34,7 +34,7 @@ local MEASURED = {
 -- the measured 0.08 ms, well before the plan's 8 ms (section 8).
 local FLOOR = { heartbeatMs = 0.25 }
 
-include("tests/engine/_world.luau").build(true)
+include("tests/engine/_world.luau").build(true, "budgets")
 local descendants = Workspace:GetDescendants()
 
 -- Reports `value` against its budget, then holds it to the budget.
