@@ -410,37 +410,44 @@ function OpenCloud.parseEntriesPage(response: Response): ({ EntryKey }, string?)
 	return keys, nextPage(decoded.nextPageCursor)
 end
 
-local function entryUrl(universeId: string, datastore: string, entry: EntryKey): string
-	return datastores(
-		universeId,
-		"/datastore/entries/entry",
-		{ { "datastoreName", datastore }, { "entryKey", entry.key }, { "scope", entry.scope } }
-	)
-end
-
--- GET one entry. Scope universe-datastores.objects:read. 200 with its value,
--- 204 when it "is marked as deleted".
-function OpenCloud.getEntryRequest(apiKey: string, universeId: string, datastore: string, entry: EntryKey): Request
-	return {
-		method = "GET",
-		url = entryUrl(universeId, datastore, entry),
-		headers = headers(apiKey, "application/json"),
-	}
-end
-
--- Whether a get-entry response says the entry is gone: marked as deleted
--- (204) or not found (404).
-function OpenCloud.isDeletedEntry(response: Response): boolean
-	return response.statusCode == 204 or response.statusCode == 404
-end
-
 -- DELETE one entry. Scope universe-datastores.objects:delete. 204 when done.
 function OpenCloud.deleteEntryRequest(apiKey: string, universeId: string, datastore: string, entry: EntryKey): Request
 	return {
 		method = "DELETE",
-		url = entryUrl(universeId, datastore, entry),
+		url = datastores(
+			universeId,
+			"/datastore/entries/entry",
+			{ { "datastoreName", datastore }, { "entryKey", entry.key }, { "scope", entry.scope } }
+		),
 		headers = headers(apiKey, "application/json"),
 	}
+end
+
+-- GET a data store's entries through Open Cloud v2 (openapi.json, List Data
+-- Store Entries), which leaves out entries marked for deletion
+-- (`showDeleted` is false by default); the v1 listing above still lists a
+-- key a while after it is deleted. Scope universe-datastores.objects:list.
+function OpenCloud.listLiveEntriesRequest(
+	apiKey: string,
+	universeId: string,
+	datastore: string,
+	pageToken: string?
+): Request
+	local url = cloudV2(`universes/{universeId}/data-stores/{urlEncode(datastore)}/entries?maxPageSize=256`)
+	if pageToken then
+		url ..= `&pageToken={urlEncode(pageToken)}`
+	end
+	return { method = "GET", url = url, headers = headers(apiKey, "application/json") }
+end
+
+-- The entry ids on one page of a v2 listing, and the token for the next.
+function OpenCloud.parseLiveEntriesPage(response: Response): ({ string }, string?)
+	local decoded = serde.decode("json", response.body)
+	local ids = {}
+	for _, entry in decoded.dataStoreEntries or {} do
+		table.insert(ids, entry.id or entry.path)
+	end
+	return ids, nextPage(decoded.nextPageToken)
 end
 
 -- A request as it would be sent, with the key redacted. For --dry-run.

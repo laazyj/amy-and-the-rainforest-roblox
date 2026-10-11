@@ -23,8 +23,8 @@ end
 
 -- A Dev experience whose data stores are `stores` (name -> scope -> keys),
 -- listed `perPage` at a time, as the DataStores v1 API answers. With
--- `lagging`, a deleted key stays listed, as Roblox's listing does for a
--- while, and reads as deleted (204).
+-- `lagging`, a deleted key stays in the v1 listing, as Roblox's does for a
+-- while; the v2 listing leaves out deleted keys.
 local function server(stores: { [string]: { [string]: { string } } }, perPage: number?, lagging: boolean?)
 	local size = perPage or 2
 	local gone: { [string]: boolean } = {}
@@ -44,8 +44,17 @@ local function server(stores: { [string]: { [string]: { string } } }, perPage: n
 				table.remove(keys, index)
 			end
 			return F.response(204)
-		elseif string.find(url, "/datastore/entries/entry?", 1, true) then
-			return if gone[entry] then F.response(204) else F.response(200, "{}")
+		elseif string.find(url, "/cloud/v2/", 1, true) then
+			local name = query(`?name={string.match(url, "/data%-stores/([^/]+)/entries")}`, "name") :: string
+			local live = {}
+			for scope, keys in stores[name] do
+				for _, key in keys do
+					if not gone[`{name}/{scope}/{key}`] then
+						table.insert(live, { id = key })
+					end
+				end
+			end
+			return F.response(200, serde.encode("json", { dataStoreEntries = live }))
 		elseif string.find(url, "/datastore/entries?", 1, true) then
 			local all = {}
 			local store = stores[query(url, "datastoreName") :: string]
@@ -95,13 +104,11 @@ return function(t: any)
 			-- a player's Save, and another run's store, are never touched
 			expect(stores.Progress.global).toEqual({ "Player_123" })
 			expect(stores["test-pr33-77-10-resume-Progress"].global).toEqual({ "Player_-1" })
-			expect(m:stdout()).toContain(
-				`{PREFIX}persist-Progress: deleted 3 entries; listed after: 0 entries; 0 with a value`
-			)
-			expect(m:stdout()).toContain(`test stores {PREFIX}*: 3 store(s), 5 entries deleted, 0 left with a value`)
+			expect(m:stdout()).toContain(`{PREFIX}persist-Progress: deleted 3 entries; listed after: 0 entries`)
+			expect(m:stdout()).toContain(`test stores {PREFIX}*: 3 store(s), 5 entries deleted, 0 left`)
 		end)
 
-		it("waits for a lagging listing, then reads each key still listed as deleted", function()
+		it("checks through the v2 listing, which leaves out deleted keys the v1 listing still has", function()
 			local waited = {}
 			local m = F.mock({
 				args = args(),
@@ -111,10 +118,8 @@ return function(t: any)
 				end,
 			})
 			expect(m:run(CleanTestStores.main)).toBeNil()
-			expect(#waited).toBe(CleanTestStores.LIST_ATTEMPTS - 1)
-			expect(m:stdout()).toContain(
-				`{PREFIX}a: deleted 2 entries; listed after: 2 entries (2 still listed, each read as deleted); 0 with a value`
-			)
+			expect(#waited).toBe(0)
+			expect(m:stdout()).toContain(`{PREFIX}a: deleted 2 entries; listed after: 0 entries`)
 		end)
 
 		it("sends the key and builds every request through OpenCloud", function()
@@ -122,23 +127,30 @@ return function(t: any)
 			expect(m:run(CleanTestStores.main)).toBeNil()
 			for _, call in m.calls do
 				expect(call.headers[OpenCloud.API_KEY_HEADER]).toBe(F.KEY)
-				local base = `{OpenCloud.BASE_URL}/datastores/v1/universes/{F.DEV}/standard-datastores`
-				expect(string.sub(call.url, 1, #base)).toBe(base)
+				local v1 = `{OpenCloud.BASE_URL}/datastores/v1/universes/{F.DEV}/standard-datastores`
+				local v2 = `{OpenCloud.BASE_URL}/cloud/v2/universes/{F.DEV}/data-stores/{PREFIX}a/entries`
+				expect(string.sub(call.url, 1, #v1) == v1 or string.sub(call.url, 1, #v2) == v2).toBe(true)
 			end
+			expect(m.calls[4].url).toContain("/cloud/v2/")
 			expect(m.calls[1].url).toContain(`prefix=test-{RUN}-`)
 			expect(m.calls[2].url).toContain("allScopes=true")
 			expect(m.calls[3].method).toBe("DELETE")
 		end)
 
-		it("fails when a listed entry still has a value after deleting", function()
+		it("lists again while entries remain, then fails if they never go", function()
 			local stubborn = server({ [`{PREFIX}a`] = { global = { "k" } } })
+			local waited = 0
 			local m = F.mock({
 				args = args(),
 				handler = function(request)
 					return if request.method == "DELETE" then F.response(204) else stubborn(request)
 				end,
+				sleep = function()
+					waited += 1
+				end,
 			})
-			expect(m:run(CleanTestStores.main)).toContain("1 entries in the test stores still have a value")
+			expect(m:run(CleanTestStores.main)).toContain("1 entries are still listed in the test stores")
+			expect(waited).toBe(CleanTestStores.LIST_ATTEMPTS - 1)
 		end)
 
 		it("refuses a listed store without the run's prefix, deleting nothing", function()
