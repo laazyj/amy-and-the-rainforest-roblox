@@ -62,6 +62,10 @@ local StoryEngine = {}
 -- How long a Chapter card holds before the Chapter's first Quest starts.
 StoryEngine.CHAPTER_CARD_SECONDS = 3.2
 
+-- Every Showing, for reading a Showing from a Save.
+StoryEngine.SHOWINGS =
+	table.freeze({ intro = true, dialogue = true, outro = true, ending = true }) :: { [Showing]: true }
+
 StoryEngine.KINDS = table.freeze({ talk = talk, reach = reach, collect = collect }) :: { [Story.QuestKind]: Story.Kind }
 
 type Out = { events: { StoryEvent }, commands: { WorldCommand } }
@@ -160,11 +164,16 @@ local function finish(story: Story.Story, progress: Progress, out: Out)
 	end
 end
 
+-- Whether `progress` has started the Story.
+function StoryEngine.started(progress: Progress): boolean
+	return progress.quest ~= nil or progress.ended or #progress.completed > 0
+end
+
 -- Starts the Story from fresh Progress: the first Chapter's card and first
 -- Quest. Progress that has already started is returned unchanged.
 function StoryEngine.start(story: Story.Story, progress: Progress): (Progress, { StoryEvent }, { WorldCommand })
 	local out: Out = { events = {}, commands = {} }
-	if progress.quest or progress.ended or #progress.completed > 0 then
+	if StoryEngine.started(progress) then
 		return progress, out.events, out.commands
 	end
 	local result = copy(progress)
