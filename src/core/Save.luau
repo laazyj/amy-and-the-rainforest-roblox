@@ -8,8 +8,11 @@
 
 	  read     stored data -> a Save of this version, through the
 	           Migrations; nil and why when it cannot be read
+	  open     what a server plays from the stored data: `read`, or for
+	           data that is not a Save at all, a new Save keeping it aside
 	  write    a Save -> the data to store
-	  record   a Save with new Progress and its Chapters' Checkpoints
+	  record   a Save with new Progress and its Chapters' Checkpoints;
+	           never unstarted Progress over a started Save
 	  restore  the Progress a Resume starts from
 
 	Schema versions. A Migration turns a Save of version n into version
@@ -23,6 +26,10 @@
 	it keeps the fields it does not know and the version number, so its
 	writes lose nothing the newer code needs. A Save two or more versions
 	newer is not read, and Persist then never writes over it.
+
+	Data that is no Save of any version (corrupt, or hand-edited) is kept
+	whole under `unreadable` in a new Save, so it can be repaired by hand,
+	and the player starts the Story afresh rather than never saving again.
 ]]
 
 local Story = require("./Story")
@@ -161,6 +168,27 @@ function Save.read(story: Story.Story, stored: any): (Save?, string?)
 	return data :: Save, nil
 end
 
+-- Whether `stored` claims a schema version newer than this code's: never
+-- to be written over, whether this code can read it (one newer) or not.
+local function newer(stored: any): boolean
+	return type(stored) == "table" and type(stored.version) == "number" and stored.version > Save.VERSION
+end
+
+-- What a server plays from `stored`: the Save `read` gives; for data that
+-- is no Save of any version, a new Save keeping it under `unreadable`, and
+-- why; nil and why for a Save too new to read, which must not be written.
+function Save.open(story: Story.Story, stored: any): (Save?, string?)
+	local save, reason = Save.read(story, stored)
+	if save then
+		return save, nil
+	elseif newer(stored) then
+		return nil, reason
+	end
+	local fresh = Save.new()
+	fresh.unreadable = copy(stored)
+	return fresh, reason
+end
+
 -- The data to store for `save`: plain tables only, nothing shared with it.
 function Save.write(save: Save): { [string]: any }
 	return copy(save)
@@ -176,6 +204,11 @@ end
 -- Chapter reached without being started (a Dev shortcut's jump) gets the
 -- Checkpoint of a player who has just started it.
 function Save.record(story: Story.Story, save: Save, progress: Progress): Save
+	if Save.started(save) and not StoryEngine.started(progress) then
+		-- a session that has not begun (the Title screen still showing) has
+		-- nothing to save; only a new Save, Start again, is unstarted
+		return save
+	end
 	local result = table.clone(save)
 	result.progress = copy(progress)
 	local checkpoints = {}

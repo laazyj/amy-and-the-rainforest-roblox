@@ -5,6 +5,9 @@
 --   - a player with no Save starts the Story at once, with no Title screen;
 --   - Progress is written on Story events, without being asked to;
 --   - leaving writes the last Progress and releases the session lock;
+--   - a returning player who leaves at the Title screen keeps their Save;
+--   - a Save that cannot be loaded in time means playing without saving,
+--     and the Save is left as it was;
 --   - a returning player is offered the Title screen, and each Title
 --     choice (Continue, Play this chapter again, Start again) leads where
 --     it should;
@@ -115,6 +118,32 @@ describe("Saves", function()
 		local save, locked = stored(player)
 		expect(locked).toBe(false)
 		expect(save.progress.quest).toBe(third)
+	end)
+
+	it("keeps the Save of a returning player who leaves at the Title screen, choosing nothing", function()
+		local back = join()
+		waitFor("ShowTitle", 30, function()
+			return titles[back] ~= nil
+		end)
+		leave(back)
+		local save = stored(back)
+		expect(save.progress.quest).toBe(third)
+		expect(save.checkpoints[story.chapters[1].id] ~= nil).toBe(true)
+	end)
+
+	it("plays without saving when the Save does not load in time, leaving it as it was", function()
+		local timeout = Persist.LOAD_TIMEOUT
+		Persist.LOAD_TIMEOUT = 0
+		local back = join()
+		waitFor("the first Quest", 30, function()
+			return server.activeQuest(back) == first
+		end)
+		Persist.LOAD_TIMEOUT = timeout
+		expect(titles[back]).toBeNil()
+		expect(sent[back][1]).toBe("ShowChapter")
+		playTo(back, quests[2].quest.id)
+		leave(back)
+		expect(stored(back).progress.quest).toBe(third)
 	end)
 
 	it("offers a returning player the Title screen; Continue resumes at their Quest", function()

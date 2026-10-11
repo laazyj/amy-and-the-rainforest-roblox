@@ -70,7 +70,7 @@ TitleScreen.LABELS = table.freeze({
 	cancel = "No, go back",
 } :: { [Button]: string })
 
-TitleScreen.CONFIRM = "Start the whole story again from the very beginning?"
+TitleScreen.CONFIRM = "Start the whole story again from the very beginning? Your place in the story will be gone."
 
 TitleScreen.CHOICES = table.freeze({ continue = true, replay = true, restart = true } :: { [string]: true })
 

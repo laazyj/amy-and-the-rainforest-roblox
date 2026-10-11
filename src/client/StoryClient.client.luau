@@ -310,22 +310,56 @@ titleText(
 	string.format('%s<font color="#%02x%02x%02x">%s</font>', words.the, gold.r, gold.g, gold.b, words.gold)
 )
 
-local titleNote = titleText("Note", 0.6, 0.05, Enum.Font.GothamMedium, "")
+-- The choices sit at the bottom, above the safe area, and grow upwards:
+-- the note (the Chapter, or the confirmation's question), then the buttons
+-- in a row that wraps, so they fit a phone in landscape or portrait.
+local function list(parent: Instance, direction: Enum.FillDirection, padding: number): UIListLayout
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = direction
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+	layout.Padding = UDim.new(0, padding)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = parent
+	return layout
+end
+
+local titleChoices = Instance.new("Frame")
+titleChoices.Name = "Choices"
+titleChoices.AnchorPoint = Vector2.new(0.5, 1)
+titleChoices.Position = UDim2.new(0.5, 0, 1, -24)
+titleChoices.Size = UDim2.new(0.94, 0, 0, 0)
+titleChoices.AutomaticSize = Enum.AutomaticSize.Y
+titleChoices.BackgroundTransparency = 1
+titleChoices.ZIndex = 32
+titleChoices.Parent = titleScreen
+list(titleChoices, Enum.FillDirection.Vertical, 10)
+
+local titleNote = Instance.new("TextLabel")
+titleNote.Name = "Note"
+titleNote.LayoutOrder = 1
+titleNote.Size = UDim2.new(1, 0, 0, 0)
+titleNote.AutomaticSize = Enum.AutomaticSize.Y
+titleNote.BackgroundTransparency = 1
+titleNote.Font = Enum.Font.GothamMedium
+titleNote.TextSize = 22
+titleNote.TextWrapped = true
+titleNote.TextColor3 = Color3.new(1, 1, 1)
+titleNote.TextStrokeColor3 = rgb(palette.deep)
+titleNote.TextStrokeTransparency = 0.4
+titleNote.Text = ""
+titleNote.ZIndex = 33
+titleNote.Parent = titleChoices
 
 local titleButtons = Instance.new("Frame")
-titleButtons.Name = "Choices"
-titleButtons.AnchorPoint = Vector2.new(0.5, 0)
-titleButtons.Position = UDim2.new(0.5, 0, 0.67, 0)
-titleButtons.Size = UDim2.new(0.9, 0, 0.3, 0)
+titleButtons.Name = "Buttons"
+titleButtons.LayoutOrder = 2
+titleButtons.Size = UDim2.new(1, 0, 0, 0)
+titleButtons.AutomaticSize = Enum.AutomaticSize.Y
 titleButtons.BackgroundTransparency = 1
 titleButtons.ZIndex = 32
-titleButtons.Parent = titleScreen
-local buttonList = Instance.new("UIListLayout")
-buttonList.FillDirection = Enum.FillDirection.Vertical
-buttonList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-buttonList.Padding = UDim.new(0, 10) -- feel.md: at least 8 between touch targets
-buttonList.SortOrder = Enum.SortOrder.LayoutOrder
-buttonList.Parent = titleButtons
+titleButtons.Parent = titleChoices
+list(titleButtons, Enum.FillDirection.Horizontal, 10).Wraps = true -- feel.md: at least 8 between touch targets
 
 ----------------------------------------------------------------
 -- Dialogue
@@ -424,6 +458,7 @@ local function renderTitle()
 	local view = TitleScreen.view(title)
 	titleScreen.Visible = view.visible
 	titleNote.Text = view.note or ""
+	titleNote.Visible = view.note ~= nil
 	for _, child in titleButtons:GetChildren() do
 		if child:IsA("TextButton") then
 			child:Destroy()
@@ -433,7 +468,7 @@ local function renderTitle()
 		local choice = Instance.new("TextButton")
 		choice.Name = button.id
 		choice.LayoutOrder = order
-		choice.Size = UDim2.new(0, 320, 0, 56) -- feel.md: at least 48 x 48
+		choice.Size = UDim2.new(0, 240, 0, 52) -- feel.md: at least 48 x 48
 		choice.BackgroundColor3 = rgb(if button.primary then palette.gold else palette.cream)
 		choice.Font = Enum.Font.FredokaOne
 		choice.TextSize = 24

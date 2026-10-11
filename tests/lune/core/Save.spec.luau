@@ -134,6 +134,33 @@ return function(t: any)
 		end
 	end)
 
+	describe("Save.open", function()
+		it("opens a Save as Save.read reads it", function()
+			local save = Save.record(fixture, Save.new(), progressAt("chapter2.pick"))
+			expect(Save.open(fixture, stored(Save.write(save)))).toEqual(save)
+		end)
+
+		it("keeps data that is no Save aside, under unreadable, in a new Save, and says why", function()
+			local corrupt = { version = 2, progress = { quest = 3 } }
+			local save, reason = Save.open(fixture, corrupt)
+			expect(reason).toContain("progress")
+			expect(Save.started(save :: Save.Save)).toBe(false)
+			expect((save :: any).unreadable).toEqual(corrupt)
+			-- and what is kept aside survives the next records
+			local later = Save.record(fixture, save :: Save.Save, progressAt("chapter1.go_out"))
+			expect(later.unreadable).toEqual(corrupt)
+			expect(Save.open(fixture, "garbage")).toEqual(
+				{ version = Save.VERSION, progress = StoryEngine.fresh(), checkpoints = {}, unreadable = "garbage" } :: any
+			)
+		end)
+
+		it("opens nothing for a Save two versions newer, which must never be written over", function()
+			local save, reason = Save.open(fixture, { version = Save.VERSION + 2, progress = StoryEngine.fresh() })
+			expect(save).toBeNil()
+			expect(reason).toContain("newer")
+		end)
+	end)
+
 	describe("Save.write", function()
 		it("shares no table with the Save", function()
 			local save = Save.record(fixture, Save.new(), progressAt("chapter1.go_out"))
@@ -172,7 +199,13 @@ return function(t: any)
 			local later = Save.record(fixture, Save.new(), progressAt("chapter2.pick"))
 			local back = Save.record(fixture, later, progressAt("chapter1.go_out"))
 			expect(back.checkpoints).toEqual({ chapter1 = progressAt("chapter1.greet") })
-			expect(Save.record(fixture, later, StoryEngine.fresh()).checkpoints).toEqual({})
+		end)
+
+		it("never records unstarted Progress over a started Save: a session still at the Title screen", function()
+			local saved = Save.record(fixture, Save.new(), progressAt("chapter2.pick"))
+			expect(Save.record(fixture, saved, StoryEngine.fresh())).toEqual(saved)
+			-- a new Save takes it, as Start again's does
+			expect(Save.record(fixture, Save.new(), StoryEngine.fresh())).toEqual(Save.new())
 		end)
 
 		it("leaves the Save it was given as it was", function()

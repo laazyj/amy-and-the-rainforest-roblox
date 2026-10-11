@@ -110,15 +110,19 @@ Result of brief 008's spike, 2026-10-09:
 `wally.toml` pins `lm-loleris/profilestore` exactly (`=1.0.3`, published from
 github.com/MadStudioRoblox/ProfileStore). `tools/build.sh` runs
 `wally install` when `ServerPackages/` is missing or older than `wally.toml`,
-and prints the SHA-256 of each installed file; CI fails the build if the
-install fails. Locally, without the Wally registry (`api.wally.run`; cloud
+and fails unless every installed file matches its SHA-256 in
+`tools/package-checksums.txt` (the version pins the name, the checksums pin
+the content); CI fails the build if the install fails. Locally, without the Wally registry (`api.wally.run`; cloud
 sessions are denied it), the build warns and leaves ProfileStore out, and the
 game then plays without saves. `ServerPackages/` and `wally.lock` are not
 committed. The weekly toolchain job bumps the pin like any other.
 
-When the pin moves, read ProfileStore's changes against the parts Persist
-uses (the types at the top of `src/server/Persist.luau`) before merging;
-`tests/engine/persist.luau` is what proves them.
+When the pin moves (by hand, or in the weekly "Toolchain updates" PR, whose
+build then fails on the checksums until they are updated), read
+ProfileStore's changes against the parts Persist uses (the types at the top
+of `src/server/Persist.luau`), then replace the lines in
+`tools/package-checksums.txt` with the new files' SHA-256s from a CI build;
+`tests/engine/persist.luau` is what proves the new version.
 
 ### A new schema version
 
@@ -128,6 +132,17 @@ add `Save.MIGRATIONS[old]`, add a test for it in
 only), so the previous version still reads the new Save (glossary,
 **Schema version**). Never ship two schema versions between Release
 promotions.
+
+### A Save that is not a Save
+
+Data in a player's key that is no Save of any version (corrupt, or edited
+by hand) is kept whole under `unreadable` in a new Save, and the server logs
+`[Persist] <name>'s Save: <why>`; the player starts the Story afresh and
+saves from then on. To repair one, read the key in the Creator Dashboard's
+data store manager (Dev or Release, store `Progress`, key
+`Player_<user id>`), fix the `unreadable` value into a Save, and write it
+back while the player is away. A Save two or more versions newer is never
+touched (that player plays without saving until the server catches up).
 
 ### Studio DataStore access on Dev (Mac playtests)
 
