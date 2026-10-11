@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Tier 0 static checks: StyLua formatting, Selene lint, luau-lsp type checking,
-# the asset manifest (docs/ASSETS.md), and actionlint and zizmor (installed by
-# tools/bootstrap-agent.sh) over .github.
+# the asset manifest (docs/ASSETS.md), actionlint and zizmor (installed by
+# tools/bootstrap-agent.sh) over .github, and the guards of tools/guard.luau
+# (plan sections 2.1, 2.4 and 4).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$PWD/build/bin:$PATH" # where tools/bootstrap-agent.sh installs
@@ -52,3 +53,18 @@ if ! grep -q "typedefs/$lune_version/" .luaurc; then
 fi
 lune setup >/dev/null # writes the @lune type definitions that .luaurc points at
 luau-lsp analyze --platform=standard tests/lune tools
+
+echo "== Content schema (derived from docs/GLOSSARY.md)"
+lune run tools/guard schema
+
+echo "== Purity: src/core and src/content"
+lune run tools/guard purity
+
+echo "== No external links in content, core or client text"
+lune run tools/guard links
+
+echo "== Coverage guards: a spec per core module, glossary names in specs, a Walkthrough per Chapter"
+lune run tools/guard coverage
+
+echo "== Mutation check: every canned fault still applies (the nightly job runs them)"
+lune run tools/guard faults
