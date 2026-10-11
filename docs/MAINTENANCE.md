@@ -155,12 +155,16 @@ DataStores (plan section 3).
 zizmor's online audits run in CI only. The few findings accepted rather than
 fixed are in `.github/zizmor.yml`, each with its reason.
 
-**Follow-up (owner):** the Roblox keys are repository secrets, which zizmor's
-`secrets-outside-env` audit flags (auditor persona). For `publish-dev.yml`,
-create a `dev` environment limited to the `main` branch, move
-`ROBLOX_DEV_API_KEY` into it and set `environment: dev` on the publish job, so
-a workflow edited on a PR branch cannot reach a publish path with the key.
-`engine-tests.yml` runs on PRs by design, so it keeps the repository secret.
+**Where the Dev key lives.** `ROBLOX_DEV_API_KEY` exists twice, with the
+same value: as a secret of the `dev` environment (limited to the `main`
+branch, no required reviewers), which `publish-dev.yml` and
+`upload-assets.yml` read through `environment: dev`, so a workflow edited
+on a PR branch cannot reach a publish or upload path with the key; and as a
+repository secret, which `engine-tests.yml` reads, because engine tests run
+on PR branches by design. Rotate both together. If the repository secret is
+missing, every engine-tests run skips at its gate with "ROBLOX_DEV_API_KEY
+is not available to this run"; if the environment secret is missing, Dev
+publishes and uploads skip the same way.
 
 ## Key rotation
 
