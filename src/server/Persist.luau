@@ -285,9 +285,14 @@ function Persist.start(forStory: Story.Story, progressOf: (player: any) -> Story
 	end
 	local ProfileStore: any = (require :: any)(module)
 	store = ProfileStore.New(Persist.storeName(), {})
-	game:BindToClose(function()
+	-- In a Luau Execution task the server never closes; were binding refused
+	-- there, the engine tests call close() themselves (tests/engine/persist).
+	local bound, reason = pcall(game.BindToClose, game, function()
 		Persist.close(progressOf)
 	end)
+	if not bound then
+		warn(`[Persist] BindToClose: {reason}`)
+	end
 end
 
 return Persist

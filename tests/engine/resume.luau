@@ -4,13 +4,14 @@
 -- there.
 --
 -- 1. Walk the Story with the fake player and the driver. As each Quest
---    becomes playable (the host idle, waiting on the player), save the
---    Progress, through JSON as a save would, and observe the world: where
---    each Character stands, which Props are out and in what state, and the
---    Lighting preset.
--- 2. Then, last Quest first, resume at each saved Progress in a fresh
---    StoryEngine (StoryHost.resume) and observe the world again; it must
---    match. Going backwards makes each Resume undo a later world (the
+--    becomes playable (the host idle, waiting on the player), write the
+--    player's Save to its DataStore through Persist and ProfileStore, read
+--    it back from the store, and observe the world: where each Character
+--    stands, which Props are out and in what state, and the Lighting
+--    preset. The store is this run's test store (tests/engine/_world.luau).
+-- 2. Then, last Quest first, resume from each stored Save (core/Save read
+--    and restored) in a fresh StoryEngine (StoryHost.resume) and observe
+--    the world again; it must match. Going backwards makes each Resume undo a later world (the
 --    machine leaves, Sam comes home), as a returning player's fresh server
 --    would not need to, so it is the harder test.
 --
@@ -24,11 +25,14 @@ local FakePlayer = include("tests/engine/_fakeplayer.luau")
 local HttpService = game:GetService("HttpService")
 local Workspace = game:GetService("Workspace")
 
-local TIME_LIMIT = 200
+-- the walk, with a DataStore write and read at every Quest (a key takes
+-- about one write every 6 s)
+local TIME_LIMIT = 220
 
 local world = include("tests/engine/_world.luau").build(false, "resume")
 local server = world.StoryHost
 local story = world.story
+local Persist, Save = world.Persist, world.Save
 local play = Driver.new(server, world.CharacterHost)
 
 local player = FakePlayer.new(world.spawn)
@@ -58,10 +62,10 @@ local function observe(): { [string]: any }
 end
 
 local order: { string } = {}
-local saved: { [string]: { progress: string, world: { [string]: any } } } = {}
+local saved: { [string]: { save: string, world: { [string]: any } } } = {}
 
 describe("Resume", function()
-	it("walks the Story, saving Progress and the world at every Quest", function()
+	it("walks the Story, writing the Save to its DataStore at every Quest and reading it back", function()
 		server.onClientReady(player)
 		local started = os.clock()
 		repeat
@@ -78,21 +82,27 @@ describe("Resume", function()
 					task.wait(0.1)
 					continue
 				end
-				saved[questId] = { progress = HttpService:JSONEncode(server.progress(player)), world = observe() }
+				assert(Persist.flush(player), `the Save at {questId} was not written`)
+				local stored, locked = Persist.stored(player)
+				assert(locked, "the Save is not locked to this server's session")
+				local save = assert(Save.read(story, stored))
+				expect(save.progress.quest).toBe(questId)
+				saved[questId] = { save = HttpService:JSONEncode(stored), world = observe() }
 				table.insert(order, questId)
 			end
 			play(player)
 			task.wait(0.1)
 		until (server.progress(player) :: any).ended
-		print(`  saved {#order} Quests in {math.floor(os.clock() - started)} s`)
+		print(`  saved {#order} Quests to {Persist.storeName()} in {math.floor(os.clock() - started)} s`)
 		expect(#order).toBe(#world.Story.quests(story))
 	end)
 
-	it("rebuilds, from each saved Progress, the world walked to, last Quest first", function()
+	it("rebuilds, from each stored Save, the world walked to, last Quest first", function()
 		local mismatches = {}
 		for i = #order, 1, -1 do
 			local questId = order[i]
-			server.resume(player, HttpService:JSONDecode(saved[questId].progress))
+			local save = assert(Save.read(story, HttpService:JSONDecode(saved[questId].save)))
+			server.resume(player, Save.restore(story, save.progress))
 			expect(server.activeQuest(player)).toBe(questId)
 			local resumed, walked = observe(), saved[questId].world
 			local before = #mismatches

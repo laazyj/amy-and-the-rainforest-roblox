@@ -1,6 +1,8 @@
 # Tier 2: build the place, publish it to Dev as a Saved version (not visible
 # to players), then run tests/engine/ against that exact version through Open
-# Cloud Luau Execution. See docs/OPEN_CLOUD.md.
+# Cloud Luau Execution, then delete what the run left in its test stores
+# (test-<RUN_ID>-*) through the Open Cloud DataStore API and list them
+# again to show they are empty. See docs/OPEN_CLOUD.md.
 #
 # Without ROBLOX_DEV_API_KEY (before setup, or on a PR from a fork, which
 # gets no secrets) the job skips cleanly with a notice instead of failing.
@@ -54,6 +56,8 @@ jobs:
       DEV_PLACE_ID: ${{ vars.DEV_PLACE_ID }}
       RELEASE_UNIVERSE_ID: ${{ vars.RELEASE_UNIVERSE_ID }}
       RELEASE_PLACE_ID: ${{ vars.RELEASE_PLACE_ID }}
+      # names this run's test stores, test-<RUN_ID>-*
+      RUN_ID: pr${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -79,7 +83,16 @@ jobs:
         env:
           ROBLOX_DEV_API_KEY: ${{ secrets.ROBLOX_DEV_API_KEY }}
           VERSION: ${{ steps.publish.outputs.version }}
-          PR: ${{ github.event.pull_request.number }}
         run: |
           lune run tools/run-engine-tests --universe "$DEV_UNIVERSE_ID" --place "$DEV_PLACE_ID" \
-            --version "$VERSION" --dir tests/engine --run-id "pr${PR}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            --version "$VERSION" --dir tests/engine --run-id "$RUN_ID"
+
+      # Runs whether the tests passed or not, once any task may have run.
+      - name: Delete the run's test-store entries and list the stores again
+        if: always() && steps.publish.outcome == 'success'
+        env:
+          ROBLOX_DEV_API_KEY: ${{ secrets.ROBLOX_DEV_API_KEY }}
+        run: |
+          set -o pipefail
+          lune run tools/clean-test-stores --universe "$DEV_UNIVERSE_ID" --place "$DEV_PLACE_ID" \
+            --run-id "$RUN_ID" | tee -a "$GITHUB_STEP_SUMMARY"

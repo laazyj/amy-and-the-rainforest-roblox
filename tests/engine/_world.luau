@@ -40,6 +40,7 @@ function World.build(withMap: boolean, saves: string)
 		spawn = Convert.vector(story.spots.AmySpawn.at) + Vector3.new(0, 4, 0),
 		Story = (require :: any)(ReplicatedStorage:WaitForChild("core"):WaitForChild("Story")),
 		StoryEngine = (require :: any)(ReplicatedStorage:WaitForChild("core"):WaitForChild("StoryEngine")),
+		Save = (require :: any)(ReplicatedStorage:WaitForChild("core"):WaitForChild("Save")),
 		StoryHost = StoryHost,
 		CharacterHost = server("CharacterHost"),
 		DevShortcuts = (require :: any)(ServerScriptService:WaitForChild("Dev"):WaitForChild("DevShortcuts")),

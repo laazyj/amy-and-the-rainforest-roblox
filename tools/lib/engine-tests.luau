@@ -31,6 +31,12 @@ type Embedded = { [string]: { [string]: string } }
 type Script = { name: string, source: string, embedded: Embedded? }
 
 -- RUN_ID ends up inside DataStore names (limit 50 characters), so keep it short and plain.
+-- The prefix of every store a run's scripts name with storeName()
+-- (tests/engine/_prelude.luau), which the test-store cleanup deletes.
+function EngineTests.storePrefix(runId: string): string
+	return `test-{runId}-`
+end
+
 function EngineTests.resolveRunId(explicit: string?, env: { [string]: string? }): string
 	local runId = explicit
 		or if env.GITHUB_RUN_ID

@@ -63,7 +63,7 @@ local WIRING: { { file: string, label: string, code: string } } = {
 	{
 		file = "Persist.luau",
 		label = "BindToClose releases every Save",
-		code = "game:BindToClose(function()\n\t\tPersist.close(progressOf)\n\tend)",
+		code = "pcall(game.BindToClose, game, function()\n\t\tPersist.close(progressOf)\n\tend)",
 	},
 	{
 		file = "StoryHost.luau",
