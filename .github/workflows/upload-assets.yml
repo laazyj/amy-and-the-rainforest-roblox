@@ -9,7 +9,9 @@
 # runs fetched tools: `upload` runs the uploader with a read-only token;
 # `pull-request` runs no fetched tools, applies the two files and opens the PR.
 #
-# Inert until ROBLOX_DEV_API_KEY exists: without it the job skips with a notice.
+# The Dev key lives in the `dev` GitHub environment (limited to main); the
+# gate and upload jobs declare `environment: dev`. Without the key the job
+# skips with a notice.
 name: Upload assets
 
 on:
@@ -28,6 +30,7 @@ jobs:
   gate:
     name: Check for the Dev key and an open Asset ids PR
     runs-on: ubuntu-latest
+    environment: dev
     permissions:
       contents: read
       pull-requests: read # list the open Asset ids PR
@@ -63,6 +66,7 @@ jobs:
     needs: gate
     if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-latest
+    environment: dev
     timeout-minutes: 30
     permissions:
       contents: read

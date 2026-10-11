@@ -34,13 +34,12 @@ rules:
       - toolchain-check.yml
       - upload-assets.yml
 
-  # Shown only by `--persona=auditor`; listed so nothing is hidden. The keys
-  # are repository secrets, passed only to the steps that need them. The
-  # owner follow-up (a `dev` environment for publish-dev) is in
-  # docs/MAINTENANCE.md.
+  # Shown only by `--persona=auditor`; listed so nothing is hidden.
+  # publish-dev.yml and upload-assets.yml read the Dev key from the `dev`
+  # environment. engine-tests.yml runs on PR branches by design, so it reads
+  # the repository secret (docs/MAINTENANCE.md); toolchain-check.yml reads
+  # the PR token. Each key is passed only to the steps that need it.
   secrets-outside-env:
     ignore:
       - engine-tests.yml
-      - publish-dev.yml
       - toolchain-check.yml
-      - upload-assets.yml
