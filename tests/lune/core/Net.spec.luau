@@ -19,6 +19,8 @@ return function(t: any)
 			expect(Net.check("ShowEnding", table.pack("The end ♥", "a story by Clara"))).toBe(true)
 			expect(Net.check("DialogueFinished", { n = 0 })).toBe(true)
 			expect(Net.check("ClientReady", { n = 0 })).toBe(true)
+			expect(Net.check("ShowTitle", table.pack("Chapter Two — The Unexplored World", true))).toBe(true)
+			expect(Net.check("TitleChoice", table.pack("continue"))).toBe(true)
 		end)
 
 		local malformed: { { any } } = {
@@ -31,6 +33,8 @@ return function(t: any)
 			{ "ShowEnding", table.pack("a", "b", "c"), "takes 2 argument(s), got 3" },
 			{ "DialogueFinished", table.pack("done"), "takes 0 argument(s), got 1" },
 			{ "ClientReady", table.pack(true), "takes 0 argument(s), got 1" },
+			{ "ShowTitle", table.pack("Chapter Two", "yes"), "argument 2 must be boolean" },
+			{ "TitleChoice", table.pack(7), "argument 1 must be string" },
 		}
 		for _, case in malformed do
 			it(`rejects a malformed {case[1]} payload: {case[3]}`, function()

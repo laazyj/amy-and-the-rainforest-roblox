@@ -45,7 +45,8 @@ describe("remote contract", function()
 			counts[message.remote] = (counts[message.remote] or 0) + 1
 		end
 		for remote, contract in Net.REMOTES do
-			if contract.direction == "toClient" then
+			-- only a returning player is sent ShowTitle; tests/engine/persist.luau checks it
+			if contract.direction == "toClient" and remote ~= "ShowTitle" then
 				print(`  {remote}: {counts[remote] or 0} payloads hold`)
 				expect((counts[remote] or 0) > 0).toBe(true)
 			end

@@ -153,7 +153,8 @@ return function(t: any)
 					)
 				end)
 				it(`has the client send {name}`, function()
-					expect(source(CLIENT)).toContain(`{name}:FireServer()`)
+					local call = if #remote.args == 0 then `{name}:FireServer()` else `{name}:FireServer(`
+					expect(source(CLIENT)).toContain(call)
 				end)
 			else
 				it(`has the client render {name}, payload checked`, function()

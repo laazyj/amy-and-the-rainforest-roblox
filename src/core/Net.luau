@@ -8,6 +8,10 @@
 	The remote names predate the glossary and are kept on the wire, so the
 	golden file (tests/fixtures/golden/walkthrough.json) still names them:
 	ShowChapterCard travels as ShowChapter, or ShowEnding for the end card.
+
+	ShowTitle and TitleChoice carry the Title screen (src/core/TitleScreen),
+	an adapter detail like ClientReady, not World commands: only a returning
+	player is sent ShowTitle, so the golden file has none.
 ]]
 
 local Events = require("./Events")
@@ -27,6 +31,11 @@ Net.REMOTES = table.freeze({
 	ShowEnding = { direction = "toClient", args = { "string", "string" } },
 	DialogueFinished = { direction = "toServer", args = {} },
 	ClientReady = { direction = "toServer", args = {} },
+	-- the Title screen's offer to a returning player (TitleScreen.Offer):
+	-- the Chapter they are in, and whether there is a Quest to continue
+	ShowTitle = { direction = "toClient", args = { "string", "boolean" } },
+	-- the Title choice: "continue", "replay" or "restart" (TitleScreen.CHOICES)
+	TitleChoice = { direction = "toServer", args = { "string" } },
 } :: { [string]: Remote })
 
 -- Holds a remote's arguments (from table.pack) to its payload: the right
