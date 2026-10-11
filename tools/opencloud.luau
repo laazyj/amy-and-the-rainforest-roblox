@@ -410,15 +410,35 @@ function OpenCloud.parseEntriesPage(response: Response): ({ EntryKey }, string?)
 	return keys, nextPage(decoded.nextPageCursor)
 end
 
+local function entryUrl(universeId: string, datastore: string, entry: EntryKey): string
+	return datastores(
+		universeId,
+		"/datastore/entries/entry",
+		{ { "datastoreName", datastore }, { "entryKey", entry.key }, { "scope", entry.scope } }
+	)
+end
+
+-- GET one entry. Scope universe-datastores.objects:read. 200 with its value,
+-- 204 when it "is marked as deleted".
+function OpenCloud.getEntryRequest(apiKey: string, universeId: string, datastore: string, entry: EntryKey): Request
+	return {
+		method = "GET",
+		url = entryUrl(universeId, datastore, entry),
+		headers = headers(apiKey, "application/json"),
+	}
+end
+
+-- Whether a get-entry response says the entry is gone: marked as deleted
+-- (204) or not found (404).
+function OpenCloud.isDeletedEntry(response: Response): boolean
+	return response.statusCode == 204 or response.statusCode == 404
+end
+
 -- DELETE one entry. Scope universe-datastores.objects:delete. 204 when done.
 function OpenCloud.deleteEntryRequest(apiKey: string, universeId: string, datastore: string, entry: EntryKey): Request
 	return {
 		method = "DELETE",
-		url = datastores(
-			universeId,
-			"/datastore/entries/entry",
-			{ { "datastoreName", datastore }, { "entryKey", entry.key }, { "scope", entry.scope } }
-		),
+		url = entryUrl(universeId, datastore, entry),
 		headers = headers(apiKey, "application/json"),
 	}
 end

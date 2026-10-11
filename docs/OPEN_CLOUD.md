@@ -157,9 +157,13 @@ lune run tools/clean-test-stores --universe <id> --place <id> --run-id <id> [--d
 
 It lists the data stores whose names start with `test-<RUN_ID>-`, refuses
 any name the listing returns without that prefix, deletes every entry of
-every scope in each, and lists each store's entries again. stdout has one
-line per store (`<store>: deleted N entries; listed after: 0 entries`) and
-a summary; the run fails if any entry is still listed. The engine-tests
+every scope in each, and lists each store's entries again. **The listing
+lags a delete** (seen on Dev, PR #33: every key was still listed a moment
+after its 204), so it lists again up to 6 times, 10 s apart, and reads each
+key still listed on its own: Get Entry answers 204, "marked as deleted",
+for a deleted key. stdout has one line per store (`<store>: deleted N
+entries; listed after: M entries (M still listed, each read as deleted); 0
+with a value`) and a summary; the run fails if any key still has a value. The engine-tests
 workflow runs it after the tests whether they passed or not, and appends
 its output to the job summary. Data stores themselves cannot be deleted
 through the v1 API, so the empty test stores stay listed in the Creator
@@ -384,7 +388,8 @@ Verified:
   `GET /v1/universes/{u}/standard-datastores?prefix=&limit=&cursor=`
   (`universe-datastores.control:list`); `GET …/standard-datastores/datastore/entries?datastoreName=&allScopes=true&limit=&cursor=`
   (`universe-datastores.objects:list`); `DELETE …/datastore/entries/entry?datastoreName=&entryKey=&scope=`
-  (`universe-datastores.objects:delete`, 204). Pages end when
+  (`universe-datastores.objects:delete`, 204); `GET` on the same path
+  (`universe-datastores.objects:read`; 204 when "marked as deleted"). Pages end when
   `nextPageCursor` is empty. The schema names the store list `data` and the
   keys strings; the examples show `datastores` and `{scope, key}` objects.
   `tools/opencloud.luau` reads both.
