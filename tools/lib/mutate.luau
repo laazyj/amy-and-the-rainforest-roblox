@@ -41,8 +41,14 @@ Mutate.FAULTS = {
 		edits = { { from = 'hooks = { onComplete = { "paradise_reveal" } },', to = "" } },
 	},
 	{
-		-- core/Save and its migrations arrive with brief 010; until then the
-		-- Progress a save holds is rebuilt by Resume, so the fault breaks that.
+		name = "break a save migration (version 1 -> 2 adds no Checkpoints)",
+		file = "src/core/Save.luau",
+		edits = {
+			{ from = "\t\t\tcheckpoints[chapter.id] = startOf(story, chapter)\n", to = "" },
+		},
+	},
+	{
+		-- the Progress a Save holds is rebuilt by Resume
 		name = "break a Resume (Progress no longer replays the Beats of completed Quests)",
 		file = "src/core/StoryEngine.luau",
 		edits = {

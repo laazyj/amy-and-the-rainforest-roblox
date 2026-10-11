@@ -37,11 +37,22 @@ return function(t: any)
 	end)
 
 	describe("the canned faults", function()
-		it("are a dozen, each with a name", function()
-			expect(#Mutate.FAULTS).toBe(12)
+		it("are at least a dozen, each with its own name and at least one edit", function()
+			expect(#Mutate.FAULTS >= 12).toBe(true)
+			local names = {}
 			for _, fault in Mutate.FAULTS do
-				expect(fault.name ~= "").toBe(true)
+				expect(fault.name ~= "" and not names[fault.name]).toBe(true)
+				expect(#fault.edits > 0).toBe(true)
+				names[fault.name] = true
 			end
+		end)
+
+		it("include breaking a save migration", function()
+			local found = false
+			for _, fault in Mutate.FAULTS do
+				found = found or fault.file == "src/core/Save.luau"
+			end
+			expect(found).toBe(true)
 		end)
 
 		it("are stale when an edit no longer matches its file", function()
