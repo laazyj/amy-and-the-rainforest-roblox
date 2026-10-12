@@ -114,6 +114,11 @@ Mutate.FAULTS = {
 		file = "src/core/ObjectiveText.luau",
 		edits = { { from = 'visible = trimmed ~= ""', to = "visible = true" } },
 	},
+	{
+		name = "break the camera rule's clamp (a camera outside the cone is left there)",
+		file = "src/core/CameraModel.luau",
+		edits = { { from = "if cosine >= CameraModel.CLAMP_COSINE then", to = "if true then" } },
+	},
 } :: { Fault }
 
 -- Why each fault no longer applies to the files `read` returns; empty when
