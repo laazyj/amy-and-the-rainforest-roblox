@@ -8,6 +8,8 @@
 	  ShowChapter /   -> ChapterCardTimeline: the Chapter card and the end card
 	  ShowEnding
 	  ShowTitle       -> TitleScreen: the Title screen's choices
+	  FrameShot       -> Camera (src/client/Camera, over CameraModel): the
+	                     Shot, framed from behind Amy
 
 	Every remote it receives is held to the Net contract first (Net.guard);
 	a malformed payload is dropped with a warning.
@@ -41,6 +43,7 @@ local palette = require(ReplicatedStorage:WaitForChild("content"):WaitForChild("
 local Shared = ReplicatedStorage:WaitForChild("shared")
 local AssetIds = require(Shared:WaitForChild("AssetIds"))
 local Remotes = require(Shared:WaitForChild("Net"))
+local Camera = require(script.Parent:WaitForChild("Camera"))
 
 local remotes = Remotes.waitForRemotes()
 local ShowDialogue = remotes.ShowDialogue
@@ -381,6 +384,7 @@ end
 
 local function advance()
 	if DialogueViewModel.advance(dialogue) then
+		Camera.dialogueFinished()
 		DialogueFinished:FireServer()
 	end
 	renderDialogue()
@@ -451,9 +455,10 @@ ShowChapter.OnClientEvent:Connect(Net.guard("ShowChapter", showCard(false), warn
 ShowEnding.OnClientEvent:Connect(Net.guard("ShowEnding", showCard(true), warn))
 
 ----------------------------------------------------------------
--- Shots: the camera frames them (brief 011 builds src/client/Camera)
+-- The camera, and the Shots it frames
 ----------------------------------------------------------------
-FrameShot.OnClientEvent:Connect(Net.guard("FrameShot", function(_shot: string, _character: string?) end, warn))
+Camera.start()
+FrameShot.OnClientEvent:Connect(Net.guard("FrameShot", Camera.frameShot, warn))
 
 ----------------------------------------------------------------
 -- The Title screen

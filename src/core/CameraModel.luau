@@ -235,6 +235,34 @@ function CameraModel.turn(camera: Camera, yaw: number, pitch: number)
 	camera.pitch = math.clamp(camera.pitch + pitch, CameraModel.MIN_PITCH, CameraModel.MAX_PITCH)
 end
 
+-- Turned by something else than the camera by more than this, Amy was
+-- put somewhere (TeleportPlayer, a respawn), and the camera follows.
+CameraModel.TURNED_ELSEWHERE = math.rad(3)
+
+-- Amy faces `facing` in the world: when something else than the camera
+-- turned her since the last Frame, the follow camera goes behind her.
+function CameraModel.observe(camera: Camera, facing: Vec3)
+	local yaw = CameraModel.yawOf(facing)
+	if yaw and camera.last and math.abs(wrap(yaw - camera.last.yaw)) > CameraModel.TURNED_ELSEWHERE then
+		CameraModel.place(camera, facing)
+	end
+end
+
+-- feel.md section 1's touch control zones, the phone's (the larger): each
+-- bottom corner, this share of the width and of the height. Device
+-- classes (brief 012) will give the tablet its smaller ones.
+CameraModel.ZONE_WIDTH = 0.35
+CameraModel.ZONE_HEIGHT = 0.4
+
+-- Whether a touch starting at (x, y) in a viewport `width` by `height`
+-- turns the view: anywhere but the control zones, which hold the
+-- thumbstick (bottom left) and the talk button (bottom right).
+function CameraModel.turnsView(x: number, y: number, width: number, height: number): boolean
+	local bottom = y > height * (1 - CameraModel.ZONE_HEIGHT)
+	local corner = x < width * CameraModel.ZONE_WIDTH or x > width * (1 - CameraModel.ZONE_WIDTH)
+	return not (bottom and corner)
+end
+
 --[[ The Shots ]]
 
 -- 0 to 1 over 0 to 1, starting and ending gently.

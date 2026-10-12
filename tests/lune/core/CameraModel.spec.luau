@@ -195,6 +195,40 @@ return function(t: any)
 		end)
 	end)
 
+	describe("CameraModel.observe", function()
+		it("puts the camera behind Amy when the server turns her (TeleportPlayer), ending any Shot", function()
+			local camera = CameraModel.new({ x = 0, y = 0, z = 1 })
+			local amy = { x = 0, y = 3, z = 0 }
+			CameraModel.frameShot(camera, "Dialogue", "Dad")
+			CameraModel.step(camera, SAMPLE, amy, always({ x = 0, y = 5, z = 8 }))
+			CameraModel.observe(camera, { x = 0, y = 0, z = -1 })
+			local frame = CameraModel.step(camera, SAMPLE, amy, always({ x = 0, y = 5, z = 8 }))
+			expect(frame.shot).toBeNil()
+			expect(frame.facing.z).toBe(-1)
+			holds(frame, amy, "after the teleport")
+		end)
+
+		it("leaves the camera alone while Amy faces the way the last Frame turned her", function()
+			local camera = CameraModel.new({ x = 0, y = 0, z = 1 })
+			local amy = { x = 0, y = 3, z = 0 }
+			CameraModel.turn(camera, 0.5, 0)
+			local frame = CameraModel.step(camera, SAMPLE, amy)
+			CameraModel.observe(camera, frame.facing)
+			expect(CameraModel.step(camera, SAMPLE, amy).facing).toEqual(frame.facing)
+		end)
+	end)
+
+	describe("CameraModel.turnsView", function()
+		it("turns the view for a touch anywhere but the thumbstick's and the talk button's zones", function()
+			local width, height = 844, 390
+			expect(CameraModel.turnsView(422, 100, width, height)).toBe(true) -- the middle
+			expect(CameraModel.turnsView(50, 50, width, height)).toBe(true) -- top left
+			expect(CameraModel.turnsView(422, 380, width, height)).toBe(true) -- bottom middle
+			expect(CameraModel.turnsView(100, 350, width, height)).toBe(false) -- the thumbstick
+			expect(CameraModel.turnsView(800, 350, width, height)).toBe(false) -- the talk button
+		end)
+	end)
+
 	describe("CameraModel.clamp", function()
 		local function rig(azimuth: number, elevation: number): CameraModel.Rig
 			return { yaw = 0, azimuth = azimuth, elevation = elevation, distance = 10, lookAt = { x = 0, y = 0, z = 0 } }
