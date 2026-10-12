@@ -29,6 +29,8 @@ Net.REMOTES = table.freeze({
 	SetObjective = { direction = "toClient", args = { "string?" } },
 	ShowChapter = { direction = "toClient", args = { "string", "string" } },
 	ShowEnding = { direction = "toClient", args = { "string", "string" } },
+	-- a Shot by name, and the Character it frames when it frames one
+	FrameShot = { direction = "toClient", args = { "string", "string?" } },
 	DialogueFinished = { direction = "toServer", args = {} },
 	ClientReady = { direction = "toServer", args = {} },
 	-- the Title screen's offer to a returning player (TitleScreen.Offer):
@@ -80,6 +82,8 @@ function Net.message(command: Events.WorldCommand): (string?, Args?)
 		return "SetObjective", table.pack(command.text)
 	elseif command.kind == "ShowChapterCard" then
 		return if command.ending then "ShowEnding" else "ShowChapter", table.pack(command.title, command.subtitle)
+	elseif command.kind == "FrameShot" then
+		return "FrameShot", table.pack(command.shot, command.character)
 	end
 	return nil, nil
 end

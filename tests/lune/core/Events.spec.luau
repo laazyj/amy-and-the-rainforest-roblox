@@ -41,6 +41,7 @@ return function(t: any)
 		it("name the World commands", function()
 			expect(keys(Events.WORLD_COMMANDS)).toEqual({
 				"ClearPickups",
+				"FrameShot",
 				"MoveCharacter",
 				"OfferTalk",
 				"RemovePickup",
@@ -69,6 +70,8 @@ return function(t: any)
 			},
 			{ Events.WORLD_COMMANDS, { kind = "ShowDialogue", lines = { { speaker = "Amy", text = "Deal." } } } },
 			{ Events.WORLD_COMMANDS, { kind = "Wait", seconds = 0.5 } },
+			{ Events.WORLD_COMMANDS, { kind = "FrameShot", shot = "ForestWallReveal" } },
+			{ Events.WORLD_COMMANDS, { kind = "FrameShot", shot = "MeetCharacter", character = "Fox" } },
 		}
 		for i, case in valid do
 			it(`accepts valid message {i} ({case[2].kind})`, function()
@@ -92,6 +95,8 @@ return function(t: any)
 			},
 			{ W, { kind = "Wait", seconds = "0.5" }, "Wait.seconds must be number" },
 			{ W, { kind = "ShowChapterCard", title = "a", subtitle = "b" }, "ShowChapterCard.ending must be boolean" },
+			{ W, { kind = "FrameShot" }, "FrameShot.shot must be string" },
+			{ W, { kind = "FrameShot", shot = "MeetCharacter", character = 7 }, "FrameShot.character must be string?" },
 		}
 		for _, case in malformed do
 			it(`rejects a malformed message: {case[3]}`, function()

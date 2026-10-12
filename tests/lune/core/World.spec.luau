@@ -24,6 +24,7 @@ return function(t: any)
 		{ { kind = "TeleportPlayer", spot = "GardenInside" }, "teleportPlayer" },
 		{ { kind = "SetPropState", prop = "Machine", state = "advancing" }, "setPropState" },
 		{ { kind = "SetLighting", preset = "paradise" }, "setLighting" },
+		{ { kind = "FrameShot", shot = "MeetCharacter", character = "Fox" }, "frameShot" },
 		{ { kind = "SpawnPickups", quest = "chapter9.pick" }, "spawnPickups" },
 		{ { kind = "RemovePickup", pickup = "FlowerA" }, "removePickup" },
 		{ { kind = "ClearPickups", quest = "chapter9.pick" }, "clearPickups" },
@@ -58,6 +59,8 @@ return function(t: any)
 			World.execute(recording, { kind = "MoveCharacter", character = "Sam", spot = "Farm" })
 			expect(calls[1]).toEqual({ "showChapterCard", "The end ♥", "b", true :: any })
 			expect(calls[2]).toEqual({ "moveCharacter", "Sam", "Farm" })
+			World.execute(recording, { kind = "FrameShot", shot = "MeetCharacter", character = "Fox" })
+			expect(calls[3]).toEqual({ "frameShot", "MeetCharacter", "Fox" })
 		end)
 
 		for _, case in

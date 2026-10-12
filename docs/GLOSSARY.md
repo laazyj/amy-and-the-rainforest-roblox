@@ -154,7 +154,7 @@ of all three lists below are in `src/core/Events.luau`.
 | `SetPropState` | `prop`, `state` | Moves a Prop to one of its declared states |
 | `PlayCue` *later* | `cue` | Plays a Cue |
 | `SetLighting` | `preset` | Applies a Lighting preset |
-| `FrameShot` *later* | `shot` | Frames a Shot; the follow camera returns when the Shot ends |
+| `FrameShot` | `shot`, `character` or none | Frames a Shot, of the Character when the Shot takes one; the follow camera returns when the Shot ends |
 | `OfferTalk` | `character`, `label` | Offers the Character's talk affordance, with its Talk label |
 | `WithdrawTalk` | `character` | Withdraws the Character's talk affordance |
 | `SpawnPickups` | `quest` | Spawns the Quest's Pickups at their Spots |
@@ -170,19 +170,20 @@ grows by one named command, recorded here in the same PR. *Later*:
 reserved, not yet implemented.
 
 **On the wire.** `src/core/Net.luau` is the contract between server and
-client. Three World commands reach the client, over remotes whose names
-predate this glossary and are kept so the golden file still matches:
-`ShowDialogue`, `SetObjective`, and `ShowChapterCard` as `ShowChapter`
-(or `ShowEnding` for the end card). The client sends `DialogueFinished`,
-and `ClientReady` once it has loaded, which starts the Story; that is an
-adapter detail, not a Player event. The Title screen travels the same way:
-`ShowTitle` (the Chapter a returning player is in, and whether there is a
-Quest to continue) and the client's `TitleChoice`; only a returning player
-is sent `ShowTitle`, so the golden file has none. Both sides hold every payload to the
+client. Four World commands reach the client: `FrameShot`, and three
+over remotes whose names predate this glossary and are kept so the
+golden file still matches: `ShowDialogue`, `SetObjective`, and
+`ShowChapterCard` as `ShowChapter` (or `ShowEnding` for the end card).
+The client sends `DialogueFinished`, and `ClientReady` once it has
+loaded, which starts the Story; that is an adapter detail, not a Player
+event. The Title screen travels the same way: `ShowTitle` (the Chapter a
+returning player is in, and whether there is a Quest to continue) and
+the client's `TitleChoice`; only a returning player is sent `ShowTitle`,
+so the golden file has none. Both sides hold every payload to the
 contract: the server checks each World command against its schema in
-`src/core/Events.luau` and each message before it sends it, and the client
-binder wraps every remote it receives in `Net.guard`, which drops a
-malformed payload; tier 2 (`tests/engine/contract.luau`) passes every
+`src/core/Events.luau` and each message before it sends it, and the
+client binder wraps every remote it receives in `Net.guard`, which drops
+a malformed payload; tier 2 (`tests/engine/contract.luau`) passes every
 payload in the golden file through that guard.
 
 ## 4. Enumerations

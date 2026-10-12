@@ -35,6 +35,8 @@ return function(t: any)
 			{ "ClientReady", table.pack(true), "takes 0 argument(s), got 1" },
 			{ "ShowTitle", table.pack("Chapter Two", "yes"), "argument 2 must be boolean" },
 			{ "TitleChoice", table.pack(7), "argument 1 must be string" },
+			{ "FrameShot", table.pack(nil, "Fox"), "argument 1 must be string" },
+			{ "FrameShot", table.pack("MeetCharacter", 7), "argument 2 must be string?" },
 		}
 		for _, case in malformed do
 			it(`rejects a malformed {case[1]} payload: {case[3]}`, function()
@@ -87,6 +89,15 @@ return function(t: any)
 			expect(args).toEqual(table.pack("The end ♥", "b"))
 		end)
 
+		it("carries FrameShot to the client with its Character, or nil for none", function()
+			local remote, args = Net.message({ kind = "FrameShot", shot = "MeetCharacter", character = "Lion" })
+			expect(remote).toBe("FrameShot")
+			expect(args).toEqual(table.pack("MeetCharacter", "Lion"))
+			remote, args = Net.message({ kind = "FrameShot", shot = "ForestWallReveal" })
+			expect(remote).toBe("FrameShot")
+			expect(args).toEqual(table.pack("ForestWallReveal", nil))
+		end)
+
 		it("keeps the other World commands on the server", function()
 			expect(Net.message({ kind = "MoveCharacter", character = "Sam", spot = "Farm" })).toBeNil()
 			expect(Net.message({ kind = "Wait", seconds = 3.2 })).toBeNil()
@@ -99,6 +110,8 @@ return function(t: any)
 					{ kind = "SetObjective", text = "x" },
 					{ kind = "ShowChapterCard", title = "a", subtitle = "b", ending = false },
 					{ kind = "ShowChapterCard", title = "a", subtitle = "b", ending = true },
+					{ kind = "FrameShot", shot = "Dialogue", character = "Dad" },
+					{ kind = "FrameShot", shot = "MachineFinale" },
 				} :: { any }
 			do
 				local remote, args = Net.message(command)

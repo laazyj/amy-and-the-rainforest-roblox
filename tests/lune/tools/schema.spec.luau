@@ -108,7 +108,7 @@ return function(t: any)
 			expect(schema.commands.MoveCharacter).toEqual({ character = true, spot = true })
 			expect(schema.commands.SetObjective).toEqual({ text = true })
 			expect(schema.commands.PlayCue).toBeNil()
-			expect(schema.commands.FrameShot).toBeNil()
+			expect(schema.commands.FrameShot).toEqual({ shot = true, character = true })
 		end)
 
 		it("have Shots and no Cues yet", function()

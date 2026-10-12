@@ -51,6 +51,7 @@ local ShowEnding = remotes.ShowEnding
 local ClientReady = remotes.ClientReady
 local ShowTitle = remotes.ShowTitle
 local TitleChoice = remotes.TitleChoice
+local FrameShot = remotes.FrameShot
 
 -- The view-model's colours are a few frozen tables; each becomes a Color3 once.
 local colours: { [Story.RGB]: Color3 } = {}
@@ -448,6 +449,11 @@ end
 
 ShowChapter.OnClientEvent:Connect(Net.guard("ShowChapter", showCard(false), warn))
 ShowEnding.OnClientEvent:Connect(Net.guard("ShowEnding", showCard(true), warn))
+
+----------------------------------------------------------------
+-- Shots: the camera frames them (brief 011 builds src/client/Camera)
+----------------------------------------------------------------
+FrameShot.OnClientEvent:Connect(Net.guard("FrameShot", function(_shot: string, _character: string?) end, warn))
 
 ----------------------------------------------------------------
 -- The Title screen

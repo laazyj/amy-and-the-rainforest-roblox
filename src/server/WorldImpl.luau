@@ -45,6 +45,9 @@ function WorldImpl.new(story: Story.Story, player: any, toClient: (command: Even
 		end,
 		setPropState = PropHost.setState,
 		setLighting = LightingHost.set,
+		frameShot = function(shot, character)
+			toClient({ kind = "FrameShot", shot = shot, character = character })
+		end,
 		spawnPickups = function(quest)
 			PickupHost.spawn(player, quest)
 		end,
