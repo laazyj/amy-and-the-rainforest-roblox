@@ -33,6 +33,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 local TweenService = game:GetService("TweenService")
 
 -- The camera first, before anything here yields: every frame is its own.
@@ -51,6 +53,7 @@ local ObjectiveText = require(Core:WaitForChild("ObjectiveText"))
 local Story = require(Core:WaitForChild("Story"))
 local Net = require(Core:WaitForChild("Net"))
 local ScreenLayout = require(Core:WaitForChild("ScreenLayout"))
+local TalkAndAdvance = require(Core:WaitForChild("TalkAndAdvance"))
 local TitleScreen = require(Core:WaitForChild("TitleScreen"))
 local palette = require(ReplicatedStorage:WaitForChild("content"):WaitForChild("palette")).colours
 local Shared = ReplicatedStorage:WaitForChild("shared")
@@ -444,6 +447,8 @@ local dialogue = DialogueViewModel.new()
 -- the Screen layout, set by applyLayout once the UI is built
 local layout: ScreenLayout.Layout
 local objectiveView = ObjectiveText.view(nil)
+-- the touch controls, shown for the Dialogue (Touch controls, below)
+local renderTouch: () -> ()
 
 -- The Objective tracker, or its icon on a Phone while a Dialogue shows.
 local function renderObjective()
@@ -461,6 +466,7 @@ local function renderDialogue()
 	if dialogueFrame.Visible ~= view.open then
 		dialogueFrame.Visible = view.open
 		renderObjective()
+		renderTouch()
 	end
 	clickCatcher.Visible = view.open and not layout.touch
 	if dialogue.lines ~= shownLines or dialogue.index ~= shownIndex then
@@ -483,6 +489,7 @@ local function advance()
 end
 
 clickCatcher.Activated:Connect(advance)
+dialogueFrame.Activated:Connect(advance)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then
 		return
@@ -500,6 +507,131 @@ ShowDialogue.OnClientEvent:Connect(Net.guard("ShowDialogue", function(lines: { E
 	DialogueViewModel.enqueue(dialogue, lines)
 	renderDialogue()
 end, warn))
+
+----------------------------------------------------------------
+-- Touch controls (feel.md sections 1 and 4)
+----------------------------------------------------------------
+-- The Talk-and-advance button, a ContextActionService touch button in the
+-- right zone: it advances a Dialogue, or else uses the nearest prompt
+-- shown, which stays the universal talk affordance. Roblox's thumbstick
+-- has the left zone, and steps aside while a Dialogue shows (Amy listens;
+-- the box may cover the zone). The jump button goes: the Story never asks
+-- for a jump, and the right zone is the talk button's.
+local TALK_ACTION = "TalkAndAdvance"
+local TALK_LABELS: TalkAndAdvance.Labels = { talk = "Talk", next = "Next" }
+local talkBound = false
+local prompts: { [ProximityPrompt]: true } = {}
+
+-- Each prompt shown, by its distance from Amy.
+local function promptDistances(): { [ProximityPrompt]: number }
+	local character = player.Character
+	local amy = character and character:FindFirstChild("HumanoidRootPart")
+	local distances = {}
+	if not (amy and amy:IsA("BasePart")) then
+		return distances
+	end
+	for prompt in prompts do
+		local parent = prompt.Parent
+		local at = if parent and parent:IsA("BasePart")
+			then parent.Position
+			elseif parent and parent:IsA("Attachment") then parent.WorldPosition
+			else nil
+		if at then
+			distances[prompt] = (at - amy.Position).Magnitude
+		end
+	end
+	return distances
+end
+
+local function talkOrAdvance(_: string, state: Enum.UserInputState): Enum.ContextActionResult
+	if state == Enum.UserInputState.Begin then
+		local action = TalkAndAdvance.press(dialogue.lines ~= nil, promptDistances())
+		if action == "advance" then
+			advance()
+		elseif action then
+			local prompt = action :: ProximityPrompt
+			prompt:InputHoldBegin()
+			prompt:InputHoldEnd()
+		end
+	end
+	return Enum.ContextActionResult.Sink
+end
+
+-- Puts `gui` at `rect`, in the layout's units, whatever its parent.
+local function place(gui: GuiObject, rect: ScreenLayout.Rect)
+	local parent = gui.Parent
+	local origin = if parent and parent:IsA("GuiObject")
+		then parent.AbsolutePosition - root.AbsolutePosition
+		else Vector2.zero
+	gui.AnchorPoint = Vector2.zero
+	gui.Position = UDim2.fromOffset(rect.x - origin.X, rect.y - origin.Y)
+	gui.Size = UDim2.fromOffset(rect.width, rect.height)
+end
+
+-- Roblox's touch controls (PlayerGui.TouchGui), once the player module
+-- has built them: the thumbstick (dynamic or classic) and the jump button.
+local CONTROLS: { [string]: string } =
+	{ DynamicThumbstickFrame = "thumbstick", ThumbstickFrame = "thumbstick", JumpButton = "jump" }
+local hiddenJumps: { [GuiObject]: true } = setmetatable({}, { __mode = "k" }) :: any
+
+local function eachControl(each: (control: GuiObject, kind: string) -> ())
+	local touchGui = playerGui:FindFirstChild("TouchGui")
+	local frame = touchGui and touchGui:FindFirstChild("TouchControlFrame")
+	for _, child in if frame then frame:GetChildren() else {} do
+		local kind = CONTROLS[child.Name]
+		if kind and child:IsA("GuiObject") then
+			each(child, kind)
+		end
+	end
+end
+
+renderTouch = function()
+	local open = dialogue.lines ~= nil
+	if talkBound then
+		ContextActionService:SetTitle(TALK_ACTION, TalkAndAdvance.title(open, TALK_LABELS))
+	end
+	eachControl(function(control, kind)
+		if kind == "thumbstick" then
+			control.Visible = not open
+		end
+	end)
+end
+
+-- Lays the touch controls out in the Screen layout's zones.
+local function placeTouchControls()
+	if layout.touch ~= talkBound then
+		if layout.touch then
+			ContextActionService:BindAction(TALK_ACTION, talkOrAdvance, true)
+		else
+			ContextActionService:UnbindAction(TALK_ACTION)
+		end
+		talkBound = layout.touch
+	end
+	local button = if talkBound then ContextActionService:GetButton(TALK_ACTION) else nil
+	if button and layout.talk then
+		place(button, layout.talk)
+	end
+	eachControl(function(control, kind)
+		if kind == "thumbstick" and layout.touch then
+			place(control, layout.zones[1])
+		elseif kind == "jump" and not hiddenJumps[control] then
+			-- the player module shows it again on its own; it stays hidden
+			hiddenJumps[control] = true
+			control.Visible = false
+			control:GetPropertyChangedSignal("Visible"):Connect(function()
+				control.Visible = false
+			end)
+		end
+	end)
+	renderTouch()
+end
+
+ProximityPromptService.PromptShown:Connect(function(prompt: ProximityPrompt)
+	prompts[prompt] = true
+end)
+ProximityPromptService.PromptHidden:Connect(function(prompt: ProximityPrompt)
+	prompts[prompt] = nil
+end)
 
 ----------------------------------------------------------------
 -- Objective tracker
@@ -644,6 +776,8 @@ local function applyLayout()
 	})
 	local text = layout.text
 	Camera.setZones(layout.zones)
+	placeTouchControls()
+	hintLabel.Text = if layout.touch then "tap to continue  ▶" else "click / E / Space to continue  ▶"
 
 	local box = layout.dialogue
 	dialogueFrame.Position = UDim2.fromOffset(box.x, box.bottom)
@@ -714,6 +848,22 @@ do
 	end)
 end
 applyLayout()
+-- The player module builds its touch controls when touch is first used.
+local function watchTouchGui(touchGui: Instance)
+	if touchGui.Name == "TouchGui" then
+		touchGui.DescendantAdded:Connect(function(added: Instance)
+			if CONTROLS[added.Name] then
+				task.defer(placeTouchControls)
+			end
+		end)
+		task.defer(placeTouchControls)
+	end
+end
+playerGui.ChildAdded:Connect(watchTouchGui)
+local touchGui = playerGui:FindFirstChild("TouchGui")
+if touchGui then
+	watchTouchGui(touchGui)
+end
 
 ----------------------------------------------------------------
 -- Every frame: time passes for the Dialogue and the card
