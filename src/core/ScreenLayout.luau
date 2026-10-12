@@ -14,6 +14,12 @@
 	                     about how many lines `text` wraps to
 	  dialogueHeight(layout, text, largeHint)
 	                     about how tall the dialogue box grows for a Line
+	  spill(layout, lines, first)
+	                     the first Line that would not fit the box
+	  largestScale(screen, lines, first)
+	                     the largest Text scale at which every Line fits
+	                     the screen's dialogue box: brief 015's setting is
+	                     capped at it
 
 	The rules, the same for every class with its own numbers:
 
@@ -23,8 +29,10 @@
 	  dialogue box    at the bottom; its text column is the space there
 	                  minus 24 units of padding each side, never wider
 	                  than 30 x the body size (60 characters); it grows up
-	                  to fit its Line, at most 40% of the height in phone
-	                  portrait
+	                  to fit its Line, its name tag staying below the
+	                  head window of shot:Dialogue (the speaker's head is
+	                  inside y 0.15-0.5 of the viewport), and to at most
+	                  40% of the height in phone portrait
 	  Objective       the top right; on a Phone it collapses to an icon
 	  tracker         while a Dialogue shows
 	  touch control   the bottom-left and bottom-right corners of the
@@ -34,10 +42,12 @@
 	                  while a Hint shows) sit in the right one
 	  touch targets   at least 48 x 48, 8 apart
 
-	While a Dialogue shows on touch, Amy listens: the thumbstick steps
-	aside (the old full-screen click catcher already took every touch), so
-	the box may use the left zone, and keeps clear of the right zone's
-	buttons, beside them in landscape and above them in portrait.
+	While a Dialogue shows on touch, Amy listens: the player's controls are
+	disabled (the old full-screen click catcher already took every touch),
+	so the box may use the left zone, and keeps clear of the right zone's
+	Talk-and-advance button, beside it in landscape and above it in
+	portrait. The Skip button shows only in free play (the Onboarding's
+	Hint on the first Line is skipped by tapping), above the Talk button.
 ]]
 
 local DeviceClass = require("./DeviceClass")
@@ -140,6 +150,11 @@ ScreenLayout.COLUMN_EMS = 30
 ScreenLayout.PADDING = 24
 -- The tallest a box may grow in phone portrait, as a share of the height.
 ScreenLayout.PORTRAIT_BOX = 0.4
+-- Where shot:Dialogue frames the speaker's head (feel.md section 2), as
+-- shares of the viewport; nothing covers it (section 1).
+ScreenLayout.HEAD_WINDOW = table.freeze({ left = 0.33, right = 0.67, top = 0.15, bottom = 0.5 })
+-- largestScale tries the Text scales from the largest down, this far apart.
+ScreenLayout.SCALE_STEP = 0.05
 ScreenLayout.TARGET = 48
 ScreenLayout.TARGET_GAP = 8
 -- The longest Skip label the Skip button is sized for, in characters: it
@@ -296,7 +311,6 @@ function ScreenLayout.new(screen: Screen): Layout
 			skipWidth,
 			ScreenLayout.TARGET
 		)
-		local buttons = math.min(talk.x, skip.x)
 		local around = 6
 		pulse = rect(talk.x - around, talk.y - around, size + 2 * around, size + 2 * around)
 
@@ -316,9 +330,9 @@ function ScreenLayout.new(screen: Screen): Layout
 		hint = rect(safe.x + MARGIN, left.y - ScreenLayout.TARGET_GAP - hintHeight, hintWidth, hintHeight)
 
 		if portrait then
-			box = { left = safe.x, space = safe.width, bottom = skip.y - ScreenLayout.TARGET_GAP }
+			box = { left = safe.x, space = safe.width, bottom = talk.y - ScreenLayout.TARGET_GAP }
 		else
-			local space = buttons - ScreenLayout.TARGET_GAP - (safe.x + MARGIN)
+			local space = talk.x - ScreenLayout.TARGET_GAP - (safe.x + MARGIN)
 			box = { left = safe.x + MARGIN, space = space, bottom = bottom - MARGIN }
 		end
 	else
@@ -332,17 +346,11 @@ function ScreenLayout.new(screen: Screen): Layout
 	local textColumn = column(box.space, text.body)
 	local boxWidth = textColumn + 2 * ScreenLayout.PADDING
 	local boxX = box.left + (box.space - boxWidth) / 2
-	local maxHeight
+	-- the name tag stays below the head window; in phone portrait the box
+	-- also grows to at most 40% of the height
+	local maxHeight = box.bottom - (height * ScreenLayout.HEAD_WINDOW.bottom + overhang)
 	if class == "Phone" and portrait then
-		maxHeight = ScreenLayout.PORTRAIT_BOX * height
-	elseif collapses then
-		-- its name tag up to the top of the safe area, or to below the
-		-- collapsed Objective tracker's icon when the box reaches under it
-		local top = overhang
-			+ if boxX + boxWidth <= icon.x then safe.y else icon.y + icon.height + ScreenLayout.TARGET_GAP
-		maxHeight = box.bottom - top
-	else
-		maxHeight = height / 2
+		maxHeight = math.min(maxHeight, ScreenLayout.PORTRAIT_BOX * height)
 	end
 
 	local titleWidth = safe.width - 2 * MARGIN
@@ -402,6 +410,33 @@ function ScreenLayout.new(screen: Screen): Layout
 			gap = ScreenLayout.TARGET_GAP + 2,
 		},
 	}
+end
+
+-- The first Line of `lines` that would not fit `layout`'s dialogue box
+-- without scrolling, `first` (the Onboarding's first Line) with its large
+-- Hint; nil when every one fits.
+function ScreenLayout.spill(layout: Layout, lines: { string }, first: string?): string?
+	for _, text in lines do
+		if ScreenLayout.dialogueHeight(layout, text, text == first) > layout.dialogue.maxHeight then
+			return text
+		end
+	end
+	return nil
+end
+
+-- The largest Text scale, from 1.5 down to 1 in steps of 0.05, at which
+-- every Line of `lines` fits `screen`'s dialogue box; nil when even scale
+-- 1 does not.
+function ScreenLayout.largestScale(screen: Screen, lines: { string }, first: string?): number?
+	local steps = math.round((ScreenLayout.MAX_SCALE - ScreenLayout.MIN_SCALE) / ScreenLayout.SCALE_STEP)
+	for step = steps, 0, -1 do
+		local atScale = table.clone(screen)
+		atScale.textScale = ScreenLayout.MIN_SCALE + step * ScreenLayout.SCALE_STEP
+		if not ScreenLayout.spill(ScreenLayout.new(atScale), lines, first) then
+			return atScale.textScale
+		end
+	end
+	return nil
 end
 
 return ScreenLayout

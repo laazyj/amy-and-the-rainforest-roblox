@@ -82,7 +82,7 @@ return function(t: any)
 				row = "Click or press Space to continue",
 				large = true,
 				glow = false,
-				skip = true,
+				skip = false, -- the first Line's Hint is skipped by tapping
 			})
 			expect(view(vm, true).row).toBe("Tap to continue")
 		end)
@@ -124,7 +124,7 @@ return function(t: any)
 	describe("Onboarding step walk", function()
 		it("shows the walk Hint, and on touch the ring on the thumbstick", function()
 			local vm = walking()
-			expect(view(vm).hint).toBe("W and S walk, A and D turn (or the arrow keys)")
+			expect(view(vm).hint).toBe("Walk with W and S, turn with A and D, or use the arrow keys")
 			expect(view(vm).ring).toBe(false)
 			local touch = view(vm, true)
 			expect(touch.hint).toBe("Drag here to walk")

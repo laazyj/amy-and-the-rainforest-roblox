@@ -16,7 +16,7 @@ local Onboarding = require("../core/Onboarding")
 
 local steps: { [string]: Onboarding.Hint } = {
 	advance = { pc = "Click or press Space to continue", touch = "Tap to continue" },
-	walk = { pc = "W and S walk, A and D turn (or the arrow keys)", touch = "Drag here to walk" },
+	walk = { pc = "Walk with W and S, turn with A and D, or use the arrow keys", touch = "Drag here to walk" },
 	talk = { pc = "Press E to talk" },
 }
 

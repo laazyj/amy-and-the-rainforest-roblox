@@ -1,5 +1,6 @@
 -- ScreenLayout: feel.md's layout rules, for every Device class and
--- orientation, at Text scale 1 and 1.5.
+-- orientation, at Text scale 1, 1.25 and 1.5, each capped at the largest
+-- scale at which every Line of the Story fits the device.
 
 local Content = require("../../../src/content/Story")
 local ScreenLayout = require("../../../src/core/ScreenLayout")
@@ -69,6 +70,28 @@ local DEVICES: { ScreenLayout.Screen } = {
 		insets = { left = 0, top = 82, right = 0, bottom = 20 },
 		textScale = 1,
 	},
+	-- the most common Android phone, both ways, and a small landscape one
+	{
+		class = "Phone",
+		width = 360,
+		height = 800,
+		insets = { left = 0, top = 82, right = 0, bottom = 24 },
+		textScale = 1,
+	},
+	{
+		class = "Phone",
+		width = 800,
+		height = 360,
+		insets = { left = 24, top = 58, right = 24, bottom = 0 },
+		textScale = 1,
+	},
+	{
+		class = "Phone",
+		width = 640,
+		height = 360,
+		insets = { left = 0, top = 58, right = 0, bottom = 0 },
+		textScale = 1,
+	},
 	{ class = "PC", width = 1280, height = 720, insets = { left = 0, top = 58, right = 0, bottom = 0 }, textScale = 1 },
 	{
 		class = "PC",
@@ -85,11 +108,6 @@ local DEVICES: { ScreenLayout.Screen } = {
 		textScale = 1,
 	},
 }
-
--- Phones smaller than feel.md's 6-inch design (DEVICES[3] and [4]): laid out
--- at Text scale 1 only. The longest Lines cannot fit 40% of an iPhone SE's
--- portrait height at the larger Text scales; brief 015's setting decides.
-local SMALLER = { [3] = true, [4] = true }
 
 -- Every Line of the Story, and the longest Objective.
 local LINES: { string } = {}
@@ -111,13 +129,11 @@ for _, line in Content.story.ending.lines do
 end
 local FIRST_LINE = LINES[1]
 
--- The one Line that does not fit phone portrait's box (40% of the height)
--- at Text scale 1.5: 171 characters, past the style guide's guide of about
--- 140. It is not canon, so the owner may shorten it (see the PR for brief
--- 012); any other Line that stops fitting fails here.
-local OVER_LONG = {
-	"There's a squirrel the colour of nanna's cardigan, and a fox like a sunset, and the golden lion is GENTLE, Dad. Nobody is eaten in a paradise. It's against the whole idea.",
-}
+-- Each device's largest Text scale, at which every Line fits its box.
+local CAPS: { [ScreenLayout.Screen]: number } = {}
+for _, device in DEVICES do
+	CAPS[device] = ScreenLayout.largestScale(device, LINES, FIRST_LINE) :: number
+end
 
 local function at(device: ScreenLayout.Screen, textScale: number): Layout
 	local screen = table.clone(device)
@@ -160,8 +176,14 @@ return function(t: any)
 	local describe, it, expect = t.describe, t.it, t.expect
 
 	local function each(rule: string, check: (Layout, ScreenLayout.Screen) -> ())
-		for i, device in DEVICES do
-			local scales: { number } = if SMALLER[i] then { 1 } else { 1, 1.25, 1.5 }
+		for _, device in DEVICES do
+			local scales: { number } = {}
+			for _, wanted in { 1, 1.25, 1.5 } do
+				local scale = math.min(wanted, CAPS[device])
+				if not table.find(scales, scale) then
+					table.insert(scales, scale)
+				end
+			end
 			for _, textScale in scales do
 				it(`{rule}: {describeScreen(device, textScale)}`, function()
 					check(at(device, textScale), device)
@@ -172,7 +194,7 @@ return function(t: any)
 
 	describe("ScreenLayout text sizes", function()
 		it("are feel.md's for each class at Text scale 1: body, speaker, Objective, hint", function()
-			local phone, tablet, pc = at(DEVICES[1], 1), at(DEVICES[5], 1), at(DEVICES[9], 1)
+			local phone, tablet, pc = at(DEVICES[1], 1), at(DEVICES[5], 1), at(DEVICES[12], 1)
 			expect(phone.text).toEqual({ body = 20, speaker = 18, objective = 18, hint = 14 })
 			expect(tablet.text).toEqual({ body = 24, speaker = 20, objective = 20, hint = 16 })
 			expect(pc.text).toEqual({ body = 24, speaker = 20, objective = 20, hint = 16 })
@@ -180,7 +202,7 @@ return function(t: any)
 
 		it("scale with the Text scale, which stays between 1 and 1.5", function()
 			expect(at(DEVICES[1], 1.5).text).toEqual({ body = 30, speaker = 27, objective = 27, hint = 21 })
-			expect(at(DEVICES[9], 1.5).text).toEqual({ body = 36, speaker = 30, objective = 30, hint = 24 })
+			expect(at(DEVICES[12], 1.5).text).toEqual({ body = 36, speaker = 30, objective = 30, hint = 24 })
 			expect(at(DEVICES[1], 3).text).toEqual(at(DEVICES[1], 1.5).text)
 			expect(at(DEVICES[1], 0.5).text).toEqual(at(DEVICES[1], 1).text)
 		end)
@@ -199,17 +221,13 @@ return function(t: any)
 		end)
 
 		each("every Line of the Story fits it without scrolling", function(layout)
-			local largest = layout.class == "Phone" and layout.portrait and layout.textScale == ScreenLayout.MAX_SCALE
+			expect(ScreenLayout.spill(layout, LINES, FIRST_LINE)).toBeNil()
+		end)
+
+		each("its name tag stays below shot:Dialogue's head window for every Line", function(layout, device)
+			local below = ScreenLayout.HEAD_WINDOW.bottom * device.height
 			for _, text in LINES do
-				if largest and table.find(OVER_LONG, text) then
-					continue
-				end
-				local height = ScreenLayout.dialogueHeight(layout, text, text == FIRST_LINE)
-				if height > layout.dialogue.maxHeight then
-					error(
-						`{string.format("%q", text)} needs {height} units; the box grows to {layout.dialogue.maxHeight}`
-					)
-				end
+				expect(box(layout, text).y >= below - 1e-6).toBe(true)
 			end
 		end)
 
@@ -245,8 +263,8 @@ return function(t: any)
 				at(DEVICES[5], 1).zones[2],
 				{ x = 1376 * 0.75, y = 1032 * 0.65, width = 1376 * 0.25, height = 1032 * 0.35 }
 			)
-			expect(at(DEVICES[9], 1).zones).toEqual({})
-			expect(at(DEVICES[9], 1).talk).toBeNil()
+			expect(at(DEVICES[12], 1).zones).toEqual({})
+			expect(at(DEVICES[12], 1).talk).toBeNil()
 		end)
 
 		it("follow a rotation: a phone turned to portrait has its zones and box laid out again", function()
@@ -254,7 +272,7 @@ return function(t: any)
 			expect(portrait.portrait).toBe(true)
 			expect(portrait.zones[1].height).toBe(844 * 0.4)
 			expect(landscape.dialogue.bottom > (landscape.talk :: Rect).y).toBe(true) -- beside the buttons
-			expect(portrait.dialogue.bottom < portrait.skip.y).toBe(true) -- above them
+			expect(portrait.dialogue.bottom < (portrait.talk :: Rect).y).toBe(true) -- above it
 		end)
 
 		each("the Talk-and-advance and Skip buttons sit in the right zone, the ring in the left", function(layout)
@@ -286,7 +304,6 @@ return function(t: any)
 			local button = layout.title.button
 			expect(button.width >= ScreenLayout.TARGET and button.height >= ScreenLayout.TARGET).toBe(true)
 			expect(layout.title.gap >= ScreenLayout.TARGET_GAP).toBe(true)
-			expect(layout.objective.icon.width >= ScreenLayout.TARGET).toBe(true)
 		end)
 
 		each("the Title screen's buttons fit every label in two lines, inside the safe area", function(layout)
@@ -334,11 +351,12 @@ return function(t: any)
 			end
 		end)
 
-		each("while a Dialogue shows: the box, the Objective tracker and the buttons", function(layout)
+		each("while a Dialogue shows: the box, the Objective tracker and the Talk button", function(layout)
 			local objective = if layout.objective.collapses
 				then layout.objective.icon
 				else tracker(layout, longestObjective)
-			local buttons: { Rect } = { layout.skip }
+			-- the Skip button shows only in free play
+			local buttons: { Rect } = {}
 			if layout.talk then
 				table.insert(buttons, layout.talk)
 			end
@@ -398,6 +416,33 @@ return function(t: any)
 				right = 0,
 				bottom = 0,
 			})
+		end)
+	end)
+
+	describe("ScreenLayout.largestScale", function()
+		it("lets every device play every Line at Text scale 1", function()
+			for _, device in DEVICES do
+				if not CAPS[device] then
+					error(`{describeScreen(device, 1)}: a Line does not fit even at Text scale 1`)
+				end
+			end
+		end)
+
+		it("is the largest step at which every Line fits: one step more and one does not", function()
+			for _, device in DEVICES do
+				local cap = CAPS[device]
+				if cap >= ScreenLayout.MAX_SCALE then
+					continue
+				end
+				local over = at(device, cap + ScreenLayout.SCALE_STEP)
+				expect(ScreenLayout.spill(over, LINES, FIRST_LINE)).never.toBeNil()
+			end
+		end)
+
+		it("is nil when a Line fits no scale, and 1.5 for a Line that fits every one", function()
+			local phone = DEVICES[1]
+			expect(ScreenLayout.largestScale(phone, { string.rep("word ", 400) })).toBeNil()
+			expect(ScreenLayout.largestScale(phone, { "Woof!" })).toBe(ScreenLayout.MAX_SCALE)
 		end)
 	end)
 

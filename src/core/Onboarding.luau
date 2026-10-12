@@ -88,6 +88,7 @@ export type View = {
 	row: string,
 	large: boolean,
 	glow: boolean,
+	-- the Skip button: with a Hint in free play
 	skip: boolean,
 }
 
@@ -250,7 +251,8 @@ function Onboarding.view(vm: Onboarding, hints: Hints, touch: boolean): View
 		row = if large then words :: string else continue,
 		large = large,
 		glow = vm.glow > 0,
-		skip = words ~= nil or ring or pulse,
+		-- free play only: the first Line's Hint is skipped by tapping
+		skip = not large and (words ~= nil or ring or pulse),
 	}
 end
 
