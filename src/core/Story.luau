@@ -24,7 +24,8 @@ export type Line = { speaker: string, text: string, canon: boolean? }
 export type QuestKind = "talk" | "reach" | "collect"
 
 -- The Beats each Hook plays, by name; the Beats are in the Chapter's hooks.luau.
-export type Hooks = { onStart: { string }?, onComplete: { string }? }
+-- onTalkedTo: a talk Quest's Character is talked to, before its `dialogue`.
+export type Hooks = { onStart: { string }?, onTalkedTo: { string }?, onComplete: { string }? }
 
 export type Quest = {
 	id: string,
@@ -108,6 +109,8 @@ export type Outcome = {
 	collected: { string }?,
 	-- whether the Kind is satisfied and the Quest moves on
 	done: boolean,
+	-- the Hook whose Beats play when it is: talk's onTalkedTo
+	hook: "onTalkedTo"?,
 }
 export type Kind = {
 	-- World commands that make the Quest playable, with the Pickups already

@@ -251,7 +251,7 @@ Scene (look + sound)                     Player
 | **Line** | One thing said: Speaker, text, optional narration audio. **Canon** Lines are Clara's exact words and are locked. | `{ speaker, text }` | Narrator: "She tryed again but Sam brang her back." |
 | **Speaker** | Who says a Line: Amy, the Narrator, or a Character. | `speaker` | `Narrator` |
 | **Beat** | A named, staged moment: a fixed sequence of World commands played at a Hook. Beats are how the story *moves the world*. | `samCatches`, `samGoesToFarm`, `paradiseReveal`, `machineArrives`, `machineStops` | `beat:sam_catches` |
-| **Hook** | A point in a Quest's life where Beats run: `onStart`, `onComplete`. A Quest names its Hooks' Beats in the chapter's `data.luau`; the Beats are in its `hooks.luau`. | `questStartedHooks[...]`, `onComplete` | `chapter1.sneak_out_1.onComplete → sam_catches` |
+| **Hook** | A point in a Quest's life where Beats run: `onStart`, `onTalkedTo` (a `talk` Quest's Character is talked to), `onComplete`. A Quest names its Hooks' Beats in the chapter's `data.luau`; the Beats are in its `hooks.luau`. | `questStartedHooks[...]`, `onComplete` | `chapter1.sneak_out_1.onComplete → sam_catches` |
 | **Scene** | A region of the world with its own look and sound: terrain, Props, Spots, Zones, ambience, music. | implicit in `WorldBuilder` | Garden, Village, Field, Forest Wall, Paradise, Heart Glade |
 | **Spot** | A named position and facing inside a Scene. Content never holds raw coordinates; it names Spots. | `position`, `faceZ`, `spawnPoints` | `spot:GardenGateInside` |
 | **Zone** | A named invisible volume the player can enter. Entering one is a Player event. | `zone` | `zone:ForestGap` |

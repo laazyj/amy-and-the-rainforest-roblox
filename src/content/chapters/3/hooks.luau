@@ -4,6 +4,16 @@
 local Story = require("../../../core/Story")
 
 local beats: { [string]: Story.Beat } = {
+	-- Amy meets each animal: it in full, facing her, before they talk.
+	meet_squirrel = {
+		{ kind = "FrameShot", shot = "MeetCharacter", character = "Squirrel" },
+	},
+	meet_fox = {
+		{ kind = "FrameShot", shot = "MeetCharacter", character = "Fox" },
+	},
+	meet_lion = {
+		{ kind = "FrameShot", shot = "MeetCharacter", character = "Lion" },
+	},
 	-- Back home: the ordinary world is a little greyer than she remembered.
 	ordinary_world = {
 		{ kind = "SetLighting", preset = "ordinary" },

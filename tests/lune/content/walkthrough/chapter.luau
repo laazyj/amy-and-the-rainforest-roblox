@@ -22,6 +22,8 @@ export type ChapterWalk = {
 	-- every Objective shown, in order
 	objectives: { string },
 	beats: { string },
+	-- every Shot framed, in order: "Dialogue(Dad)", "ForestWallReveal"
+	shots: { string },
 	-- the World when the Chapter completes
 	world: WorldState.WorldState,
 	-- the Story event that follows ChapterCompleted
@@ -66,6 +68,7 @@ function Chapter.walk(id: string): ChapterWalk
 		played = {},
 		objectives = {},
 		beats = {},
+		shots = {},
 		world = Walker.rebuild(story, resume),
 		next = "",
 	}
@@ -88,6 +91,9 @@ function Chapter.walk(id: string): ChapterWalk
 			objectives(commands)
 			for _, command in commands do
 				WorldState.apply(story, result.world, command)
+				if command.kind == "FrameShot" then
+					table.insert(result.shots, Walker.shot(command))
+				end
 			end
 		end
 		for _, event in step.events do

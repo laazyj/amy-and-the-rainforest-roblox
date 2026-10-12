@@ -53,8 +53,8 @@ Mutate.FAULTS = {
 		file = "src/core/StoryEngine.luau",
 		edits = {
 			{
-				from = "\t\t\tBeat.play(placed.chapter, hooks.onStart, events, commands)\n\t\t\tBeat.play(placed.chapter, hooks.onComplete, events, commands)\n",
-				to = "\t\t\tBeat.play(placed.chapter, hooks.onStart, events, commands)\n",
+				from = "\t\t\tBeat.play(placed.chapter, hooks.onTalkedTo, events, commands)\n\t\t\tBeat.play(placed.chapter, hooks.onComplete, events, commands)\n",
+				to = "\t\t\tBeat.play(placed.chapter, hooks.onTalkedTo, events, commands)\n",
 			},
 		},
 	},

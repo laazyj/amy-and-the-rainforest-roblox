@@ -29,7 +29,7 @@ local chapter: Story.ChapterData = {
 					text = "The trees are like a giant wall... they're holding hands so nobody can get in. But look -- there's a little gap. Just my size.",
 				},
 			} :: { Story.Line },
-			hooks = { onStart = { "sam_goes_to_farm" } },
+			hooks = { onStart = { "sam_goes_to_farm" }, onComplete = { "forest_wall_reveal" } },
 		},
 		{
 			id = "chapter2.enter_forest",

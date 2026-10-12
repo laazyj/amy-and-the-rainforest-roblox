@@ -9,6 +9,7 @@
 local CameraModel = require("../../../src/core/CameraModel")
 local Shot = require("../../../src/core/Shot")
 local Story = require("../../../src/core/Story")
+local Walker = require("./walker")
 
 type Vec3 = Story.Vec3
 
@@ -53,9 +54,7 @@ local FRAMINGS: { CameraModel.Framing } = {
 	{ shot = "MachineFinale" },
 }
 
-local function named(framing: CameraModel.Framing): string
-	return if framing.character then `{framing.shot}({framing.character})` else framing.shot
-end
+local named = Walker.shot
 
 -- A subject `rng` places round Amy: ahead, beside or behind her, near or far.
 local function placeSubject(rng: () -> number, amy: Vec3, framing: CameraModel.Framing): Vec3

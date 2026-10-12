@@ -1,6 +1,6 @@
 --[[
 	A small Story for the core specs: every Quest Kind, every Dialogue, Beats
-	at both Hooks, a Prop, two Lighting presets and two Chapters. The real
+	at every Hook, a Prop, two Lighting presets and two Chapters. The real
 	Story (src/content) is walked by the content specs.
 ]]
 
@@ -28,7 +28,7 @@ local fixture: Story.Story = {
 					intro = { { speaker = "Narrator", text = "Hello." } },
 					dialogue = { { speaker = "Hero", text = "Hi!" }, { speaker = "Guide", text = "Welcome." } },
 					outro = { { speaker = "Narrator", text = "Off you go." } },
-					hooks = { onComplete = { "guide_leaves" } },
+					hooks = { onTalkedTo = { "guide_turns" }, onComplete = { "guide_leaves" } },
 				},
 				{
 					id = "chapter1.go_out",
@@ -39,6 +39,7 @@ local fixture: Story.Story = {
 				},
 			},
 			beats = {
+				guide_turns = { { kind = "FrameShot", shot = "MeetCharacter", character = "Guide" } },
 				guide_leaves = {
 					{ kind = "MoveCharacter", character = "Guide", spot = "Field" },
 					{ kind = "Wait", seconds = 0.5 },

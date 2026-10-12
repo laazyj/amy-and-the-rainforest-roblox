@@ -226,6 +226,7 @@ Kind column.
 | Hook | Runs when |
 |---|---|
 | `onStart` | The Quest becomes `active`, before its Objective and intro Dialogue are shown |
+| `onTalkedTo` | A `talk` Quest's Character is talked to (`TalkedTo`), before its `dialogue` Dialogue is shown |
 | `onComplete` | The Quest becomes `completed`, after its outro Dialogue has finished |
 
 In a Chapter's `data.luau` a Quest names the Beats each Hook plays,
@@ -238,10 +239,14 @@ its `hooks.luau`.
 |---|---|---|
 | `beat:sam_catches` | `chapter1.sneak_out_1.onComplete`, `chapter1.sneak_out_2.onComplete` | Sam runs to the gate and brings Amy back into the garden |
 | `beat:sam_goes_to_farm` | `chapter2.walk_to_forest.onStart` | Sam leaves for the farm |
+| `beat:forest_wall_reveal` | `chapter2.walk_to_forest.onComplete` | `FrameShot(shot:ForestWallReveal)`: the wall of trees, the gap centred |
 | `beat:paradise_reveal` | `chapter2.enter_forest.onComplete` | `SetLighting(lighting:paradise)` |
+| `beat:meet_squirrel` | `chapter3.meet_squirrel.onTalkedTo` | `FrameShot(shot:MeetCharacter, character:Squirrel)` |
+| `beat:meet_fox` | `chapter3.meet_fox.onTalkedTo` | `FrameShot(shot:MeetCharacter, character:Fox)` |
+| `beat:meet_lion` | `chapter3.meet_lion.onTalkedTo` | `FrameShot(shot:MeetCharacter, character:Lion)` |
 | `beat:ordinary_world` | `chapter3.rush_home.onComplete` | `SetLighting(lighting:ordinary)` |
 | `beat:machine_arrives` | `chapter3.tell_mum.onComplete` | The machine and villagers arrive; Dad, Mum and Sam move to the field |
-| `beat:machine_stops` | `chapter4.explain.onComplete` | The blade stops, sparkles over the crowd, the machine reverses away |
+| `beat:machine_stops` | `chapter4.explain.onComplete` | Framed by `shot:MachineFinale`, which holds through the Ending's Lines: the blade stops, sparkles over the crowd, the machine reverses away |
 
 ### Spots
 
@@ -310,7 +315,7 @@ Framing and where each is used are specified in
 
 | Shot | Argument |
 |---|---|
-| `shot:Dialogue` | none |
+| `shot:Dialogue` | the Dialogue's first Speaker who is a Character in the world; the core frames it before every such Dialogue (`src/core/Shot.luau`) |
 | `shot:ForestWallReveal` | none |
 | `shot:MeetCharacter` | the Character being met |
 | `shot:MachineFinale` | none |

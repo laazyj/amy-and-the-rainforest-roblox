@@ -126,6 +126,11 @@ function Walker.withoutPlayer(world: WorldState.WorldState): WorldState.WorldSta
 	return copy
 end
 
+-- A FrameShot as specs name it: "MeetCharacter(Fox)", "ForestWallReveal".
+function Walker.shot(framing: { shot: string, character: string? }): string
+	return if framing.character then `{framing.shot}({framing.character})` else framing.shot
+end
+
 -- The kind of each command or event in `list`, in order.
 function Walker.kinds(list: { any }): { string }
 	local kinds = {}
