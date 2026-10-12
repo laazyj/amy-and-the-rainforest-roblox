@@ -37,10 +37,15 @@ return function(t: any)
 			})
 		end)
 
-		it("plays beat paradise_reveal", function()
+		it("plays beat forest_wall_reveal, beat paradise_reveal", function()
 			expect(walk.beats).toEqual({
+				"forest_wall_reveal",
 				"paradise_reveal",
 			})
+		end)
+
+		it("frames shot:ForestWallReveal once Amy reaches the forest, and no other Shot", function()
+			expect(walk.shots).toEqual({ "ForestWallReveal" })
 		end)
 
 		it("ends with Sam at spot Farm (beat sam_goes_to_farm, replayed by the Resume) in lighting:paradise", function()

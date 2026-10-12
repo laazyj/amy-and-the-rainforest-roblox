@@ -85,6 +85,36 @@ return function(t: any)
 			expect(world.objective).toBeNil()
 		end)
 
+		it("frames each Shot where feel.md puts it, and no others", function()
+			local shots = {}
+			for _, step in walk.steps do
+				for _, command in step.commands do
+					if command.kind == "FrameShot" then
+						table.insert(shots, `{step.quest or "the Ending"}: {Walker.shot(command)}`)
+					end
+				end
+			end
+			expect(shots).toEqual({
+				-- shot:Dialogue: every Dialogue whose Speaker is a Character in the world
+				"chapter1.ask_dad: Dialogue(Dad)",
+				"chapter1.sneak_out_1: Dialogue(Sam)",
+				"chapter1.sneak_out_2: Dialogue(Sam)",
+				-- chapter2.walk_to_forest.onComplete, as the next Quest starts
+				"chapter2.enter_forest: ForestWallReveal",
+				-- the first TalkedTo of each animal, before its shot:Dialogue
+				"chapter3.meet_squirrel: MeetCharacter(Squirrel)",
+				"chapter3.meet_squirrel: Dialogue(Squirrel)",
+				"chapter3.meet_fox: MeetCharacter(Fox)",
+				"chapter3.meet_fox: Dialogue(Fox)",
+				"chapter3.meet_lion: MeetCharacter(Lion)",
+				"chapter3.meet_lion: Dialogue(Lion)",
+				"chapter3.tell_mum: Dialogue(Mum)",
+				"chapter4.explain: Dialogue(Dad)",
+				-- chapter4.explain.onComplete, held through the Ending's Lines
+				"the Ending: MachineFinale",
+			})
+		end)
+
 		it(`sends the client the {#golden} messages of the golden file, in order`, function()
 			for i = 1, math.max(#golden, #sent) do
 				if golden[i] ~= sent[i] then
@@ -103,6 +133,10 @@ return function(t: any)
 
 			it("rebuilds the World the walk had there", function()
 				expect(resumed).toEqual(Walker.withoutPlayer(playable.world))
+			end)
+
+			it("frames no Shot, so none is left on screen after a jump or a Resume", function()
+				expect(table.find(Walker.kinds(StoryEngine.resume(story, playable.progress)), "FrameShot")).toBeNil()
 			end)
 
 			it("completes the Story from there", function()

@@ -6,17 +6,19 @@
 			-> progress', storyEvents, worldCommands
 
 	No engine, no time: a Wait is a World command the adapter carries out,
-	and a Dialogue is shown with ShowDialogue and finished by the Player event
-	DialogueFinished. While a Dialogue is showing (`progress.showing`), every
-	other Player event is ignored, so a Quest cannot complete under its own
-	intro.
+	and a Dialogue is shown with ShowDialogue and finished by the Player
+	event DialogueFinished; when a Character in the world speaks, a
+	FrameShot of shot:Dialogue comes just before it (Shot.forDialogue).
+	While a Dialogue is showing (`progress.showing`), every other Player
+	event is ignored, so a Quest cannot complete under its own intro.
 
 	A Quest's life, in the order the commands come out:
 
 	  start     QuestStarted, its onStart Beats, SetObjective, then the intro
 	            Dialogue; once that is finished, its Kind's begin commands
 	  play      Player events go to its Kind (src/core/quests/<kind>.luau)
-	  done      the `dialogue` Dialogue (talk Quests), then the outro
+	  done      its onTalkedTo Beats and the `dialogue` Dialogue (talk
+	            Quests), then the outro
 	  complete  QuestCompleted, its onComplete Beats, then the next Quest:
 	            in a new Chapter, ChapterCompleted, ChapterStarted and the
 	            Chapter card first; after the last, the Ending's Dialogue and
@@ -31,6 +33,7 @@
 
 local Beat = require("./Beat")
 local Events = require("./Events")
+local Shot = require("./Shot")
 local Story = require("./Story")
 local WorldState = require("./WorldState")
 local collect = require("./quests/collect")
@@ -85,10 +88,15 @@ local function kindOf(quest: Story.Quest): Story.Kind
 	return StoryEngine.KINDS[quest.kind] or error(`{quest.id} has unknown Kind {quest.kind}`)
 end
 
--- Shows `lines` if there are any and remembers which Dialogue it is.
+-- Shows `lines` if there are any, framed by shot:Dialogue when a
+-- Character in the world speaks, and remembers which Dialogue it is.
 local function show(story: Story.Story, progress: Progress, out: Out, lines: { Story.Line }?, showing: Showing): boolean
 	if not lines or #lines == 0 then
 		return false
+	end
+	local framing = Shot.forDialogue(story, lines, out.commands)
+	if framing then
+		table.insert(out.commands, framing)
 	end
 	table.insert(out.commands, { kind = "ShowDialogue", lines = Story.shownLines(story, lines) })
 	progress.showing = showing
@@ -205,8 +213,8 @@ function StoryEngine.step(
 		return result, out.events, out.commands
 	end
 
-	local quest = Story.quest(story, progress.quest)
-	if progress.showing or not quest then
+	local quest, chapter = Story.quest(story, progress.quest)
+	if progress.showing or not quest or not chapter then
 		return progress, out.events, out.commands
 	end
 	local outcome = kindOf(quest).handle(quest, progress.collected, event)
@@ -216,6 +224,9 @@ function StoryEngine.step(
 	local result = copy(progress)
 	result.collected = outcome.collected or result.collected
 	append(out, outcome.commands)
+	if outcome.hook and quest.hooks then
+		Beat.play(chapter, quest.hooks[outcome.hook], out.events, out.commands)
+	end
 	-- Once its Kind is satisfied, a Quest shows its `dialogue` (talk Quests).
 	if outcome.done and not show(story, result, out, quest.dialogue, "dialogue") then
 		finish(story, result, out)
@@ -253,6 +264,7 @@ function StoryEngine.resume(story: Story.Story, progress: Progress): { WorldComm
 		local hooks: Story.Hooks = quest.hooks or {}
 		if table.find(progress.completed, quest.id) then
 			Beat.play(placed.chapter, hooks.onStart, events, commands)
+			Beat.play(placed.chapter, hooks.onTalkedTo, events, commands)
 			Beat.play(placed.chapter, hooks.onComplete, events, commands)
 		elseif quest.id == progress.quest then
 			local kind = kindOf(quest)

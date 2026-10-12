@@ -73,6 +73,9 @@ Scene (look + sound)                     Player
 | **Moderation status** | Where Roblox moderation is with an Asset. See [Lifecycles](#5-lifecycles). | `approved` |
 | **Placeholder** | A plain palette-coloured stand-in with no text for an illustration not drawn yet, until the real piece replaces it. | `card:chapter1` |
 | **Shot** | A named camera framing used by a Beat or a Dialogue. Specified in [`design/feel.md`](design/feel.md). See [enumeration](#shots). | `shot:ForestWallReveal` |
+| **Camera rule** | The camera stays within 60° of directly behind Amy: unit(camera − Amy) · (−facing) ≥ 0.5, at every frame. Specified in [`design/feel.md`](design/feel.md#invariants). | |
+| **Follow camera** | The camera in free play: behind Amy, who turns with the view as with shift-lock. Every Shot takes the camera from it and hands it back. | |
+| **Camera model** | The camera as plain data (`src/core/CameraModel.luau`): a **Rig** is a camera placement relative to Amy (her facing, the camera's angles from directly behind her, its distance, its look-at), and a **Frame** is what one frame renders (camera, look-at, Amy's facing, the Shot). `src/client/Camera.luau` renders it. | `CameraModel.step(camera, seconds, amy, subject)` |
 | **Lighting preset** | A named look for a Scene. See [enumeration](#lighting-presets). | `lighting:paradise` |
 | **Progress** | Where a player is in the Story: current Chapter and Quest, completed Quest ids, the Pickups touched in the current Quest, which Dialogue is showing, and later Collectibles, Bonds, and the Prop states that matter. Kept in the Save. | |
 | **Checkpoint** | The Progress snapshot taken at a Chapter start, kept in the Save alongside current Progress, one per Chapter reached. "Play this chapter again" restarts from it. | the Checkpoint of `chapter2`: every Chapter One Quest completed, `chapter2.walk_to_forest` just started |
@@ -154,7 +157,7 @@ of all three lists below are in `src/core/Events.luau`.
 | `SetPropState` | `prop`, `state` | Moves a Prop to one of its declared states |
 | `PlayCue` *later* | `cue` | Plays a Cue |
 | `SetLighting` | `preset` | Applies a Lighting preset |
-| `FrameShot` *later* | `shot` | Frames a Shot; the follow camera returns when the Shot ends |
+| `FrameShot` | `shot`, `character` or none | Frames a Shot, of the Character when the Shot takes one; the follow camera returns when the Shot ends |
 | `OfferTalk` | `character`, `label` | Offers the Character's talk affordance, with its Talk label |
 | `WithdrawTalk` | `character` | Withdraws the Character's talk affordance |
 | `SpawnPickups` | `quest` | Spawns the Quest's Pickups at their Spots |
@@ -170,19 +173,20 @@ grows by one named command, recorded here in the same PR. *Later*:
 reserved, not yet implemented.
 
 **On the wire.** `src/core/Net.luau` is the contract between server and
-client. Three World commands reach the client, over remotes whose names
-predate this glossary and are kept so the golden file still matches:
-`ShowDialogue`, `SetObjective`, and `ShowChapterCard` as `ShowChapter`
-(or `ShowEnding` for the end card). The client sends `DialogueFinished`,
-and `ClientReady` once it has loaded, which starts the Story; that is an
-adapter detail, not a Player event. The Title screen travels the same way:
-`ShowTitle` (the Chapter a returning player is in, and whether there is a
-Quest to continue) and the client's `TitleChoice`; only a returning player
-is sent `ShowTitle`, so the golden file has none. Both sides hold every payload to the
+client. Four World commands reach the client: `FrameShot`, and three
+over remotes whose names predate this glossary and are kept so the
+golden file still matches: `ShowDialogue`, `SetObjective`, and
+`ShowChapterCard` as `ShowChapter` (or `ShowEnding` for the end card).
+The client sends `DialogueFinished`, and `ClientReady` once it has
+loaded, which starts the Story; that is an adapter detail, not a Player
+event. The Title screen travels the same way: `ShowTitle` (the Chapter a
+returning player is in, and whether there is a Quest to continue) and
+the client's `TitleChoice`; only a returning player is sent `ShowTitle`,
+so the golden file has none. Both sides hold every payload to the
 contract: the server checks each World command against its schema in
-`src/core/Events.luau` and each message before it sends it, and the client
-binder wraps every remote it receives in `Net.guard`, which drops a
-malformed payload; tier 2 (`tests/engine/contract.luau`) passes every
+`src/core/Events.luau` and each message before it sends it, and the
+client binder wraps every remote it receives in `Net.guard`, which drops
+a malformed payload; tier 2 (`tests/engine/contract.luau`) passes every
 payload in the golden file through that guard.
 
 ## 4. Enumerations
@@ -225,6 +229,7 @@ Kind column.
 | Hook | Runs when |
 |---|---|
 | `onStart` | The Quest becomes `active`, before its Objective and intro Dialogue are shown |
+| `onTalkedTo` | A `talk` Quest's Character is talked to (`TalkedTo`), before its `dialogue` Dialogue is shown |
 | `onComplete` | The Quest becomes `completed`, after its outro Dialogue has finished |
 
 In a Chapter's `data.luau` a Quest names the Beats each Hook plays,
@@ -237,10 +242,14 @@ its `hooks.luau`.
 |---|---|---|
 | `beat:sam_catches` | `chapter1.sneak_out_1.onComplete`, `chapter1.sneak_out_2.onComplete` | Sam runs to the gate and brings Amy back into the garden |
 | `beat:sam_goes_to_farm` | `chapter2.walk_to_forest.onStart` | Sam leaves for the farm |
+| `beat:forest_wall_reveal` | `chapter2.walk_to_forest.onComplete` | `FrameShot(shot:ForestWallReveal)`: the wall of trees, the gap centred |
 | `beat:paradise_reveal` | `chapter2.enter_forest.onComplete` | `SetLighting(lighting:paradise)` |
+| `beat:meet_squirrel` | `chapter3.meet_squirrel.onTalkedTo` | `FrameShot(shot:MeetCharacter, character:Squirrel)` |
+| `beat:meet_fox` | `chapter3.meet_fox.onTalkedTo` | `FrameShot(shot:MeetCharacter, character:Fox)` |
+| `beat:meet_lion` | `chapter3.meet_lion.onTalkedTo` | `FrameShot(shot:MeetCharacter, character:Lion)` |
 | `beat:ordinary_world` | `chapter3.rush_home.onComplete` | `SetLighting(lighting:ordinary)` |
 | `beat:machine_arrives` | `chapter3.tell_mum.onComplete` | The machine and villagers arrive; Dad, Mum and Sam move to the field |
-| `beat:machine_stops` | `chapter4.explain.onComplete` | The blade stops, sparkles over the crowd, the machine reverses away |
+| `beat:machine_stops` | `chapter4.explain.onComplete` | Framed by `shot:MachineFinale`, which holds through the Ending's Lines: the blade stops, sparkles over the crowd, the machine reverses away |
 
 ### Spots
 
@@ -309,7 +318,7 @@ Framing and where each is used are specified in
 
 | Shot | Argument |
 |---|---|
-| `shot:Dialogue` | none |
+| `shot:Dialogue` | the Dialogue's first Speaker who is a Character in the world; the core frames it before every such Dialogue (`src/core/Shot.luau`) |
 | `shot:ForestWallReveal` | none |
 | `shot:MeetCharacter` | the Character being met |
 | `shot:MachineFinale` | none |

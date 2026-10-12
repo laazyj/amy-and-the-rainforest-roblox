@@ -53,8 +53,8 @@ Mutate.FAULTS = {
 		file = "src/core/StoryEngine.luau",
 		edits = {
 			{
-				from = "\t\t\tBeat.play(placed.chapter, hooks.onStart, events, commands)\n\t\t\tBeat.play(placed.chapter, hooks.onComplete, events, commands)\n",
-				to = "\t\t\tBeat.play(placed.chapter, hooks.onStart, events, commands)\n",
+				from = "\t\t\tBeat.play(placed.chapter, hooks.onTalkedTo, events, commands)\n\t\t\tBeat.play(placed.chapter, hooks.onComplete, events, commands)\n",
+				to = "\t\t\tBeat.play(placed.chapter, hooks.onTalkedTo, events, commands)\n",
 			},
 		},
 	},
@@ -113,6 +113,11 @@ Mutate.FAULTS = {
 		name = "the Objective tracker shows with no Objective",
 		file = "src/core/ObjectiveText.luau",
 		edits = { { from = 'visible = trimmed ~= ""', to = "visible = true" } },
+	},
+	{
+		name = "break the camera rule's clamp (a camera outside the cone is left there)",
+		file = "src/core/CameraModel.luau",
+		edits = { { from = "if cosine >= CameraModel.CLAMP_COSINE then", to = "if true then" } },
 	},
 } :: { Fault }
 

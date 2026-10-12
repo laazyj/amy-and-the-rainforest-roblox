@@ -168,6 +168,29 @@ playtest starts fresh, which is fine for a tier 3 run that wants the golden
 first minute. Dev saves never reach Release: each experience has its own
 DataStores (plan section 3).
 
+## The camera rule in Studio (tier 3, by hand until the Mac runner)
+
+`tests/studio/CameraRule.client.luau` is the tier 3 assertion for "Amy's
+face is never seen" (feel.md, Invariants and section 2). Until brief
+mac-001's runner runs it, the owner runs it by hand on the Mac:
+
+1. Build the place (`tools/build.sh`, or download the `place` artifact
+   of the PR's CI run) and open `build/AmyAndTheRainforest.rbxl` in
+   Studio. Do not publish it: only CI publishes.
+2. In the Explorer, add a **LocalScript** under **StarterPlayer →
+   StarterPlayerScripts**, name it `CameraRule`, and paste the file's
+   contents into it.
+3. Press **Play** and play the Story to the end card, or jump with the
+   Dev shortcuts (`/chapter 2`, `/quest chapter3.meet_fox`) to the Shots.
+   For phone and tablet, use **Test → Device** emulation (a phone and a
+   tablet preset, both orientations) and turn the view by dragging.
+4. Read the Output: every failure is a `[CameraRule] FAIL` line, and a
+   summary (`N checks, M failures`) prints every 30 s and at the end card.
+   A pass is `0 failures` with checks from every Shot.
+
+What it checks, and when, is in the script's header. Close the place
+without saving the script into anything you keep.
+
 ## Workflow security checks
 
 `tools/check.sh` runs actionlint and zizmor (pedantic persona) on every PR;

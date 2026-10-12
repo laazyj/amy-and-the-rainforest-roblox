@@ -8,6 +8,8 @@
 	  ShowChapter /   -> ChapterCardTimeline: the Chapter card and the end card
 	  ShowEnding
 	  ShowTitle       -> TitleScreen: the Title screen's choices
+	  FrameShot       -> Camera (src/client/Camera, over CameraModel): the
+	                     Shot, framed from behind Amy
 
 	Every remote it receives is held to the Net contract first (Net.guard);
 	a malformed payload is dropped with a warning.
@@ -25,6 +27,10 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+
+-- The camera first, before anything here yields: every frame is its own.
+local Camera = require(script.Parent:WaitForChild("Camera"))
+Camera.start()
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -51,6 +57,7 @@ local ShowEnding = remotes.ShowEnding
 local ClientReady = remotes.ClientReady
 local ShowTitle = remotes.ShowTitle
 local TitleChoice = remotes.TitleChoice
+local FrameShot = remotes.FrameShot
 
 -- The view-model's colours are a few frozen tables; each becomes a Color3 once.
 local colours: { [Story.RGB]: Color3 } = {}
@@ -380,6 +387,7 @@ end
 
 local function advance()
 	if DialogueViewModel.advance(dialogue) then
+		Camera.dialogueFinished()
 		DialogueFinished:FireServer()
 	end
 	renderDialogue()
@@ -408,6 +416,11 @@ end, warn))
 -- Objective tracker
 ----------------------------------------------------------------
 SetObjective.OnClientEvent:Connect(Net.guard("SetObjective", function(text: string?)
+	-- The server never moves on while a Dialogue shows, but for a Resume (a
+	-- Dev shortcut's jump): the camera leaves that Dialogue's Shot.
+	if DialogueViewModel.view(dialogue).open then
+		Camera.resumed()
+	end
 	local view = ObjectiveText.view(text)
 	objectiveFrame.Visible = view.visible
 	objectiveText.Text = view.text
@@ -450,6 +463,11 @@ ShowChapter.OnClientEvent:Connect(Net.guard("ShowChapter", showCard(false), warn
 ShowEnding.OnClientEvent:Connect(Net.guard("ShowEnding", showCard(true), warn))
 
 ----------------------------------------------------------------
+-- The Shots the camera frames
+----------------------------------------------------------------
+FrameShot.OnClientEvent:Connect(Net.guard("FrameShot", Camera.frameShot, warn))
+
+----------------------------------------------------------------
 -- The Title screen
 ----------------------------------------------------------------
 local title = TitleScreen.new()
@@ -480,6 +498,7 @@ local function renderTitle()
 		choice.Activated:Connect(function()
 			local made = TitleScreen.press(title, button.id)
 			if made then
+				Camera.resumed()
 				TitleChoice:FireServer(made)
 			end
 			renderTitle()

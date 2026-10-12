@@ -46,10 +46,28 @@ return function(t: any)
 			})
 		end)
 
-		it("plays beat ordinary_world, beat machine_arrives", function()
-			expect(walk.beats).toEqual({
-				"ordinary_world",
-				"machine_arrives",
+		it(
+			"plays beat meet_squirrel, beat meet_fox, beat meet_lion, beat ordinary_world, beat machine_arrives",
+			function()
+				expect(walk.beats).toEqual({
+					"meet_squirrel",
+					"meet_fox",
+					"meet_lion",
+					"ordinary_world",
+					"machine_arrives",
+				})
+			end
+		)
+
+		it("frames shot:MeetCharacter at the first TalkedTo of each animal, before its shot:Dialogue", function()
+			expect(walk.shots).toEqual({
+				"MeetCharacter(Squirrel)",
+				"Dialogue(Squirrel)",
+				"MeetCharacter(Fox)",
+				"Dialogue(Fox)",
+				"MeetCharacter(Lion)",
+				"Dialogue(Lion)",
+				"Dialogue(Mum)",
 			})
 		end)
 

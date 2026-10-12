@@ -37,6 +37,10 @@ return function(t: any)
 			})
 		end)
 
+		it("frames shot:Dialogue of Dad, then of Sam at each sneak-out's outro", function()
+			expect(walk.shots).toEqual({ "Dialogue(Dad)", "Dialogue(Sam)", "Dialogue(Sam)" })
+		end)
+
 		it("plays beat sam_catches after each sneak-out", function()
 			expect(walk.beats).toEqual({
 				"sam_catches",

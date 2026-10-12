@@ -40,6 +40,10 @@ return function(t: any)
 			})
 		end)
 
+		it("frames shot:Dialogue of Dad, then shot:MachineFinale, held through the Ending's Lines", function()
+			expect(walk.shots).toEqual({ "Dialogue(Dad)", "MachineFinale" })
+		end)
+
 		it("ends with the machine retreating, the villagers cheering and no Objective", function()
 			expect(walk.world.props).toEqual({ Machine = "retreating", Villagers = "cheering" })
 			expect(walk.world.objective).toBeNil()

@@ -90,16 +90,26 @@ return function(t: any)
 			expect(progress).toBe(playable)
 		end)
 
-		local talking, _, talked = StoryEngine.step(fixture, playable, { kind = "TalkedTo", character = "Guide" })
+		local talking, talkedEvents, talked =
+			StoryEngine.step(fixture, playable, { kind = "TalkedTo", character = "Guide" })
 
 		it("withdraws the talk affordance and shows the dialogue on TalkedTo(Guide)", function()
-			expect(Walker.kinds(talked)).toEqual({ "WithdrawTalk", "ShowDialogue" })
-			expect(talked[2]).toEqual({
+			expect(Walker.kinds(talked)).toEqual({ "WithdrawTalk", "FrameShot", "FrameShot", "ShowDialogue" })
+			expect(talked[4]).toEqual({
 				kind = "ShowDialogue",
 				lines = { { speaker = "the Hero", text = "Hi!" }, { speaker = "the Guide", text = "Welcome." } },
 			})
 			expect(talking.showing).toBe("dialogue")
 			expect(talking.quest).toBe("chapter1.greet")
+		end)
+
+		it("plays beat guide_turns at onTalkedTo, before the dialogue", function()
+			expect(talkedEvents).toEqual({ { kind = "BeatPlayed", beat = "guide_turns" } })
+			expect(talked[2]).toEqual({ kind = "FrameShot", shot = "MeetCharacter", character = "Guide" })
+		end)
+
+		it("frames the dialogue with shot:Dialogue of the Guide, the first Speaker in the world", function()
+			expect(talked[3]).toEqual({ kind = "FrameShot", shot = "Dialogue", character = "Guide" })
 		end)
 
 		local outro, _, outroCommands = StoryEngine.step(fixture, talking, { kind = "DialogueFinished" })
@@ -153,6 +163,7 @@ return function(t: any)
 				"ShowChapterCard",
 				"Wait",
 				"SetObjective",
+				"FrameShot",
 				"ShowDialogue",
 			})
 			expect(Walker.kinds(step.events)).toEqual({
