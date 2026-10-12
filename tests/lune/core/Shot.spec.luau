@@ -27,10 +27,10 @@ return function(t: any)
 			expect(Shot.HELD).toEqual({ Dialogue = true, MachineFinale = true })
 		end)
 
-		it("lasts at most 4 seconds, unless held until DialogueFinished", function()
+		it("holds its framing after easing in, within 4 seconds in all, unless held until DialogueFinished", function()
 			for _, name in Shot.NAMES do
-				local seconds = Shot.SECONDS[name]
-				expect(Shot.HELD[name] == true or (seconds ~= nil and seconds <= Shot.LONGEST)).toBe(true)
+				local hold = Shot.HOLD[name]
+				expect(Shot.HELD[name] == true or (hold ~= nil and Shot.EASE_IN + hold <= Shot.LONGEST)).toBe(true)
 			end
 		end)
 

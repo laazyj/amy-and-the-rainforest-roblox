@@ -250,6 +250,22 @@ return function(t: any)
 		end)
 	end)
 
+	describe("CameraModel.pullIn", function()
+		it("pulls the camera in at once, and eases it back out over 0.3 s", function()
+			expect(CameraModel.pullIn(1, 0.25, 1 / 60)).toBe(0.25)
+			local reach = 0.25
+			for _ = 1, 9 do
+				reach = CameraModel.pullIn(reach, 1, 1 / 60)
+			end
+			expect(reach > 0.25 and reach < 1).toBe(true) -- 0.15 s out: on its way
+			for _ = 1, 9 do
+				reach = CameraModel.pullIn(reach, 1, 1 / 60)
+			end
+			expect(reach).toBe(1)
+			expect(CameraModel.pullIn(0.5, 0.75, 1)).toBe(0.75) -- never past what is clear
+		end)
+	end)
+
 	describe("CameraModel.turnsView", function()
 		it("turns the view for a touch anywhere but the thumbstick's and the talk button's zones", function()
 			local width, height = 844, 390
@@ -331,11 +347,12 @@ return function(t: any)
 			end)
 		end
 
-		for name, seconds in Shot.SECONDS do
-			it(`ends {name} within {seconds} s and hands back to the follow camera over 0.5 s`, function()
-				local camera = CameraModel.new({ x = 1, y = 0, z = 0 })
+		for name, hold in Shot.HOLD do
+			local seconds = Shot.EASE_IN + hold
+			it(`eases {name} in, holds it {hold} s, and hands back to the follow camera over 0.5 s`, function()
+				local camera = CameraModel.new({ x = 0, y = 0, z = 1 })
 				local amy = { x = 0, y = 3, z = 0 }
-				local subject = { x = 0, y = 4, z = 20 } -- ahead of where Amy turns to
+				local subject = { x = 0, y = 4, z = 20 } -- ahead of Amy: a short swing
 				local find = always(subject)
 				CameraModel.frameShot(camera, name, "Squirrel")
 				-- how long the Shot is framed, from its first frame
@@ -345,6 +362,7 @@ return function(t: any)
 					framed += TICK
 				end
 				expect(framed).toBe(seconds)
+				expect(frame.settled).toBeNil()
 				-- Amy faces the subject, and the follow camera goes behind her there
 				expect(math.abs(frame.facing.z - 1) < 1e-6).toBe(true)
 				local behind = CameraModel.step(CameraModel.new({ x = 0, y = 0, z = 1 }), 0, amy)
@@ -357,6 +375,32 @@ return function(t: any)
 				expect(apart(frame.lookAt, behind.lookAt) < 1e-6).toBe(true)
 			end)
 		end
+
+		it("reaches each timed Shot's framed hold even from behind Amy, and ends it within 4 s", function()
+			local rng = random(44)
+			for _, framing in FRAMINGS do
+				if Shot.HOLD[framing.shot] then
+					for pose = 1, 100 do
+						local camera = CameraModel.new(direction(rng))
+						CameraModel.turn(camera, 0, between(rng, -1, 1))
+						local amy = { x = 0, y = 3, z = 0 }
+						local find = always(placeSubject(rng, amy, framing))
+						CameraModel.frameShot(camera, framing.shot, framing.character)
+						local framed, held, frame = 0, 0, CameraModel.step(camera, TICK, amy, find)
+						while frame.shot do
+							if frame.settled then
+								held += TICK
+							end
+							frame = CameraModel.step(camera, TICK, amy, find)
+							framed += TICK
+						end
+						if held < 0.25 or framed > Shot.LONGEST then
+							error(`{named(framing)} pose {pose}: framed {framed} s, held {held} s`)
+						end
+					end
+				end
+			end
+		end)
 
 		it("holds a held Shot until DialogueFinished, then hands back over 0.5 s", function()
 			local camera = CameraModel.new({ x = 0, y = 0, z = 1 })

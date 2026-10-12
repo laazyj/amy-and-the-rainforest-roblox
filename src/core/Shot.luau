@@ -18,10 +18,13 @@ Shot.NAMES = table.freeze({ "Dialogue", "ForestWallReveal", "MeetCharacter", "Ma
 -- Shots that accompany a Dialogue: each holds until DialogueFinished.
 Shot.HELD = table.freeze({ Dialogue = true, MachineFinale = true } :: { [string]: boolean })
 
--- How long each other Shot lasts, easing in included: at most 4 seconds.
-Shot.SECONDS = table.freeze({ ForestWallReveal = 3.5, MeetCharacter = 3.5 } :: { [string]: number })
+-- How long each other Shot holds its framing once it has eased in: its
+-- move (a tilt, an arc, a push in) plays then, so the subject is always
+-- framed, however far the Shot had to swing to reach it.
+Shot.HOLD = table.freeze({ ForestWallReveal = 3, MeetCharacter = 2.5 } :: { [string]: number })
 
--- The longest any Shot that is not held may last.
+-- The longest any Shot that is not held may last, easing in included: a
+-- long swing shortens its hold.
 Shot.LONGEST = 4
 
 -- A Shot eases in from the camera before it over at least this long, and

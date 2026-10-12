@@ -49,8 +49,16 @@ export type Rig = {
 
 -- What the adapter renders: the camera, the point it looks at, and the
 -- way Amy faces, all in world space; and the Shot framed, if any, with
--- its Character.
-export type Frame = { camera: Vec3, lookAt: Vec3, facing: Vec3, shot: string?, character: string? }
+-- its Character, and whether it has eased in (`settled`): from then on it
+-- frames its subject.
+export type Frame = {
+	camera: Vec3,
+	lookAt: Vec3,
+	facing: Vec3,
+	shot: string?,
+	character: string?,
+	settled: boolean?,
+}
 
 -- A FrameShot: the Shot, and the Character it frames when it takes one.
 export type Framing = { shot: string, character: string? }
@@ -238,6 +246,17 @@ function CameraModel.turn(camera: Camera, yaw: number, pitch: number)
 	camera.pitch = math.clamp(camera.pitch + pitch, CameraModel.MIN_PITCH, CameraModel.MAX_PITCH)
 end
 
+-- Pulled in by an obstacle between it and Amy, the camera moves in at
+-- once; it eases back out over this long, as Roblox's own camera does, so
+-- a trunk passing is no cut.
+CameraModel.EASE_OUT_SECONDS = 0.3
+
+-- How far out along its ray (0 to 1) the camera is this frame: `reach`
+-- last frame, `clear` how far it may go now (1 when nothing is in the way).
+function CameraModel.pullIn(reach: number, clear: number, seconds: number): number
+	return if clear < reach then clear else math.min(clear, reach + seconds / CameraModel.EASE_OUT_SECONDS)
+end
+
 -- PC turning (feel.md section 5): these keys turn Amy and the view
 -- together, by KeyCode name, +1 to her left and -1 to her right; W/S and
 -- Up/Down walk. The one place the key mapping lives.
@@ -322,8 +341,8 @@ CameraModel.DIALOGUE_HEAD_RISE = 0.24
 -- the steepest the two-shot looks up or down at a speaker
 local DIALOGUE_STEEPEST = math.rad(35)
 
--- The Rig of each Shot `t` seconds in, before easing in and before the
--- clamp: every path keeps the cone by itself (a Shot that would show her
+-- The Rig of each Shot `t` seconds after it has eased in (0 while it eases
+-- in), before the clamp: every path keeps the cone by itself (a Shot that would show her
 -- face is not a valid Shot), and tier 1 checks it.
 CameraModel.PATHS = {
 	Dialogue = function(scene)
@@ -349,7 +368,7 @@ CameraModel.PATHS = {
 		local facing = CameraModel.facing(scene.heading)
 		local from = add(add(scene.amy, UP, 2), facing, 6)
 		local to = v(scene.subject.x, 18, scene.subject.z)
-		local share = smooth((t - Shot.EASE_IN) / 3)
+		local share = smooth(t / 3)
 		return {
 			yaw = scene.heading,
 			azimuth = math.rad(12),
@@ -361,7 +380,7 @@ CameraModel.PATHS = {
 
 	MeetCharacter = function(scene, t)
 		local row = CameraModel.MEETINGS[scene.character or ""] or STILL_MEETING
-		local share = smooth(t / (Shot.SECONDS.MeetCharacter :: number))
+		local share = smooth(t / (Shot.HOLD.MeetCharacter :: number))
 		return {
 			yaw = scene.heading,
 			azimuth = math.rad(math.lerp(row.azimuth[1], row.azimuth[2], share)),
@@ -374,7 +393,7 @@ CameraModel.PATHS = {
 	-- wide, from behind Amy and the crowd, toward the machine and the
 	-- trees; holds while the machine reverses, then tilts up to the treetops
 	MachineFinale = function(scene, t)
-		local share = smooth((t - 2.5) / 3)
+		local share = smooth((t - 2) / 3)
 		return {
 			yaw = scene.heading,
 			azimuth = math.rad(35),
@@ -455,9 +474,11 @@ end
 function CameraModel.step(camera: Camera, seconds: number, amy: Vec3, subject: Subject?): Frame
 	camera.clock += seconds
 	local playing = camera.playing
-	local limit = playing and Shot.SECONDS[playing.framing.shot]
-	if limit and camera.clock - (playing :: Playing).started >= limit then
-		finish(camera)
+	local hold = playing and Shot.HOLD[playing.framing.shot]
+	if playing and playing.ease and hold then
+		if camera.clock - playing.started >= math.min(Shot.LONGEST, playing.ease + hold) then
+			finish(camera)
+		end
 	end
 	local follow = CameraModel.follow(camera, amy)
 	local at = subjectNow(camera, amy, subject or nowhere, camera.last or follow)
@@ -473,7 +494,7 @@ function CameraModel.step(camera: Camera, seconds: number, amy: Vec3, subject: S
 		local path = PATHS[playing.framing.shot]
 		local ease = playing.ease or easeFor(playing.from, path(scene, 0))
 		playing.ease = ease
-		rig = CameraModel.blend(playing.from, path(scene, t), smooth(t / ease))
+		rig = CameraModel.blend(playing.from, path(scene, math.max(0, t - ease)), smooth(t / ease))
 	elseif camera.handBack then
 		local t = camera.clock - camera.handBack.started
 		if t >= Shot.HAND_BACK then
@@ -488,6 +509,7 @@ function CameraModel.step(camera: Camera, seconds: number, amy: Vec3, subject: S
 	local frame = CameraModel.frame(rig, amy)
 	if playing then
 		frame.shot, frame.character = playing.framing.shot, playing.framing.character
+		frame.settled = camera.clock - playing.started >= (playing.ease :: number)
 	end
 	return frame
 end

@@ -3,6 +3,11 @@
 	Dialogue, and plays the active Quest by its Kind (talks to its Character,
 	enters its Zone, touches its Pickups in order). Records every step, and
 	the WorldState at the moment each Quest becomes playable.
+
+	Every walk also holds the Story to the invariant the client's Resume
+	detection rests on (src/client/StoryClient): while a Dialogue shows,
+	nothing else is sent, no SetObjective included. A step's ShowDialogue
+	is its last command, and only DialogueFinished moves on from it.
 ]]
 
 local Events = require("../../../src/core/Events")
@@ -69,6 +74,11 @@ function Walker.walk(story: Story.Story, progress: StoryEngine.Progress?, world:
 	end
 
 	local function record(event: Events.PlayerEvent?, next: StoryEngine.Progress, events, commands)
+		for i, command in commands do
+			if command.kind == "ShowDialogue" and i < #commands then
+				error(`step {#walk.steps + 1} sends {commands[i + 1].kind} while a Dialogue shows`)
+			end
+		end
 		walk.progress = next
 		for _, command in commands do
 			WorldState.apply(story, state, command)
