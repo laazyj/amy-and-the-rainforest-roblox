@@ -43,7 +43,6 @@ local Camera = (require :: any)(playerScripts:WaitForChild("Camera"))
 local Core = ReplicatedStorage:WaitForChild("core")
 -- the script is not in the place's tree, so the type checker cannot follow these
 local CameraModel = (require :: any)(Core:WaitForChild("CameraModel"))
-local Shot = (require :: any)(Core:WaitForChild("Shot"))
 
 local SAMPLE_SECONDS = 0.25
 local SUMMARY_SECONDS = 30
@@ -185,12 +184,10 @@ if player.Character then
 end
 
 local shot: string? = nil
-local shotStarted = 0
 local eased = false
 local sinceSample, sinceSummary = 0, 0
 RunService:BindToRenderStep("CameraRuleCheck", Enum.RenderPriority.Last.Value, function(seconds)
 	local frame = Camera.last()
-	local now = os.clock()
 	local framed = frame and frame.shot
 	if fresh > 0 and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
 		fresh -= 1
@@ -198,9 +195,10 @@ RunService:BindToRenderStep("CameraRuleCheck", Enum.RenderPriority.Last.Value, f
 	end
 	if framed ~= shot then
 		check(if framed then `{framed} starts` else `{shot} ends`, false)
-		shot, shotStarted, eased = framed, now, false
+		shot, eased = framed, false
 	end
-	local settled = framed ~= nil and now - shotStarted >= Shot.EASE_IN
+	-- the model says when a Shot has eased in: at least 0.5 s, longer after a long swing
+	local settled = frame ~= nil and frame.settled == true
 	if settled and not eased then
 		eased = true
 		check(`{framed} eased in`, true)

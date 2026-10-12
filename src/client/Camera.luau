@@ -8,8 +8,9 @@
 	                Roblox's default camera's) and Amy's root turned to the
 	                model's facing (AutoRotate off: shift-lock feel). The
 	                camera is pulled in along its ray when something stands
-	                between it and Amy; its direction, and so the camera
-	                rule, is unchanged.
+	                between it and Amy (at once; it eases back out over
+	                0.3 s); its direction, and so the camera rule, is
+	                unchanged.
 	  FrameShot     CameraModel.frameShot; a Shot's subject is a Character's
 	                Head in Workspace.StoryCharacters, or the forest gap.
 	                The Characters' name tags hide while shot:Dialogue plays
@@ -20,8 +21,9 @@
 	                never locked. Touch: a drag that starts outside the
 	                control zones (feel.md section 1) turns the view
 	  spawn         each new character is found the frame it appears, and
-	                the camera starts behind Amy as she faces; on death the
-	                last Frame holds until she respawns. The server putting
+	                the camera starts behind Amy as she faces; on death (her
+	                joints kept, so she stays in one piece) the last Frame
+	                holds until she respawns. The server putting
 	                her somewhere (TeleportPlayer) or a Resume puts the
 	                camera behind her again
 
@@ -63,6 +65,8 @@ local model: CameraModel.Camera? = nil
 local following: Model? = nil
 local root: BasePart? = nil
 local dead = false
+-- how far out along its ray toward the Frame's camera the camera is, 0 to 1
+local reach = 1
 -- the last Frame, and where Amy stood for it (tests/studio reads them)
 local lastFrame: CameraModel.Frame? = nil
 local lastAmy: Vec3? = nil
@@ -122,10 +126,13 @@ local function follow(): BasePart?
 		if not (part and part:IsA("BasePart") and humanoid) then
 			return nil -- not built yet: the camera holds where it is
 		end
-		following, root, dead = current, part, false
+		following, root, dead, reach = current, part, false, 1
 		model = CameraModel.new(plain(part.CFrame.LookVector))
 		obstacles.FilterDescendantsInstances = { current }
 		humanoid.AutoRotate = false
+		-- she can fall out of the world: a death keeps her in one piece, so
+		-- no loose head rolls round to face the held camera
+		humanoid.BreakJointsOnDeath = false
 		humanoid.Died:Once(function()
 			dead = true
 		end)
@@ -133,11 +140,14 @@ local function follow(): BasePart?
 	return root
 end
 
--- `at` pulled in toward Amy's root `from` when something stands between.
-local function unoccluded(from: Vector3, at: Vector3): Vector3
+-- `at` pulled in toward Amy's root `from` when something stands between,
+-- at once, and eased back out when it has gone.
+local function unoccluded(from: Vector3, at: Vector3, seconds: number): Vector3
 	local ray = at - from
-	local hit = Workspace:Raycast(from, ray, obstacles)
-	return if hit then from + ray.Unit * math.max(NEAREST, hit.Distance - CLEARANCE) else at
+	local hit = if ray.Magnitude > NEAREST then Workspace:Raycast(from, ray, obstacles) else nil
+	local clear = if hit then math.max(NEAREST, hit.Distance - CLEARANCE) / ray.Magnitude else 1
+	reach = CameraModel.pullIn(reach, clear, seconds)
+	return from + ray * reach
 end
 
 local function render(seconds: number)
@@ -160,7 +170,7 @@ local function render(seconds: number)
 	local at = part.Position
 	local amy = plain(at)
 	local frame = CameraModel.step(model, seconds, amy, subject)
-	camera.CFrame = CFrame.lookAt(unoccluded(at, vector(frame.camera)), vector(frame.lookAt))
+	camera.CFrame = CFrame.lookAt(unoccluded(at, vector(frame.camera), seconds), vector(frame.lookAt))
 	local facing = vector(frame.facing)
 	if part.CFrame.LookVector:Dot(facing) < 1 - 1e-9 then
 		part.CFrame = CFrame.lookAt(at, at + facing)
@@ -207,8 +217,9 @@ local function bindInput()
 		elseif input.UserInputType == Enum.UserInputType.Touch and not dragging then
 			local camera = Workspace.CurrentCamera
 			-- a touch's Position is below the top bar; the viewport includes it
-			local size = (if camera then camera.ViewportSize else Vector2.zero) - GuiService:GetGuiInset()
-			if CameraModel.turnsView(input.Position.X, input.Position.Y, size.X, size.Y) then
+			local size = if camera then camera.ViewportSize else Vector2.zero
+			local at = Vector2.new(input.Position.X, input.Position.Y) + GuiService:GetGuiInset()
+			if CameraModel.turnsView(at.X, at.Y, size.X, size.Y) then
 				dragging, dragAt = input, input.Position
 			end
 		end
