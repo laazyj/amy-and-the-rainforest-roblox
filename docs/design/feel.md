@@ -194,8 +194,7 @@ The words are game-rendered text, never part of the image.
   camera); a right-mouse drag turns too. The pointer is never locked, so
   it stays free for the Title screen, the dialogue box and prompts. E to
   talk, click, E or Space to advance. The key mapping lives in one place,
-  `CameraModel.TURN_KEYS` (coordinator's choice, awaiting the owner; the
-  alternative is arrows to turn with WASD to strafe).
+  `CameraModel.TURN_KEYS` (confirmed by the owner with the merge of #36).
   Touch: the controls in [§1](#layout-rules), and a drag outside the
   control zones turns the view.
 - Every input gets feedback within 100 ms: the client logs a Cue played
