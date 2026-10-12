@@ -14,6 +14,12 @@
 	  text fits          every visible text shows in full (TextFits)
 	  the column         the dialogue box's text column is at most
 	                     30 x its TextSize (60 characters)
+	  a Line never       the Line's bottom is no lower than the box's
+	  scrolls            bottom less its padding (the box clips its text,
+	                     so TextFits alone would not show a spill)
+	  nothing covers     while shot:Dialogue frames a speaker, once eased
+	  the head           in, the box and its name tag stay below the head
+	                     window (y 0.5 of the viewport, feel.md section 2)
 	  the safe area      every visible element is inside the safe area
 	                     (but the full-screen backdrops: the Title screen's
 	                     image, the card's overlay and the click catcher)
@@ -25,7 +31,8 @@
 	  no overlaps        no two visible interactive elements overlap: the
 	                     StoryUI's buttons, the Talk-and-advance button
 	  touch targets      on touch, each of those, and each talk prompt's
-	                     button, is at least 44 x 44 (we design at 48)
+	                     button, is at least 44 x 44 (we design at 48),
+	                     and the interactive elements are 8 apart
 
 	And it follows the Onboarding of a fresh Save (feel.md section 6),
 	from the first Chapter card: the advance Hint shows large on the first
@@ -58,12 +65,13 @@ local Content = ReplicatedStorage:WaitForChild("content")
 local hints = (require :: any)(Content:WaitForChild("hints"))
 local story = (require :: any)(Content:WaitForChild("Story")).story
 local remotes = ReplicatedStorage:WaitForChild("StoryRemotes")
+local ScreenLayout = (require :: any)(ReplicatedStorage:WaitForChild("core"):WaitForChild("ScreenLayout"))
+local Camera = (require :: any)(player:WaitForChild("PlayerScripts"):WaitForChild("Camera"))
 local Contrast = (require :: any)(ReplicatedStorage:WaitForChild("core"):WaitForChild("Contrast"))
 
 local SAMPLE_SECONDS = 0.5
 local SUMMARY_SECONDS = 30
 local MIN_TARGET = 44
-local COLUMN_EMS = 30
 -- how long a Hint may take to show or clear after what calls for it
 local WITHIN = 1
 -- full-screen backdrops and catchers, outside the safe area on purpose
@@ -85,6 +93,11 @@ end
 local function rectOf(gui: GuiObject): Rect
 	local at, size = gui.AbsolutePosition, gui.AbsoluteSize
 	return Rect.new(at.X, at.Y, at.X + size.X, at.Y + size.Y)
+end
+
+-- The space between two rects that do not overlap.
+local function spacing(a: Rect, b: Rect): number
+	return math.max(b.Min.X - a.Max.X, a.Min.X - b.Max.X, b.Min.Y - a.Max.Y, a.Min.Y - b.Max.Y)
 end
 
 local function overlap(a: Rect, b: Rect): boolean
@@ -247,15 +260,44 @@ local function checkLayout()
 			end
 		end
 	end
+	local box = ui:FindFirstChild("DialogueFrame") :: GuiObject?
 	local body = ui:FindFirstChild("Body", true) :: TextLabel?
-	if body and shown(body) and body.AbsoluteSize.X > COLUMN_EMS * body.TextSize + 1 then
-		fail("the column", `{body.AbsoluteSize.X} wide at TextSize {body.TextSize}, over {COLUMN_EMS * body.TextSize}`)
+	if box and body and shown(body) then
+		if body.AbsoluteSize.X > ScreenLayout.COLUMN_EMS * body.TextSize + 1 then
+			fail(
+				"the column",
+				`{body.AbsoluteSize.X} wide at TextSize {body.TextSize}, over {ScreenLayout.COLUMN_EMS * body.TextSize}`
+			)
+		end
+		-- the box clips its text: a Line that spills past it is cut off unseen
+		local floor = box.AbsolutePosition.Y + box.AbsoluteSize.Y - ScreenLayout.BOX.bottom
+		if body.AbsolutePosition.Y + body.AbsoluteSize.Y > floor + 1 then
+			fail("a Line never scrolls", `{body.Text} reaches below the box's padding`)
+		end
+		-- nothing covers the speaker's head: during shot:Dialogue the box, its
+		-- name tag included, stays below the head window
+		local frame = Camera.last()
+		local camera = Workspace.CurrentCamera
+		local tag = box:FindFirstChild("Speaker") :: GuiObject?
+		local top = if tag and shown(tag)
+			then math.min(tag.AbsolutePosition.Y, box.AbsolutePosition.Y)
+			else box.AbsolutePosition.Y
+		local window = if camera then ScreenLayout.HEAD_WINDOW.bottom * camera.ViewportSize.Y else 0
+		if frame and frame.shot == "Dialogue" and frame.settled and top - rectOf(screen).Min.Y < window - 1 then
+			fail("nothing covers the head", `the box's top at {top}, inside the head window (down to {window})`)
+		end
 	end
 	local buttons = interactive()
 	for i, a in buttons do
 		for j = i + 1, #buttons do
-			if overlap(rectOf(a), rectOf(buttons[j])) then
+			local first, second = rectOf(a), rectOf(buttons[j])
+			if overlap(first, second) then
 				fail("no overlaps", `{a:GetFullName()} and {buttons[j]:GetFullName()}`)
+			elseif touch() and spacing(first, second) < ScreenLayout.TARGET_GAP then
+				fail(
+					"touch targets",
+					`{a:GetFullName()} and {buttons[j]:GetFullName()} under {ScreenLayout.TARGET_GAP} apart`
+				)
 			end
 		end
 	end

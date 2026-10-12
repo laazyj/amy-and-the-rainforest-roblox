@@ -134,11 +134,11 @@ end
 
 -- Dialogue box -------------------------------------------------
 -- A button, so a tap anywhere on it advances (feel.md section 4); it grows
--- upwards to fit its Line, up to the Screen layout's tallest.
+-- upwards to fit its Line, up to the Screen layout's tallest, and clips its
+-- text, so a Line that ever spills can never cover a button.
 local dialogueFrame = Instance.new("TextButton")
 dialogueFrame.Name = "DialogueFrame"
 dialogueFrame.AnchorPoint = Vector2.new(0, 1)
-dialogueFrame.AutomaticSize = Enum.AutomaticSize.Y
 dialogueFrame.AutoButtonColor = false
 dialogueFrame.Text = ""
 dialogueFrame.BackgroundColor3 = Color3.fromRGB(24, 44, 30)
@@ -147,9 +147,6 @@ dialogueFrame.BorderSizePixel = 0
 dialogueFrame.Visible = false
 dialogueFrame.Parent = screenGui
 addCorner(dialogueFrame, 16)
-
-local dialogueLimit = Instance.new("UISizeConstraint")
-dialogueLimit.Parent = dialogueFrame
 
 addPadding(dialogueFrame, ScreenLayout.BOX.top, ScreenLayout.BOX.bottom, ScreenLayout.PADDING)
 
@@ -177,13 +174,20 @@ speakerPadding.PaddingLeft = UDim.new(0, 14)
 speakerPadding.PaddingRight = UDim.new(0, 14)
 speakerPadding.Parent = speakerLabel
 
--- the text column: the Line, then the hint row under it
+-- the text column, clipped (the name tag above it is not): the Line, then
+-- the hint row under it
+local dialogueText = Instance.new("Frame")
+dialogueText.Name = "Text"
+dialogueText.Size = UDim2.fromScale(1, 1)
+dialogueText.BackgroundTransparency = 1
+dialogueText.ClipsDescendants = true
+dialogueText.Parent = dialogueFrame
 local dialogueLines = Instance.new("Frame")
 dialogueLines.Name = "Lines"
 dialogueLines.Size = UDim2.fromScale(1, 0)
 dialogueLines.AutomaticSize = Enum.AutomaticSize.Y
 dialogueLines.BackgroundTransparency = 1
-dialogueLines.Parent = dialogueFrame
+dialogueLines.Parent = dialogueText
 local dialogueList = Instance.new("UIListLayout")
 dialogueList.SortOrder = Enum.SortOrder.LayoutOrder
 dialogueList.Padding = UDim.new(0, ScreenLayout.BOX.between)
@@ -546,6 +550,17 @@ local function renderObjective()
 	objectiveText.Text = objectiveView.text
 end
 
+-- The box as tall as its Line and hint row, up to the layout's tallest.
+local function fitDialogue()
+	local height = dialogueLines.AbsoluteSize.Y + ScreenLayout.BOX.top + ScreenLayout.BOX.bottom
+	dialogueFrame.Size = UDim2.fromOffset(layout.dialogue.width, math.min(height, layout.dialogue.maxHeight))
+end
+dialogueLines:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+	if layout then
+		fitDialogue()
+	end
+end)
+
 -- the Line the box shows, to set its text and colours only when it changes
 local shownLines, shownIndex = nil, 0
 
@@ -608,9 +623,10 @@ end, warn))
 -- The Talk-and-advance button, a ContextActionService touch button in the
 -- right zone: it advances a Dialogue, or else uses the nearest prompt
 -- shown, which stays the universal talk affordance. Roblox's thumbstick
--- has the left zone, and steps aside while a Dialogue shows (Amy listens;
--- the box may cover the zone). The jump button goes: the Story never asks
--- for a jump, and the right zone is the talk button's.
+-- has the left zone; while a Dialogue shows the player's controls are
+-- disabled (Amy listens; the box may cover the zone). The jump button
+-- goes: the Story never asks for a jump, and the right zone is the talk
+-- button's.
 local TALK_ACTION = "TalkAndAdvance"
 local TALK_LABELS: TalkAndAdvance.Labels = hints.button
 local talkBound = false
@@ -679,16 +695,40 @@ local function eachControl(each: (control: GuiObject, kind: string) -> ())
 	end
 end
 
+-- The player module's controls (PlayerModule:GetControls), found once.
+local controls: any = nil
+local controlsDisabled = false
+local function playerControls(): any
+	if controls then
+		return controls
+	end
+	local scripts = player:FindFirstChild("PlayerScripts")
+	local module = scripts and scripts:FindFirstChild("PlayerModule")
+	if module and module:IsA("ModuleScript") then
+		local ok, found = pcall(function()
+			return (require :: any)(module):GetControls()
+		end)
+		controls = if ok then found else nil
+	end
+	return controls
+end
+
 renderTouch = function()
 	local open = dialogue.lines ~= nil
 	if talkBound then
 		ContextActionService:SetTitle(TALK_ACTION, TalkAndAdvance.title(open, TALK_LABELS))
 	end
-	eachControl(function(control, kind)
-		if kind == "thumbstick" then
-			control.Visible = not open
+	-- on touch Amy listens while a Dialogue shows: the controls are disabled
+	local listening = open and layout.touch
+	local found = if listening ~= controlsDisabled then playerControls() else nil
+	if found then
+		if listening then
+			found:Disable()
+		else
+			found:Enable()
 		end
-	end)
+		controlsDisabled = listening
+	end
 end
 
 -- Lays the touch controls out in the Screen layout's zones.
@@ -953,8 +993,7 @@ local function applyLayout()
 	local box = layout.dialogue
 	shownHint = nil -- the hint row is set again for this layout
 	dialogueFrame.Position = UDim2.fromOffset(box.x, box.bottom)
-	dialogueFrame.Size = UDim2.fromOffset(box.width, 0)
-	dialogueLimit.MaxSize = Vector2.new(box.width, box.maxHeight)
+	fitDialogue() -- and again when the Lines settle at the new width
 	speakerLabel.TextSize = text.speaker
 	speakerLabel.Size = UDim2.fromOffset(0, box.speaker)
 	bodyLabel.TextSize = text.body
