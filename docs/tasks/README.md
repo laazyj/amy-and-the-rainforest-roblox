@@ -38,5 +38,6 @@ Rules every build session follows, regardless of brief:
 | 015 Settings, accessibility, store page, compliance | Phase 1 | running (B7) |
 | 016 Visual pass | Phase 1 | after 011, 012, 014; Mac required |
 | 017 Agent bootstrap and Selene standard library | tooling | done (#24) |
-| mac-001 Runner bootstrap | Phase 1 | on the MacBook, any time |
+| mac-001 Runner bootstrap | Phase 1 | paused: the owner's Mac is not a dedicated machine; see mac-001a |
+| mac-001a Runner under an unprivileged account | Phase 1 | proposed, awaiting the coordinator's feedback |
 | mac-002 Studio bridge, emulation and asset spikes | Phase 1 | after mac-001 |
