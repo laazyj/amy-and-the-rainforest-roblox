@@ -123,7 +123,7 @@ local function at(device: ScreenLayout.Screen, textScale: number): Layout
 	return ScreenLayout.new(screen)
 end
 
-local function name(device: ScreenLayout.Screen, textScale: number): string
+local function describeScreen(device: ScreenLayout.Screen, textScale: number): string
 	local orientation = if device.height > device.width then "portrait" else "landscape"
 	return `{device.class} {device.width}x{device.height} {orientation} at Text scale {textScale}`
 end
@@ -160,7 +160,7 @@ return function(t: any)
 	local function each(rule: string, check: (Layout, ScreenLayout.Screen) -> ())
 		for i, device in DEVICES do
 			for _, textScale in if SMALLER[i] then { 1 } else { 1, 1.25, 1.5 } do
-				it(`{rule}: {name(device, textScale)}`, function()
+				it(`{rule}: {describeScreen(device, textScale)}`, function()
 					check(at(device, textScale), device)
 				end)
 			end
