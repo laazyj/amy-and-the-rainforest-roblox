@@ -77,17 +77,20 @@ export type Layout = {
 		maxHeight: number,
 		-- the text column, inside the box's padding on each side
 		column: number,
-		-- the name tag's height, and the hint row's under the Line
+		-- the name tag's height, and the hint row's under the Line: at the
+		-- hint size, or the body size for the Onboarding's large Hint
 		speaker: number,
 		hintRow: number,
+		largeHintRow: number,
 	},
 	objective: { x: number, y: number, width: number, collapses: boolean, icon: Rect },
 	-- the touch control zones, left then right; none on a PC
 	zones: { Rect },
-	-- touch only: the Talk-and-advance button, and the ring the onboarding
-	-- draws round where the thumb goes
+	-- touch only: the Talk-and-advance button, the ring the Onboarding
+	-- draws round where the thumb goes, and the one it pulses round the button
 	talk: Rect?,
 	ring: Rect?,
+	pulse: Rect?,
 	-- the onboarding: where a Hint shows in free play, and its Skip button
 	hint: Rect,
 	skip: Rect,
@@ -271,7 +274,7 @@ function ScreenLayout.new(screen: Screen): Layout
 	local hintHeight = 2 * text.hint * ScreenLayout.LINE + MARGIN
 	local hintWidth = math.min(safe.width - 2 * MARGIN, ScreenLayout.COLUMN_EMS * text.hint)
 	local zones: { Rect } = {}
-	local talk, ring, skip, hint, box
+	local talk, ring, pulse, skip, hint, box
 	if touch then
 		local share = ScreenLayout.ZONES[class]
 		local zoneWidth, zoneHeight = width * share.width, height * share.height
@@ -290,6 +293,8 @@ function ScreenLayout.new(screen: Screen): Layout
 			ScreenLayout.TARGET
 		)
 		local buttons = math.min(talk.x, skip.x)
+		local around = 6
+		pulse = rect(talk.x - around, talk.y - around, size + 2 * around, size + 2 * around)
 
 		local reach = RING[class]
 		local left = zones[1]
@@ -352,6 +357,7 @@ function ScreenLayout.new(screen: Screen): Layout
 			column = textColumn,
 			speaker = text.speaker + 12,
 			hintRow = math.ceil(text.hint * ScreenLayout.LINE),
+			largeHintRow = math.ceil(text.body * ScreenLayout.LINE),
 		},
 		objective = {
 			x = objectiveX,
@@ -363,6 +369,7 @@ function ScreenLayout.new(screen: Screen): Layout
 		zones = zones,
 		talk = talk,
 		ring = ring,
+		pulse = pulse,
 		hint = hint,
 		skip = skip,
 		card = {

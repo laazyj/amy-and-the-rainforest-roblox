@@ -195,6 +195,19 @@ return function(t: any)
 				"src/content/collectibles.luau: the file has no shape in the content schema; give it a role in tools/lib/schema.luau",
 			})
 		end)
+
+		it("fails: a Hint for an Onboarding step the glossary does not have, or a step without its PC words", function()
+			local hints = copy(content["hints.luau"])
+			hints.steps.jump = { pc = "Press Space to jump" }
+			hints.steps.walk.pc = nil
+			expect(Schema.check(schema, "hints.luau", hints)).toEqual({
+				'src/content/hints.luau: steps.jump "jump" is not a Onboarding step in docs/GLOSSARY.md',
+				"src/content/hints.luau: steps.walk.pc must be non-empty text, got nil",
+			})
+			expect(Schema.check(Schema.fromGlossary(without("onboarding:walk")), "hints.luau", content["hints.luau"])).toEqual({
+				'src/content/hints.luau: steps.walk "walk" is not a Onboarding step in docs/GLOSSARY.md',
+			})
+		end)
 	end)
 
 	describe("positions and colours", function()

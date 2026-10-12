@@ -8,6 +8,8 @@
 	  ShowChapter /   -> ChapterCardTimeline: the Chapter card and the end card
 	  ShowEnding
 	  ShowTitle       -> TitleScreen: the Title screen's choices
+	  the first minute -> Onboarding: the Hints that teach walk, talk and
+	                     advance, in src/content/hints
 	  FrameShot       -> Camera (src/client/Camera, over CameraModel): the
 	                     Shot, framed from behind Amy
 
@@ -36,6 +38,7 @@ local UserInputService = game:GetService("UserInputService")
 local ContextActionService = game:GetService("ContextActionService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
 
 -- The camera first, before anything here yields: every frame is its own.
 local Camera = require(script.Parent:WaitForChild("Camera"))
@@ -52,10 +55,14 @@ local Events = require(Core:WaitForChild("Events"))
 local ObjectiveText = require(Core:WaitForChild("ObjectiveText"))
 local Story = require(Core:WaitForChild("Story"))
 local Net = require(Core:WaitForChild("Net"))
+local Onboarding = require(Core:WaitForChild("Onboarding"))
 local ScreenLayout = require(Core:WaitForChild("ScreenLayout"))
 local TalkAndAdvance = require(Core:WaitForChild("TalkAndAdvance"))
 local TitleScreen = require(Core:WaitForChild("TitleScreen"))
-local palette = require(ReplicatedStorage:WaitForChild("content"):WaitForChild("palette")).colours
+local ContentFolder = ReplicatedStorage:WaitForChild("content")
+local palette = require(ContentFolder:WaitForChild("palette")).colours
+local hints = require(ContentFolder:WaitForChild("hints"))
+local Content = require(ContentFolder:WaitForChild("Story"))
 local Shared = ReplicatedStorage:WaitForChild("shared")
 local AssetIds = require(Shared:WaitForChild("AssetIds"))
 local Remotes = require(Shared:WaitForChild("Net"))
@@ -205,7 +212,6 @@ hintLabel.Font = Enum.Font.Gotham
 hintLabel.TextColor3 = Color3.fromRGB(190, 215, 180)
 hintLabel.TextXAlignment = Enum.TextXAlignment.Right
 hintLabel.TextWrapped = true
-hintLabel.Text = "click / E / Space to continue  ▶"
 hintLabel.Parent = dialogueLines
 
 -- Invisible full-screen button that advances dialogue on a click (a PC's
@@ -276,8 +282,11 @@ objectiveIcon.Parent = screenGui
 addCorner(objectiveIcon, 12)
 
 -- Title / chapter card -----------------------------------------
-local titleOverlay = Instance.new("Frame")
+-- a button: a tap or a click skips a Chapter card
+local titleOverlay = Instance.new("TextButton")
 titleOverlay.Name = "TitleOverlay"
+titleOverlay.AutoButtonColor = false
+titleOverlay.Text = ""
 titleOverlay.Size = UDim2.new(1, 0, 1, 0)
 titleOverlay.BackgroundColor3 = Color3.fromRGB(8, 18, 10)
 titleOverlay.BackgroundTransparency = 1
@@ -309,6 +318,76 @@ subtitleLabel.TextTransparency = 1
 subtitleLabel.Text = ""
 subtitleLabel.ZIndex = 21
 subtitleLabel.Parent = titleOverlay
+
+-- The Onboarding (docs/design/feel.md section 6) --------------
+-- A Hint in free play; the advance step's shows large in the dialogue box.
+local onboardingHint = Instance.new("TextLabel")
+onboardingHint.Name = "OnboardingHint"
+onboardingHint.BackgroundColor3 = Color3.fromRGB(24, 44, 30)
+onboardingHint.BackgroundTransparency = 0.12
+onboardingHint.BorderSizePixel = 0
+onboardingHint.Font = Enum.Font.GothamMedium
+onboardingHint.TextColor3 = Color3.fromRGB(240, 248, 235)
+onboardingHint.TextWrapped = true
+onboardingHint.Visible = false
+onboardingHint.Parent = screenGui
+addCorner(onboardingHint, 12)
+
+local skipButton = Instance.new("TextButton")
+skipButton.Name = "Skip"
+skipButton.BackgroundColor3 = rgb(palette.cream)
+skipButton.Font = Enum.Font.FredokaOne
+skipButton.TextColor3 = rgb(palette.deep)
+skipButton.Text = hints.skip
+skipButton.Visible = false
+skipButton.ZIndex = 6 -- over the PC's click catcher
+skipButton.Parent = screenGui
+addCorner(skipButton, 12)
+
+-- A glowing ring: on the thumbstick for the walk step, pulsing round the
+-- Talk-and-advance button for the talk step. Neither takes input.
+local function ring(name: string): (Frame, UIStroke)
+	local frame = Instance.new("Frame")
+	frame.Name = name
+	frame.BackgroundTransparency = 1
+	frame.Visible = false
+	frame.Parent = screenGui
+	addCorner(frame, 999)
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = rgb(palette.gold)
+	stroke.Thickness = 4
+	stroke.Transparency = 0.3
+	stroke.Parent = frame
+	return frame, stroke
+end
+local thumbRing = ring("ThumbstickRing")
+local talkRing, talkStroke = ring("TalkRing")
+
+-- The Objective tracker's glow, when the first Objective appears.
+local objectiveGlow = Instance.new("UIStroke")
+objectiveGlow.Color = rgb(palette.gold)
+objectiveGlow.Thickness = 3
+objectiveGlow.Transparency = 1
+objectiveGlow.Parent = objectiveFrame
+
+-- The marker over the first Quest's Character (Dad), until Amy talks to him.
+local markerGui = Instance.new("BillboardGui")
+markerGui.Name = "OnboardingMarker"
+markerGui.Size = UDim2.fromOffset(40, 40)
+markerGui.StudsOffset = Vector3.new(0, 2.5, 0)
+markerGui.AlwaysOnTop = true
+markerGui.Enabled = false
+markerGui.Parent = playerGui
+local markerLabel = Instance.new("TextLabel")
+markerLabel.Size = UDim2.fromScale(1, 1)
+markerLabel.BackgroundTransparency = 1
+markerLabel.Font = Enum.Font.FredokaOne
+markerLabel.TextScaled = true
+markerLabel.TextColor3 = rgb(palette.gold)
+markerLabel.TextStrokeColor3 = rgb(palette.deep)
+markerLabel.TextStrokeTransparency = 0.3
+markerLabel.Text = "▼"
+markerLabel.Parent = markerGui
 
 -- Title screen (docs/design/feel.md, "Title screen") ----------
 -- Over Clara's forest wall (ui:title_screen), or plain deep green until it
@@ -449,6 +528,10 @@ local layout: ScreenLayout.Layout
 local objectiveView = ObjectiveText.view(nil)
 -- the touch controls, shown for the Dialogue (Touch controls, below)
 local renderTouch: () -> ()
+-- the Chapter card showing, and when it started
+local card: ChapterCardTimeline.Card? = nil
+local cardStarted = 0
+local onboarding = Onboarding.new(Content.story)
 
 -- The Objective tracker, or its icon on a Phone while a Dialogue shows.
 local function renderObjective()
@@ -481,9 +564,14 @@ local function renderDialogue()
 end
 
 local function advance()
+	-- the first press skips a Chapter card, not the Line under it
+	if card and ChapterCardTimeline.skip(card, os.clock() - cardStarted) then
+		return
+	end
 	if DialogueViewModel.advance(dialogue) then
 		Camera.dialogueFinished()
 		DialogueFinished:FireServer()
+		Onboarding.dialogueFinished(onboarding)
 	end
 	renderDialogue()
 end
@@ -505,6 +593,7 @@ end)
 
 ShowDialogue.OnClientEvent:Connect(Net.guard("ShowDialogue", function(lines: { Events.ShownLine })
 	DialogueViewModel.enqueue(dialogue, lines)
+	Onboarding.dialogueShown(onboarding)
 	renderDialogue()
 end, warn))
 
@@ -518,7 +607,7 @@ end, warn))
 -- the box may cover the zone). The jump button goes: the Story never asks
 -- for a jump, and the right zone is the talk button's.
 local TALK_ACTION = "TalkAndAdvance"
-local TALK_LABELS: TalkAndAdvance.Labels = { talk = "Talk", next = "Next" }
+local TALK_LABELS: TalkAndAdvance.Labels = hints.button
 local talkBound = false
 local prompts: { [ProximityPrompt]: true } = {}
 
@@ -628,9 +717,11 @@ end
 
 ProximityPromptService.PromptShown:Connect(function(prompt: ProximityPrompt)
 	prompts[prompt] = true
+	Onboarding.promptShown(onboarding, true)
 end)
 ProximityPromptService.PromptHidden:Connect(function(prompt: ProximityPrompt)
 	prompts[prompt] = nil
+	Onboarding.promptShown(onboarding, next(prompts) ~= nil)
 end)
 
 ----------------------------------------------------------------
@@ -642,6 +733,7 @@ SetObjective.OnClientEvent:Connect(Net.guard("SetObjective", function(text: stri
 	if DialogueViewModel.view(dialogue).open then
 		Camera.resumed()
 	end
+	Onboarding.objectiveShown(onboarding, text)
 	local view = ObjectiveText.view(text)
 	objectiveView = view
 	renderObjective()
@@ -656,14 +748,12 @@ end, warn))
 ----------------------------------------------------------------
 -- Chapter cards and the end card
 ----------------------------------------------------------------
-local card: ChapterCardTimeline.Card? = nil
-local cardStarted = 0
-
 local function renderCard()
 	local frame = ChapterCardTimeline.at(card :: ChapterCardTimeline.Card, os.clock() - cardStarted)
 	titleOverlay.Visible = frame ~= nil
 	if not frame then
 		card = nil
+		Onboarding.cardGone(onboarding)
 		return
 	end
 	titleOverlay.BackgroundTransparency = frame.overlayTransparency
@@ -676,9 +766,14 @@ local function showCard(ending: boolean): (title: string, subtitle: string) -> (
 		titleLabel.Text = title
 		subtitleLabel.Text = subtitle
 		card, cardStarted = ChapterCardTimeline.new(ending), os.clock()
+		if not ending then
+			Onboarding.chapterShown(onboarding, title)
+		end
 		renderCard()
 	end
 end
+
+titleOverlay.Activated:Connect(advance)
 
 ShowChapter.OnClientEvent:Connect(Net.guard("ShowChapter", showCard(false), warn))
 ShowEnding.OnClientEvent:Connect(Net.guard("ShowEnding", showCard(true), warn))
@@ -749,6 +844,64 @@ ShowTitle.OnClientEvent:Connect(Net.guard("ShowTitle", function(chapter: string,
 end, warn))
 
 ----------------------------------------------------------------
+-- The Onboarding: the first minute's Hints
+----------------------------------------------------------------
+local PULSE_SECONDS = 1.2
+-- the dialogue box's hint row as last set: the large Hint, or the standing one
+local shownHint: string? = nil
+-- where Amy was last frame, to count how far she walks
+local lastAt: Vector3? = nil
+-- the head the marker is over, found once
+local markedHead: Instance? = nil
+
+local function renderOnboarding()
+	local view = Onboarding.view(onboarding, hints, layout.touch)
+	if view.row ~= shownHint then
+		shownHint = view.row
+		hintLabel.Text = view.row
+		hintLabel.TextSize = if view.large then layout.text.body else layout.text.hint
+		local row = if view.large then layout.dialogue.largeHintRow else layout.dialogue.hintRow
+		hintLabel.Size = UDim2.new(1, 0, 0, row)
+	end
+	onboardingHint.Text = view.hint or ""
+	onboardingHint.Visible = view.hint ~= nil
+	skipButton.Visible = view.skip
+	thumbRing.Visible = view.ring and layout.ring ~= nil
+	talkRing.Visible = view.pulse and layout.pulse ~= nil
+	if talkRing.Visible then -- the pulse: the ring's stroke fades in and out
+		talkStroke.Transparency = 0.5 - 0.5 * math.cos(os.clock() * 2 * math.pi / PULSE_SECONDS)
+	end
+	objectiveGlow.Transparency = if view.glow then 0 else 1
+	if view.marker and not (markedHead and markedHead.Parent) then
+		local characters = Workspace:FindFirstChild("StoryCharacters")
+		local marked = characters and characters:FindFirstChild(view.marker)
+		markedHead = marked and marked:FindFirstChild("Head")
+	end
+	local head = if view.marker then markedHead else nil
+	markerGui.Adornee = head :: any -- a Head is a BasePart, or nil
+	markerGui.Enabled = head ~= nil
+end
+
+-- How far Amy walked since the last frame, across the ground.
+local function walked(): number
+	local character = player.Character
+	local amy = character and character:FindFirstChild("HumanoidRootPart")
+	if not (amy and amy:IsA("BasePart")) then
+		lastAt = nil
+		return 0
+	end
+	local at = amy.Position * Vector3.new(1, 0, 1)
+	local studs = if lastAt then (at - lastAt).Magnitude else 0
+	lastAt = at
+	return if studs < 10 then studs else 0 -- a teleport is not a walk
+end
+
+skipButton.Activated:Connect(function()
+	Onboarding.skip(onboarding)
+	renderOnboarding()
+end)
+
+----------------------------------------------------------------
 -- The Screen layout: for the Device class, the viewport and the safe area
 ----------------------------------------------------------------
 local TEXT_SCALE = 1 -- brief 015 adds the setting, from 1 to 1.5
@@ -759,6 +912,10 @@ pcall(function() -- PreferredInput is newer than some clients
 end)
 local inputKind: DeviceClass.InputKind =
 	DeviceClass.starting(preferred, UserInputService.TouchEnabled, UserInputService.KeyboardEnabled)
+
+local function offsets(rect: ScreenLayout.Rect): (UDim2, UDim2)
+	return UDim2.fromOffset(rect.x, rect.y), UDim2.fromOffset(rect.width, rect.height)
+end
 
 local function absolute(gui: GuiObject): ScreenLayout.Rect
 	local at, size = gui.AbsolutePosition, gui.AbsoluteSize
@@ -777,17 +934,25 @@ local function applyLayout()
 	local text = layout.text
 	Camera.setZones(layout.zones)
 	placeTouchControls()
-	hintLabel.Text = if layout.touch then "tap to continue  ▶" else "click / E / Space to continue  ▶"
+	onboardingHint.Position, onboardingHint.Size = offsets(layout.hint)
+	onboardingHint.TextSize = text.hint
+	skipButton.Position, skipButton.Size = offsets(layout.skip)
+	skipButton.TextSize = text.hint
+	if layout.ring then
+		thumbRing.Position, thumbRing.Size = offsets(layout.ring)
+	end
+	if layout.pulse then
+		talkRing.Position, talkRing.Size = offsets(layout.pulse)
+	end
 
 	local box = layout.dialogue
+	shownHint = nil -- the hint row is set again for this layout
 	dialogueFrame.Position = UDim2.fromOffset(box.x, box.bottom)
 	dialogueFrame.Size = UDim2.fromOffset(box.width, 0)
 	dialogueLimit.MaxSize = Vector2.new(box.width, box.maxHeight)
 	speakerLabel.TextSize = text.speaker
 	speakerLabel.Size = UDim2.fromOffset(0, box.speaker)
 	bodyLabel.TextSize = text.body
-	hintLabel.TextSize = text.hint
-	hintLabel.Size = UDim2.new(1, 0, 0, box.hintRow)
 
 	local objective = layout.objective
 	objectiveFrame.Position = UDim2.fromOffset(objective.x, objective.y)
@@ -815,6 +980,7 @@ local function applyLayout()
 
 	renderObjective()
 	renderDialogue()
+	renderOnboarding()
 	if titleScreen.Visible then
 		renderTitle() -- its buttons are built at the layout's size
 	end
@@ -868,6 +1034,7 @@ end
 ----------------------------------------------------------------
 -- Every frame: time passes for the Dialogue and the card
 ----------------------------------------------------------------
+local wasTeaching = false
 RunService.RenderStepped:Connect(function(seconds)
 	if dialogue.lines then
 		DialogueViewModel.tick(dialogue, seconds)
@@ -876,6 +1043,15 @@ RunService.RenderStepped:Connect(function(seconds)
 	if card then
 		renderCard()
 	end
+	local teaching = onboarding.state == "running"
+	if teaching then
+		Onboarding.tick(onboarding, seconds)
+		Onboarding.moved(onboarding, walked())
+	end
+	if teaching or wasTeaching then -- and once more when it ends, to clear it
+		renderOnboarding()
+	end
+	wasTeaching = teaching
 end)
 
 ----------------------------------------------------------------

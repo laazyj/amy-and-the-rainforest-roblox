@@ -44,6 +44,7 @@ export type Schema = {
 	lighting: Set,
 	cues: Set,
 	shots: Set,
+	onboardingSteps: Set,
 	-- World command -> the arguments the glossary gives it
 	commands: { [string]: Set },
 }
@@ -81,6 +82,7 @@ function Schema.fromGlossary(text: string): Schema
 		lighting = glossary.names("Lighting presets"),
 		cues = glossary.names("Cues"),
 		shots = glossary.names("Shots"),
+		onboardingSteps = glossary.names("Onboarding steps"),
 		commands = {},
 	}
 	for _, entry in glossary.inUse("Characters and Speakers") do
@@ -416,6 +418,18 @@ local function story(schema: Schema): Check
 	}, true)
 end
 
+-- The Hints: each Onboarding step's words for PC and for touch, and the
+-- UI's other words.
+local function hints(schema: Schema): Check
+	local both = record({ pc = text, touch = text })
+	return record({
+		steps = map(oneOf(schema.onboardingSteps, "Onboarding step"), record({ pc = text, touch = optional(text) })),
+		continue = both,
+		skip = text,
+		button = record({ talk = text, next = text }),
+	})
+end
+
 local function helpers(): Check
 	return ignore
 end
@@ -431,6 +445,7 @@ local ROLES: { [string]: Role } = {
 	["characters.luau"] = { shape = characters, plain = true },
 	["presets.luau"] = { shape = presets, plain = true },
 	["ending.luau"] = { shape = ending, plain = true },
+	["hints.luau"] = { shape = hints, plain = true },
 	-- what content writes positions, colours, Spots and Zones with
 	["layout.luau"] = { shape = helpers, plain = true },
 	["palette.luau"] = { shape = helpers, plain = true },

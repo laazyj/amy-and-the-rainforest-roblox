@@ -11,10 +11,14 @@
 	  hold .. +FADE_OUT     everything fades out (quadratic, easing in)
 	  hold + GONE_AFTER     the overlay is hidden; the card is over
 
+	A tap or a click skips a Chapter card (feel.md section 6, step 1):
+	`skip` starts its fade out at once, once it has faded in. The end card
+	is not skipped.
+
 	Transparency is Roblox's: 0 is opaque, 1 is invisible.
 ]]
 
-export type Card = { hold: number }
+export type Card = { hold: number, ending: boolean }
 
 export type Frame = { overlayTransparency: number, textTransparency: number }
 
@@ -29,7 +33,20 @@ ChapterCardTimeline.ENDING_HOLD = 6
 ChapterCardTimeline.OVERLAY_SHOWN = 0.25
 
 function ChapterCardTimeline.new(ending: boolean): Card
-	return { hold = if ending then ChapterCardTimeline.ENDING_HOLD else ChapterCardTimeline.CHAPTER_HOLD }
+	return {
+		hold = if ending then ChapterCardTimeline.ENDING_HOLD else ChapterCardTimeline.CHAPTER_HOLD,
+		ending = ending,
+	}
+end
+
+-- The player skips a card `seconds` after it started; whether it was a
+-- Chapter card, which skips (the end card does not).
+function ChapterCardTimeline.skip(card: Card, seconds: number): boolean
+	if card.ending then
+		return false
+	end
+	card.hold = math.min(card.hold, math.max(seconds, ChapterCardTimeline.FADE_IN))
+	return true
 end
 
 -- How long the card lasts, from its start until it is hidden.

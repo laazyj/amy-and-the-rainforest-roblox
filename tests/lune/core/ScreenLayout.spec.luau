@@ -5,6 +5,7 @@ local Content = require("../../../src/content/Story")
 local ScreenLayout = require("../../../src/core/ScreenLayout")
 local Story = require("../../../src/core/Story")
 local TitleScreen = require("../../../src/core/TitleScreen")
+local hints = require("../../../src/content/hints")
 
 type Rect = ScreenLayout.Rect
 type Layout = ScreenLayout.Layout
@@ -349,6 +350,25 @@ return function(t: any)
 					expect(gap(shown, button) >= ScreenLayout.TARGET_GAP).toBe(true)
 				end
 			end
+		end)
+	end)
+
+	describe("ScreenLayout Hints", function()
+		each("every Hint fits its place: two lines in free play, one large line in the box", function(layout)
+			for step, hint in hints.steps do
+				local words = if layout.touch then hint.touch else hint.pc
+				if not words then
+					continue
+				elseif step == "advance" then
+					expect(ScreenLayout.lines(words, layout.text.body, layout.dialogue.column)).toBe(1)
+				else
+					expect(ScreenLayout.lines(words, layout.text.hint, layout.hint.width) <= 2).toBe(true)
+				end
+			end
+			local continue = if layout.touch then hints.continue.touch else hints.continue.pc
+			expect(ScreenLayout.lines(continue, layout.text.hint, layout.dialogue.column)).toBe(1)
+			local skip = utf8.len(hints.skip) or 0
+			expect(skip <= ScreenLayout.SKIP_CHARACTERS).toBe(true)
 		end)
 	end)
 
