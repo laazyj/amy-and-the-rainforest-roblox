@@ -47,6 +47,7 @@ function World.build(withMap: boolean, saves: string)
 		Convert = Convert,
 		LightingHost = server("LightingHost"),
 		Persist = server("Persist"),
+		FaultLog = server("FaultLog"),
 	}
 end
 

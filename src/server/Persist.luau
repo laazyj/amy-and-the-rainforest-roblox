@@ -42,6 +42,7 @@ local Save = require(Core:WaitForChild("Save"))
 local Story = require(Core:WaitForChild("Story"))
 local StoryEngine = require(Core:WaitForChild("StoryEngine"))
 local Config = require(script.Parent.Config)
+local FaultLog = require(script.Parent.FaultLog)
 
 -- The parts of ProfileStore (lm-loleris/profilestore 1.0.3) Persist uses.
 type Signal = { Connect: (self: Signal, listener: (...any) -> ()) -> { Disconnect: (self: any) -> () } }
@@ -159,10 +160,10 @@ local function load(player: any, entry: Entry)
 		profile:AddUserId(player.UserId)
 	end
 	local save, reason = Save.open(story :: Story.Story, profile.Data)
-	if reason then
-		warn(`[Persist] {player.Name}'s Save: {reason}`)
-	end
 	if save then
+		if reason then
+			FaultLog.report("save_unreadable", player, reason)
+		end
 		entry.profile = profile
 		hold(entry, save)
 		profile.OnSessionEnd:Connect(function()
@@ -177,6 +178,7 @@ local function load(player: any, entry: Entry)
 		end)
 	else
 		-- too new to read: never written over; the player plays unsaved
+		FaultLog.report("save_too_new", player, reason or "")
 		profile:EndSession()
 	end
 	entry.loaded = true
@@ -201,7 +203,7 @@ function Persist.await(player: any): Save.Save?
 	local waited = 0
 	while entry and not entry.loaded and entries[player] == entry do
 		if waited > Persist.LOAD_TIMEOUT then
-			warn(`[Persist] {player.Name}'s Save took over {Persist.LOAD_TIMEOUT} s: playing without saving`)
+			FaultLog.report("save_load_timeout", player, `not loaded in {Persist.LOAD_TIMEOUT} s`)
 			entry.loaded = true
 			break
 		end
@@ -292,7 +294,7 @@ function Persist.start(forStory: Story.Story, progressOf: (player: any) -> Story
 	local packages = script.Parent:FindFirstChild("ServerPackages")
 	local module = packages and packages:FindFirstChild("ProfileStore")
 	if not module or not module:IsA("ModuleScript") then
-		warn("[Persist] no ProfileStore package (ServerScriptService.ServerPackages): playing without saves")
+		FaultLog.report("save_unavailable", nil, "no ServerScriptService.ServerPackages.ProfileStore")
 		return
 	end
 	local ProfileStore: any = (require :: any)(module)
@@ -304,7 +306,7 @@ function Persist.start(forStory: Story.Story, progressOf: (player: any) -> Story
 		Persist.close(progressOf)
 	end)
 	if not bound then
-		warn(`[Persist] BindToClose: {reason}`)
+		FaultLog.report("save_close_unbound", nil, tostring(reason))
 	end
 end
 

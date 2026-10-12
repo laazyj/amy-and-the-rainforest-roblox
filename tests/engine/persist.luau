@@ -11,6 +11,8 @@
 --   - a returning player is offered the Title screen, and each Title
 --     choice (Continue, Play this chapter again, Start again) leads where
 --     it should;
+--   - data that is no Save is kept aside, the player starts afresh, and the
+--     Fault save_unreadable is reported;
 --   - BindToClose releases every session lock: a task cannot shut its
 --     server down, so the test calls the function Persist.start bound.
 --
@@ -205,6 +207,42 @@ describe("Saves", function()
 		server.onTitleChoice(back, "continue")
 		expect(server.activeQuest(back)).toBe(first)
 		player = back
+	end)
+
+	it("keeps data that is no Save aside, starts afresh and reports Fault save_unreadable", function()
+		-- a second player whose stored data is made corrupt through Persist
+		local other = FakePlayer.new(world.spawn, USER_ID - 1)
+		server.onClientReady(other)
+		waitFor("the first Quest", 30, function()
+			return server.activeQuest(other) == first
+		end)
+		local corrupt = { version = Save.VERSION, progress = { quest = 3 } }
+		Persist.replace(other, corrupt :: any)
+		-- released with no last Progress, so the corrupt data is what is written
+		expect(Persist.release(other, nil)()).toBe(true)
+		server.onPlayerRemoving(other)
+		waitFor("the corrupt data's lock to be released", 40, function()
+			local _, locked = Persist.stored(other)
+			return not locked
+		end, 2)
+
+		local back = FakePlayer.new(world.spawn, USER_ID - 1)
+		server.onClientReady(back)
+		waitFor("the first Quest", 30, function()
+			return server.activeQuest(back) == first
+		end)
+		expect(titles[back]).toBeNil()
+		local reported = nil
+		for _, report in world.FaultLog.reported do
+			if report.name == "save_unreadable" and report.playerId == back.UserId then
+				reported = report
+			end
+		end
+		expect(reported ~= nil).toBe(true)
+		print(`  Fault save_unreadable: {reported and reported.why}`)
+		leave(back)
+		local data = Persist.stored(back)
+		expect(data.unreadable).toEqual(corrupt)
 	end)
 
 	it("releases every session lock on BindToClose", function()
