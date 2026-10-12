@@ -19,7 +19,8 @@
 	                Left/Right arrows) turn Amy and the view, W/S and Up/Down
 	                walk, and a right-mouse drag turns too; the pointer is
 	                never locked. Touch: a drag that starts outside the
-	                control zones (feel.md section 1) turns the view
+	                touch control zones of the Screen layout (feel.md
+	                section 1, set by StoryClient) turns the view
 	  spawn         each new character is found the frame it appears, and
 	                the camera starts behind Amy as she faces; on death (her
 	                joints kept, so she stays in one piece) the last Frame
@@ -76,6 +77,8 @@ local heads: { [string]: BasePart? } = {}
 local held: { [string]: boolean } = {}
 -- whether the last Frame was shot:Dialogue's, to notice when it starts or ends
 local inDialogue = false
+-- the touch control zones, from the Screen layout (StoryClient sets them)
+local zones: { CameraModel.Zone } = {}
 
 local obstacles = RaycastParams.new()
 obstacles.FilterType = Enum.RaycastFilterType.Exclude
@@ -215,11 +218,9 @@ local function bindInput()
 			looking = true
 			UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
 		elseif input.UserInputType == Enum.UserInputType.Touch and not dragging then
-			local camera = Workspace.CurrentCamera
-			-- a touch's Position is below the top bar; the viewport includes it
-			local size = if camera then camera.ViewportSize else Vector2.zero
+			-- a touch's Position is below the top bar; the zones are from the top
 			local at = Vector2.new(input.Position.X, input.Position.Y) + GuiService:GetGuiInset()
-			if CameraModel.turnsView(at.X, at.Y, size.X, size.Y) then
+			if CameraModel.turnsView(at.X, at.Y, zones) then
 				dragging, dragAt = input, input.Position
 			end
 		end
@@ -241,6 +242,11 @@ local function bindInput()
 			dragging = nil
 		end
 	end)
+end
+
+-- The touch control zones of the Screen layout, whenever it changes.
+function Camera.setZones(layoutZones: { CameraModel.Zone })
+	zones = layoutZones
 end
 
 -- A FrameShot from the server: the Shot plays once those before it end.

@@ -44,14 +44,14 @@ local DeviceClass = require("./DeviceClass")
 local DialogueViewModel = require("./DialogueViewModel")
 local TitleScreen = require("./TitleScreen")
 
-type DeviceClass = DeviceClass.DeviceClass
+type Class = DeviceClass.DeviceClass
 
 export type Rect = { x: number, y: number, width: number, height: number }
 -- The safe-area insets from each edge of the viewport: the notch, the home
 -- bar, rounded corners and Roblox's top bar.
 export type Insets = { left: number, top: number, right: number, bottom: number }
 export type Screen = {
-	class: DeviceClass,
+	class: Class,
 	width: number,
 	height: number,
 	insets: Insets,
@@ -62,7 +62,9 @@ export type Screen = {
 export type TextSizes = { body: number, speaker: number, objective: number, hint: number }
 
 export type Layout = {
-	class: DeviceClass,
+	class: Class,
+	-- a Phone or a Tablet: touch controls, and a tap on the box advances
+	touch: boolean,
 	portrait: boolean,
 	textScale: number,
 	safe: Rect,
@@ -75,6 +77,9 @@ export type Layout = {
 		maxHeight: number,
 		-- the text column, inside the box's padding on each side
 		column: number,
+		-- the name tag's height, and the hint row's under the Line
+		speaker: number,
+		hintRow: number,
 	},
 	objective: { x: number, y: number, width: number, collapses: boolean, icon: Rect },
 	-- the touch control zones, left then right; none on a PC
@@ -86,7 +91,8 @@ export type Layout = {
 	-- the onboarding: where a Hint shows in free play, and its Skip button
 	hint: Rect,
 	skip: Rect,
-	card: { x: number, width: number, centre: number, title: number, subtitle: number },
+	-- the title's bottom edge is at `centre`, the subtitle's top `gap` below
+	card: { x: number, width: number, centre: number, gap: number, title: number, subtitle: number },
 	title: {
 		x: number,
 		width: number,
@@ -106,11 +112,11 @@ ScreenLayout.SIZES = table.freeze({
 	Phone = table.freeze({ body = 20, speaker = 18, objective = 18, hint = 14 }),
 	Tablet = LARGE,
 	PC = LARGE,
-} :: { [DeviceClass]: TextSizes })
+} :: { [Class]: TextSizes })
 
 -- The card's title and subtitle, before the Text scale.
 local LARGE_CARD = { title = 52, subtitle = 26 }
-local CARD: { [DeviceClass]: { title: number, subtitle: number } } = {
+local CARD: { [Class]: { title: number, subtitle: number } } = {
 	Phone = { title = 40, subtitle = 22 },
 	Tablet = LARGE_CARD,
 	PC = LARGE_CARD,
@@ -120,7 +126,7 @@ local CARD: { [DeviceClass]: { title: number, subtitle: number } } = {
 ScreenLayout.ZONES = table.freeze({
 	Phone = table.freeze({ width = 0.35, height = 0.4 }),
 	Tablet = table.freeze({ width = 0.25, height = 0.35 }),
-} :: { [DeviceClass]: { width: number, height: number } })
+} :: { [Class]: { width: number, height: number } })
 
 ScreenLayout.MIN_SCALE = 1
 ScreenLayout.MAX_SCALE = 1.5
@@ -147,14 +153,15 @@ local MARGIN = 12
 local BOTTOM_MARGIN = 24
 -- A Title screen button's padding each side of its label.
 ScreenLayout.BUTTON_PADDING = 16
--- The Objective tracker: the header's top, the gap below it, the bottom,
--- each side; and its width, in Objective text sizes.
-local HEADER_TOP, HEADER_GAP, TRACKER_BOTTOM, TRACKER_SIDE = 8, 4, 10, 14
+-- The Objective tracker's padding (above, below and each side) and the gap
+-- under its header; and its width, in Objective text sizes.
+ScreenLayout.TRACKER = table.freeze({ top = 8, bottom = 10, side = 14, between = 4 })
 local TRACKER_EMS = 18
--- The dialogue box's padding above its text, below its hint, and between.
-local TOP, BOTTOM, BETWEEN = 18, 10, 6
-local TALK: { [DeviceClass]: number } = { Phone = 64, Tablet = 72 }
-local RING: { [DeviceClass]: number } = { Phone = 96, Tablet = 112 }
+-- The dialogue box's padding above its text and below its hint row, and
+-- the gap between them (its sides are PADDING).
+ScreenLayout.BOX = table.freeze({ top = 18, bottom = 10, between = 6 })
+local TALK: { [Class]: number } = { Phone = 64, Tablet = 72 }
+local RING: { [Class]: number } = { Phone = 96, Tablet = 112 }
 
 -- The longest Title screen label, in graphemes.
 local LABEL_LENGTH = 0
@@ -194,21 +201,23 @@ end
 -- at the body size when `largeHint` (the onboarding's first Line).
 function ScreenLayout.dialogueHeight(layout: Layout, text: string, largeHint: boolean): number
 	local hint = if largeHint then layout.text.body else layout.text.hint
-	return TOP
+	local box = ScreenLayout.BOX
+	return box.top
 		+ textHeight(text, layout.text.body, layout.dialogue.column)
-		+ BETWEEN
+		+ box.between
 		+ hint * ScreenLayout.LINE
-		+ BOTTOM
+		+ box.bottom
 end
 
 -- About how tall the Objective tracker grows for an Objective.
 function ScreenLayout.objectiveHeight(layout: Layout, text: string): number
 	local size = layout.text.objective
-	return HEADER_TOP
+	local tracker = ScreenLayout.TRACKER
+	return tracker.top
 		+ size * ScreenLayout.LINE
-		+ HEADER_GAP
-		+ textHeight(text, size, layout.objective.width - 2 * TRACKER_SIDE)
-		+ TRACKER_BOTTOM
+		+ tracker.between
+		+ textHeight(text, size, layout.objective.width - 2 * tracker.side)
+		+ tracker.bottom
 end
 
 local function round(size: number, scale: number): number
@@ -224,13 +233,24 @@ local function scaled(sizes: TextSizes, scale: number): TextSizes
 	}
 end
 
+-- The safe-area insets of `safe` inside `screen`, both as the engine
+-- measures them (absolute position and size); never negative.
+function ScreenLayout.insets(screen: Rect, safe: Rect): Insets
+	return {
+		left = math.max(0, safe.x - screen.x),
+		top = math.max(0, safe.y - screen.y),
+		right = math.max(0, screen.x + screen.width - (safe.x + safe.width)),
+		bottom = math.max(0, screen.y + screen.height - (safe.y + safe.height)),
+	}
+end
+
 -- A text column as wide as `space` allows, padding taken off, up to the cap.
 local function column(space: number, body: number): number
 	return math.min(space - 2 * ScreenLayout.PADDING, ScreenLayout.COLUMN_EMS * body)
 end
 
 function ScreenLayout.new(screen: Screen): Layout
-	local class = screen.class
+	local class: Class = screen.class -- annotated: the Roblox checker widens it through the sourcemap
 	local width, height, insets = screen.width, screen.height, screen.insets
 	local scale = math.clamp(screen.textScale, ScreenLayout.MIN_SCALE, ScreenLayout.MAX_SCALE)
 	local portrait = DeviceClass.portrait(width, height)
@@ -319,6 +339,7 @@ function ScreenLayout.new(screen: Screen): Layout
 
 	return {
 		class = class,
+		touch = touch,
 		portrait = portrait,
 		textScale = scale,
 		safe = safe,
@@ -329,6 +350,8 @@ function ScreenLayout.new(screen: Screen): Layout
 			bottom = box.bottom,
 			maxHeight = maxHeight,
 			column = textColumn,
+			speaker = text.speaker + 12,
+			hintRow = math.ceil(text.hint * ScreenLayout.LINE),
 		},
 		objective = {
 			x = objectiveX,
@@ -346,6 +369,7 @@ function ScreenLayout.new(screen: Screen): Layout
 			x = safe.x + 2 * MARGIN,
 			width = safe.width - 4 * MARGIN,
 			centre = safe.y + safe.height * 0.44,
+			gap = ScreenLayout.TARGET_GAP,
 			title = round(CARD[class].title, scale),
 			subtitle = round(CARD[class].subtitle, scale),
 		},
@@ -362,7 +386,7 @@ function ScreenLayout.new(screen: Screen): Layout
 				height = math.max(ScreenLayout.TARGET, 2 * text.body),
 				text = text.body,
 			},
-			gap = 10,
+			gap = ScreenLayout.TARGET_GAP + 2,
 		},
 	}
 end

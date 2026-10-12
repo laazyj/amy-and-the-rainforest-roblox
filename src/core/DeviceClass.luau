@@ -13,6 +13,8 @@
 	  inputKind(name)              the Input kind of a UserInputType's or
 	                               PreferredInput's name; nil for inputs
 	                               that say nothing about the device
+	  starting(preferred, touch, keyboard)
+	                               the Input kind before any input
 	  pick(input, width, height)   the Device class
 	  portrait(width, height)      whether the viewport is taller than wide
 ]]
@@ -43,6 +45,18 @@ local KINDS: { [string]: InputKind } = {
 
 function DeviceClass.inputKind(name: string): InputKind?
 	return KINDS[name] or if string.match(name, "^Gamepad%d*$") then "gamepad" else nil
+end
+
+-- The Input kind before any input: the device's preferred input's, or
+-- touch for a touch screen with no keyboard.
+function DeviceClass.starting(preferred: string?, touchEnabled: boolean, keyboardEnabled: boolean): InputKind
+	local kind: InputKind? = if preferred then DeviceClass.inputKind(preferred) else nil
+	if kind then
+		return kind
+	elseif touchEnabled and not keyboardEnabled then
+		return "touch"
+	end
+	return "pointer"
 end
 
 function DeviceClass.pick(input: InputKind, width: number, height: number): DeviceClass

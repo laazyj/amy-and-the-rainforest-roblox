@@ -3,6 +3,7 @@
 
 local Content = require("../../../src/content/Story")
 local ScreenLayout = require("../../../src/core/ScreenLayout")
+local Story = require("../../../src/core/Story")
 local TitleScreen = require("../../../src/core/TitleScreen")
 
 type Rect = ScreenLayout.Rect
@@ -94,8 +95,8 @@ local LINES: { string } = {}
 local longestObjective = ""
 for _, chapter in Content.story.chapters do
 	for _, quest in chapter.quests do
-		for _, dialogue in { quest.intro, quest.dialogue, quest.outro } do
-			for _, line in dialogue or {} do
+		for _, dialogue: { Story.Line }? in { quest.intro, quest.dialogue, quest.outro } do
+			for _, line in dialogue or {} :: { Story.Line } do
 				table.insert(LINES, line.text)
 			end
 		end
@@ -159,7 +160,8 @@ return function(t: any)
 
 	local function each(rule: string, check: (Layout, ScreenLayout.Screen) -> ())
 		for i, device in DEVICES do
-			for _, textScale in if SMALLER[i] then { 1 } else { 1, 1.25, 1.5 } do
+			local scales: { number } = if SMALLER[i] then { 1 } else { 1, 1.25, 1.5 }
+			for _, textScale in scales do
 				it(`{rule}: {describeScreen(device, textScale)}`, function()
 					check(at(device, textScale), device)
 				end)
@@ -251,7 +253,7 @@ return function(t: any)
 			local landscape, portrait = at(DEVICES[1], 1), at(DEVICES[2], 1)
 			expect(portrait.portrait).toBe(true)
 			expect(portrait.zones[1].height).toBe(844 * 0.4)
-			expect(landscape.dialogue.bottom > landscape.talk.y).toBe(true) -- beside the buttons
+			expect(landscape.dialogue.bottom > (landscape.talk :: Rect).y).toBe(true) -- beside the buttons
 			expect(portrait.dialogue.bottom < portrait.skip.y).toBe(true) -- above them
 		end)
 
@@ -359,6 +361,24 @@ return function(t: any)
 				local subtitle = ScreenLayout.lines(chapter.subtitle, card.subtitle, card.width) * card.subtitle
 				expect((title + subtitle) * ScreenLayout.LINE <= layout.safe.height / 2).toBe(true)
 			end
+		end)
+	end)
+
+	describe("ScreenLayout.insets", function()
+		it("are the safe area's distance from each edge of the screen, never negative", function()
+			local screen = { x = 0, y = -58, width = 844, height = 448 }
+			expect(ScreenLayout.insets(screen, { x = 47, y = 0, width = 750, height = 369 })).toEqual({
+				left = 47,
+				top = 58,
+				right = 47,
+				bottom = 21,
+			})
+			expect(ScreenLayout.insets(screen, { x = -5, y = -60, width = 900, height = 600 })).toEqual({
+				left = 0,
+				top = 0,
+				right = 0,
+				bottom = 0,
+			})
 		end)
 	end)
 

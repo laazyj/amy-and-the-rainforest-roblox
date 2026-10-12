@@ -18,6 +18,13 @@
 	view-model says it is finished, DialogueFinished goes to the server.
 	The Title screen shows while the client loads; a returning player's
 	Title choice goes to the server as TitleChoice.
+
+	Every screen is laid out for the Device class (DeviceClass: PC, Phone
+	or Tablet, from the last input and the viewport) by ScreenLayout, again
+	whenever the viewport, the safe area or the last input kind changes
+	(a rotation, a resize, a keyboard on a tablet). The safe area is
+	measured by a probe ScreenGui that keeps out of the notch, the home
+	bar and Roblox's top bar (ScreenInsets CoreUISafeInsets).
 	What is left here is building the UI, turning plain colours into
 	Color3, and connecting remotes, input and the frame loop.
 ]]
@@ -37,11 +44,13 @@ local playerGui = player:WaitForChild("PlayerGui")
 
 local Core = ReplicatedStorage:WaitForChild("core")
 local ChapterCardTimeline = require(Core:WaitForChild("ChapterCardTimeline"))
+local DeviceClass = require(Core:WaitForChild("DeviceClass"))
 local DialogueViewModel = require(Core:WaitForChild("DialogueViewModel"))
 local Events = require(Core:WaitForChild("Events"))
 local ObjectiveText = require(Core:WaitForChild("ObjectiveText"))
 local Story = require(Core:WaitForChild("Story"))
 local Net = require(Core:WaitForChild("Net"))
+local ScreenLayout = require(Core:WaitForChild("ScreenLayout"))
 local TitleScreen = require(Core:WaitForChild("TitleScreen"))
 local palette = require(ReplicatedStorage:WaitForChild("content"):WaitForChild("palette")).colours
 local Shared = ReplicatedStorage:WaitForChild("shared")
@@ -80,6 +89,33 @@ screenGui.IgnoreGuiInset = true
 screenGui.DisplayOrder = 10
 screenGui.Parent = playerGui
 
+-- The whole screen, to measure the viewport by, and a probe kept inside the
+-- safe area, to measure the insets by.
+local root = Instance.new("Frame")
+root.Name = "Screen"
+root.Size = UDim2.fromScale(1, 1)
+root.BackgroundTransparency = 1
+root.Parent = screenGui
+
+local safeAreaGui = Instance.new("ScreenGui")
+safeAreaGui.Name = "SafeArea"
+safeAreaGui.ResetOnSpawn = false
+safeAreaGui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
+safeAreaGui.Parent = playerGui
+local safeArea = Instance.new("Frame")
+safeArea.Size = UDim2.fromScale(1, 1)
+safeArea.BackgroundTransparency = 1
+safeArea.Parent = safeAreaGui
+
+local function addPadding(guiObject: GuiObject, top: number, bottom: number, sides: number)
+	local padding = Instance.new("UIPadding")
+	padding.PaddingTop = UDim.new(0, top)
+	padding.PaddingBottom = UDim.new(0, bottom)
+	padding.PaddingLeft = UDim.new(0, sides)
+	padding.PaddingRight = UDim.new(0, sides)
+	padding.Parent = guiObject
+end
+
 local function addCorner(guiObject: GuiObject, radius: number)
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, radius)
@@ -87,11 +123,14 @@ local function addCorner(guiObject: GuiObject, radius: number)
 end
 
 -- Dialogue box -------------------------------------------------
-local dialogueFrame = Instance.new("Frame")
+-- A button, so a tap anywhere on it advances (feel.md section 4); it grows
+-- upwards to fit its Line, up to the Screen layout's tallest.
+local dialogueFrame = Instance.new("TextButton")
 dialogueFrame.Name = "DialogueFrame"
-dialogueFrame.AnchorPoint = Vector2.new(0.5, 1)
-dialogueFrame.Position = UDim2.new(0.5, 0, 1, -28)
-dialogueFrame.Size = UDim2.new(0.62, 0, 0, 150)
+dialogueFrame.AnchorPoint = Vector2.new(0, 1)
+dialogueFrame.AutomaticSize = Enum.AutomaticSize.Y
+dialogueFrame.AutoButtonColor = false
+dialogueFrame.Text = ""
 dialogueFrame.BackgroundColor3 = Color3.fromRGB(24, 44, 30)
 dialogueFrame.BackgroundTransparency = 0.12
 dialogueFrame.BorderSizePixel = 0
@@ -99,24 +138,28 @@ dialogueFrame.Visible = false
 dialogueFrame.Parent = screenGui
 addCorner(dialogueFrame, 16)
 
+local dialogueLimit = Instance.new("UISizeConstraint")
+dialogueLimit.Parent = dialogueFrame
+
+addPadding(dialogueFrame, ScreenLayout.BOX.top, ScreenLayout.BOX.bottom, ScreenLayout.PADDING)
+
 local dialogueStroke = Instance.new("UIStroke")
 dialogueStroke.Color = Color3.fromRGB(140, 200, 120)
 dialogueStroke.Thickness = 2.5
+dialogueStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 dialogueStroke.Parent = dialogueFrame
 
+-- the name tag sits over the box's top edge
 local speakerLabel = Instance.new("TextLabel")
 speakerLabel.Name = "Speaker"
 speakerLabel.AnchorPoint = Vector2.new(0, 1)
-speakerLabel.Position = UDim2.new(0, 20, 0, 6)
-speakerLabel.Size = UDim2.new(0, 300, 0, 34)
+speakerLabel.Position = UDim2.new(0, -4, 0, -12)
 speakerLabel.BackgroundColor3 = Color3.fromRGB(94, 160, 80)
 speakerLabel.BorderSizePixel = 0
 speakerLabel.Font = Enum.Font.FredokaOne
-speakerLabel.TextSize = 22
 speakerLabel.TextColor3 = Color3.fromRGB(255, 255, 245)
 speakerLabel.Text = ""
 speakerLabel.AutomaticSize = Enum.AutomaticSize.X
-speakerLabel.Size = UDim2.new(0, 0, 0, 34)
 speakerLabel.Parent = dialogueFrame
 addCorner(speakerLabel, 10)
 
@@ -125,34 +168,45 @@ speakerPadding.PaddingLeft = UDim.new(0, 14)
 speakerPadding.PaddingRight = UDim.new(0, 14)
 speakerPadding.Parent = speakerLabel
 
+-- the text column: the Line, then the hint row under it
+local dialogueLines = Instance.new("Frame")
+dialogueLines.Name = "Lines"
+dialogueLines.Size = UDim2.fromScale(1, 0)
+dialogueLines.AutomaticSize = Enum.AutomaticSize.Y
+dialogueLines.BackgroundTransparency = 1
+dialogueLines.Parent = dialogueFrame
+local dialogueList = Instance.new("UIListLayout")
+dialogueList.SortOrder = Enum.SortOrder.LayoutOrder
+dialogueList.Padding = UDim.new(0, ScreenLayout.BOX.between)
+dialogueList.Parent = dialogueLines
+
 local bodyLabel = Instance.new("TextLabel")
 bodyLabel.Name = "Body"
-bodyLabel.Position = UDim2.new(0, 24, 0, 18)
-bodyLabel.Size = UDim2.new(1, -48, 1, -52)
+bodyLabel.LayoutOrder = 1
+bodyLabel.Size = UDim2.fromScale(1, 0)
+bodyLabel.AutomaticSize = Enum.AutomaticSize.Y
 bodyLabel.BackgroundTransparency = 1
 bodyLabel.Font = Enum.Font.GothamMedium
-bodyLabel.TextSize = 21
 bodyLabel.TextColor3 = Color3.fromRGB(240, 248, 235)
 bodyLabel.TextWrapped = true
 bodyLabel.TextXAlignment = Enum.TextXAlignment.Left
 bodyLabel.TextYAlignment = Enum.TextYAlignment.Top
 bodyLabel.Text = ""
-bodyLabel.Parent = dialogueFrame
+bodyLabel.Parent = dialogueLines
 
 local hintLabel = Instance.new("TextLabel")
 hintLabel.Name = "Hint"
-hintLabel.AnchorPoint = Vector2.new(1, 1)
-hintLabel.Position = UDim2.new(1, -18, 1, -8)
-hintLabel.Size = UDim2.new(0, 260, 0, 20)
+hintLabel.LayoutOrder = 2
 hintLabel.BackgroundTransparency = 1
 hintLabel.Font = Enum.Font.Gotham
-hintLabel.TextSize = 14
 hintLabel.TextColor3 = Color3.fromRGB(190, 215, 180)
 hintLabel.TextXAlignment = Enum.TextXAlignment.Right
+hintLabel.TextWrapped = true
 hintLabel.Text = "click / E / Space to continue  ▶"
-hintLabel.Parent = dialogueFrame
+hintLabel.Parent = dialogueLines
 
--- Invisible full-screen button that advances dialogue on click/tap
+-- Invisible full-screen button that advances dialogue on a click (a PC's
+-- only: on touch a tap outside the box turns the view)
 local clickCatcher = Instance.new("TextButton")
 clickCatcher.Name = "ClickCatcher"
 clickCatcher.Size = UDim2.new(1, 0, 1, 0)
@@ -163,11 +217,11 @@ clickCatcher.ZIndex = 5
 clickCatcher.Parent = screenGui
 
 -- Objective tracker --------------------------------------------
+-- It grows down to fit its Objective; on a Phone it collapses to an icon
+-- while a Dialogue shows.
 local objectiveFrame = Instance.new("Frame")
 objectiveFrame.Name = "ObjectiveFrame"
-objectiveFrame.AnchorPoint = Vector2.new(1, 0)
-objectiveFrame.Position = UDim2.new(1, -18, 0, 18)
-objectiveFrame.Size = UDim2.new(0, 320, 0, 74)
+objectiveFrame.AutomaticSize = Enum.AutomaticSize.Y
 objectiveFrame.BackgroundColor3 = Color3.fromRGB(24, 44, 30)
 objectiveFrame.BackgroundTransparency = 0.25
 objectiveFrame.BorderSizePixel = 0
@@ -175,29 +229,48 @@ objectiveFrame.Visible = false
 objectiveFrame.Parent = screenGui
 addCorner(objectiveFrame, 12)
 
+local tracker = ScreenLayout.TRACKER
+addPadding(objectiveFrame, tracker.top, tracker.bottom, tracker.side)
+local objectiveList = Instance.new("UIListLayout")
+objectiveList.SortOrder = Enum.SortOrder.LayoutOrder
+objectiveList.Padding = UDim.new(0, tracker.between)
+objectiveList.Parent = objectiveFrame
+
 local objectiveHeader = Instance.new("TextLabel")
-objectiveHeader.Position = UDim2.new(0, 14, 0, 8)
-objectiveHeader.Size = UDim2.new(1, -28, 0, 20)
+objectiveHeader.LayoutOrder = 1
+objectiveHeader.Size = UDim2.fromScale(1, 0)
+objectiveHeader.AutomaticSize = Enum.AutomaticSize.Y
 objectiveHeader.BackgroundTransparency = 1
 objectiveHeader.Font = Enum.Font.FredokaOne
-objectiveHeader.TextSize = 16
 objectiveHeader.TextColor3 = Color3.fromRGB(255, 214, 120)
 objectiveHeader.TextXAlignment = Enum.TextXAlignment.Left
 objectiveHeader.Text = ObjectiveText.HEADER
 objectiveHeader.Parent = objectiveFrame
 
 local objectiveText = Instance.new("TextLabel")
-objectiveText.Position = UDim2.new(0, 14, 0, 30)
-objectiveText.Size = UDim2.new(1, -28, 1, -38)
+objectiveText.LayoutOrder = 2
+objectiveText.Size = UDim2.fromScale(1, 0)
+objectiveText.AutomaticSize = Enum.AutomaticSize.Y
 objectiveText.BackgroundTransparency = 1
 objectiveText.Font = Enum.Font.GothamMedium
-objectiveText.TextSize = 16
 objectiveText.TextColor3 = Color3.fromRGB(240, 248, 235)
 objectiveText.TextWrapped = true
 objectiveText.TextXAlignment = Enum.TextXAlignment.Left
 objectiveText.TextYAlignment = Enum.TextYAlignment.Top
 objectiveText.Text = ""
 objectiveText.Parent = objectiveFrame
+
+local objectiveIcon = Instance.new("TextLabel")
+objectiveIcon.Name = "ObjectiveIcon"
+objectiveIcon.BackgroundColor3 = Color3.fromRGB(24, 44, 30)
+objectiveIcon.BackgroundTransparency = ObjectiveText.RESTING_TRANSPARENCY
+objectiveIcon.BorderSizePixel = 0
+objectiveIcon.Font = Enum.Font.FredokaOne
+objectiveIcon.TextColor3 = Color3.fromRGB(255, 214, 120)
+objectiveIcon.Text = "✦"
+objectiveIcon.Visible = false
+objectiveIcon.Parent = screenGui
+addCorner(objectiveIcon, 12)
 
 -- Title / chapter card -----------------------------------------
 local titleOverlay = Instance.new("Frame")
@@ -211,12 +284,11 @@ titleOverlay.ZIndex = 20
 titleOverlay.Parent = screenGui
 
 local titleLabel = Instance.new("TextLabel")
-titleLabel.AnchorPoint = Vector2.new(0.5, 0.5)
-titleLabel.Position = UDim2.new(0.5, 0, 0.44, 0)
-titleLabel.Size = UDim2.new(0.8, 0, 0, 70)
+titleLabel.AnchorPoint = Vector2.new(0.5, 1)
+titleLabel.AutomaticSize = Enum.AutomaticSize.Y
 titleLabel.BackgroundTransparency = 1
 titleLabel.Font = Enum.Font.FredokaOne
-titleLabel.TextSize = 52
+titleLabel.TextWrapped = true
 titleLabel.TextColor3 = Color3.fromRGB(255, 240, 200)
 titleLabel.TextTransparency = 1
 titleLabel.Text = ""
@@ -224,12 +296,11 @@ titleLabel.ZIndex = 21
 titleLabel.Parent = titleOverlay
 
 local subtitleLabel = Instance.new("TextLabel")
-subtitleLabel.AnchorPoint = Vector2.new(0.5, 0.5)
-subtitleLabel.Position = UDim2.new(0.5, 0, 0.54, 0)
-subtitleLabel.Size = UDim2.new(0.8, 0, 0, 40)
+subtitleLabel.AnchorPoint = Vector2.new(0.5, 0)
+subtitleLabel.AutomaticSize = Enum.AutomaticSize.Y
 subtitleLabel.BackgroundTransparency = 1
 subtitleLabel.Font = Enum.Font.Gotham
-subtitleLabel.TextSize = 26
+subtitleLabel.TextWrapped = true
 subtitleLabel.TextColor3 = Color3.fromRGB(200, 225, 190)
 subtitleLabel.TextTransparency = 1
 subtitleLabel.Text = ""
@@ -334,8 +405,6 @@ end
 local titleChoices = Instance.new("Frame")
 titleChoices.Name = "Choices"
 titleChoices.AnchorPoint = Vector2.new(0.5, 1)
-titleChoices.Position = UDim2.new(0.5, 0, 1, -24)
-titleChoices.Size = UDim2.new(0.94, 0, 0, 0)
 titleChoices.AutomaticSize = Enum.AutomaticSize.Y
 titleChoices.BackgroundTransparency = 1
 titleChoices.ZIndex = 32
@@ -349,7 +418,6 @@ titleNote.Size = UDim2.new(1, 0, 0, 0)
 titleNote.AutomaticSize = Enum.AutomaticSize.Y
 titleNote.BackgroundTransparency = 1
 titleNote.Font = Enum.Font.GothamMedium
-titleNote.TextSize = 22
 titleNote.TextWrapped = true
 titleNote.TextColor3 = Color3.new(1, 1, 1)
 titleNote.TextStrokeColor3 = rgb(palette.deep)
@@ -366,22 +434,43 @@ titleButtons.AutomaticSize = Enum.AutomaticSize.Y
 titleButtons.BackgroundTransparency = 1
 titleButtons.ZIndex = 32
 titleButtons.Parent = titleChoices
-list(titleButtons, Enum.FillDirection.Horizontal, 10).Wraps = true -- feel.md: at least 8 between touch targets
+local titleButtonList = list(titleButtons, Enum.FillDirection.Horizontal, 0)
+titleButtonList.Wraps = true
 
 ----------------------------------------------------------------
 -- Dialogue
 ----------------------------------------------------------------
 local dialogue = DialogueViewModel.new()
+-- the Screen layout, set by applyLayout once the UI is built
+local layout: ScreenLayout.Layout
+local objectiveView = ObjectiveText.view(nil)
+
+-- The Objective tracker, or its icon on a Phone while a Dialogue shows.
+local function renderObjective()
+	local collapsed = layout.objective.collapses and dialogue.lines ~= nil
+	objectiveFrame.Visible = objectiveView.visible and not collapsed
+	objectiveIcon.Visible = objectiveView.visible and collapsed
+	objectiveText.Text = objectiveView.text
+end
+
+-- the Line the box shows, to set its text and colours only when it changes
+local shownLines, shownIndex = nil, 0
 
 local function renderDialogue()
 	local view = DialogueViewModel.view(dialogue)
-	dialogueFrame.Visible = view.open
-	clickCatcher.Visible = view.open
-	speakerLabel.Text = view.speaker
-	speakerLabel.Visible = view.speaker ~= ""
-	speakerLabel.BackgroundColor3 = rgb(view.style.tag)
-	bodyLabel.TextColor3 = rgb(view.style.text)
-	bodyLabel.Text = view.text
+	if dialogueFrame.Visible ~= view.open then
+		dialogueFrame.Visible = view.open
+		renderObjective()
+	end
+	clickCatcher.Visible = view.open and not layout.touch
+	if dialogue.lines ~= shownLines or dialogue.index ~= shownIndex then
+		shownLines, shownIndex = dialogue.lines, dialogue.index
+		speakerLabel.Text = view.speaker
+		speakerLabel.Visible = view.speaker ~= ""
+		speakerLabel.BackgroundColor3 = rgb(view.style.tag)
+		bodyLabel.TextColor3 = rgb(view.style.text)
+		bodyLabel.Text = view.text
+	end
 	bodyLabel.MaxVisibleGraphemes = view.visibleGraphemes
 end
 
@@ -422,8 +511,8 @@ SetObjective.OnClientEvent:Connect(Net.guard("SetObjective", function(text: stri
 		Camera.resumed()
 	end
 	local view = ObjectiveText.view(text)
-	objectiveFrame.Visible = view.visible
-	objectiveText.Text = view.text
+	objectiveView = view
+	renderObjective()
 	if view.visible then
 		objectiveFrame.BackgroundTransparency = 0
 		TweenService:Create(objectiveFrame, TweenInfo.new(ObjectiveText.POP_SECONDS), {
@@ -486,15 +575,19 @@ local function renderTitle()
 		local choice = Instance.new("TextButton")
 		choice.Name = button.id
 		choice.LayoutOrder = order
-		choice.Size = UDim2.new(0, 240, 0, 52) -- feel.md: at least 48 x 48
+		local size = layout.title.button
+		choice.Size = UDim2.fromOffset(size.width, size.height) -- feel.md: at least 48 x 48
+		choice.AutomaticSize = Enum.AutomaticSize.Y
+		choice.TextWrapped = true
 		choice.BackgroundColor3 = rgb(if button.primary then palette.gold else palette.cream)
 		choice.Font = Enum.Font.FredokaOne
-		choice.TextSize = 24
+		choice.TextSize = size.text
 		choice.TextColor3 = rgb(palette.deep)
 		choice.Text = button.label
 		choice.ZIndex = 33
 		choice.Parent = titleButtons
 		addCorner(choice, 16)
+		addPadding(choice, 0, 0, ScreenLayout.BUTTON_PADDING)
 		choice.Activated:Connect(function()
 			local made = TitleScreen.press(title, button.id)
 			if made then
@@ -505,7 +598,6 @@ local function renderTitle()
 		end)
 	end
 end
-renderTitle()
 
 -- The Story has begun, with its first Chapter card or, for a Resume, the
 -- Objective: the Title screen goes.
@@ -523,6 +615,105 @@ ShowTitle.OnClientEvent:Connect(Net.guard("ShowTitle", function(chapter: string,
 	TitleScreen.show(title, { chapter = chapter, canContinue = canContinue })
 	renderTitle()
 end, warn))
+
+----------------------------------------------------------------
+-- The Screen layout: for the Device class, the viewport and the safe area
+----------------------------------------------------------------
+local TEXT_SCALE = 1 -- brief 015 adds the setting, from 1 to 1.5
+
+local preferred = nil
+pcall(function() -- PreferredInput is newer than some clients
+	preferred = UserInputService.PreferredInput.Name
+end)
+local inputKind: DeviceClass.InputKind =
+	DeviceClass.starting(preferred, UserInputService.TouchEnabled, UserInputService.KeyboardEnabled)
+
+local function absolute(gui: GuiObject): ScreenLayout.Rect
+	local at, size = gui.AbsolutePosition, gui.AbsoluteSize
+	return { x = at.X, y = at.Y, width = size.X, height = size.Y }
+end
+
+local function applyLayout()
+	local screen = absolute(root)
+	layout = ScreenLayout.new({
+		class = DeviceClass.pick(inputKind, screen.width, screen.height),
+		width = screen.width,
+		height = screen.height,
+		insets = ScreenLayout.insets(screen, absolute(safeArea)),
+		textScale = TEXT_SCALE,
+	})
+	local text = layout.text
+	Camera.setZones(layout.zones)
+
+	local box = layout.dialogue
+	dialogueFrame.Position = UDim2.fromOffset(box.x, box.bottom)
+	dialogueFrame.Size = UDim2.fromOffset(box.width, 0)
+	dialogueLimit.MaxSize = Vector2.new(box.width, box.maxHeight)
+	speakerLabel.TextSize = text.speaker
+	speakerLabel.Size = UDim2.fromOffset(0, box.speaker)
+	bodyLabel.TextSize = text.body
+	hintLabel.TextSize = text.hint
+	hintLabel.Size = UDim2.new(1, 0, 0, box.hintRow)
+
+	local objective = layout.objective
+	objectiveFrame.Position = UDim2.fromOffset(objective.x, objective.y)
+	objectiveFrame.Size = UDim2.fromOffset(objective.width, 0)
+	objectiveHeader.TextSize = text.objective
+	objectiveText.TextSize = text.objective
+	objectiveIcon.Position = UDim2.fromOffset(objective.icon.x, objective.icon.y)
+	objectiveIcon.Size = UDim2.fromOffset(objective.icon.width, objective.icon.height)
+	objectiveIcon.TextSize = text.objective
+
+	local cardLayout = layout.card
+	local cardMiddle = cardLayout.x + cardLayout.width / 2
+	titleLabel.TextSize = cardLayout.title
+	titleLabel.Position = UDim2.fromOffset(cardMiddle, cardLayout.centre)
+	titleLabel.Size = UDim2.fromOffset(cardLayout.width, 0)
+	subtitleLabel.TextSize = cardLayout.subtitle
+	subtitleLabel.Position = UDim2.fromOffset(cardMiddle, cardLayout.centre + cardLayout.gap)
+	subtitleLabel.Size = UDim2.fromOffset(cardLayout.width, 0)
+
+	local choices = layout.title
+	titleChoices.Position = UDim2.fromOffset(choices.x + choices.width / 2, choices.bottom)
+	titleChoices.Size = UDim2.fromOffset(choices.width, 0)
+	titleNote.TextSize = choices.note
+	titleButtonList.Padding = UDim.new(0, choices.gap)
+
+	renderObjective()
+	renderDialogue()
+	if titleScreen.Visible then
+		renderTitle() -- its buttons are built at the layout's size
+	end
+end
+
+UserInputService.LastInputTypeChanged:Connect(function(input: Enum.UserInputType)
+	local kind = DeviceClass.inputKind(input.Name)
+	if kind and kind ~= inputKind then
+		inputKind = kind :: DeviceClass.InputKind
+		applyLayout()
+	end
+end)
+-- A rotation changes the screen and the safe area at once: lay out once,
+-- after them all.
+local relayout = false
+for _, changed in
+	{
+		root:GetPropertyChangedSignal("AbsoluteSize"),
+		safeArea:GetPropertyChangedSignal("AbsoluteSize"),
+		safeArea:GetPropertyChangedSignal("AbsolutePosition"),
+	}
+do
+	changed:Connect(function()
+		if not relayout then
+			relayout = true
+			task.defer(function()
+				relayout = false
+				applyLayout()
+			end)
+		end
+	end)
+end
+applyLayout()
 
 ----------------------------------------------------------------
 -- Every frame: time passes for the Dialogue and the card

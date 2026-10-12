@@ -289,19 +289,20 @@ function CameraModel.observe(camera: Camera, facing: Vec3)
 	end
 end
 
--- feel.md section 1's touch control zones, the phone's (the larger): each
--- bottom corner, this share of the width and of the height. Device
--- classes (brief 012) will give the tablet its smaller ones.
-CameraModel.ZONE_WIDTH = 0.35
-CameraModel.ZONE_HEIGHT = 0.4
+-- A touch control zone, in viewport units: ScreenLayout's, for the Device
+-- class (feel.md section 1).
+export type Zone = { x: number, y: number, width: number, height: number }
 
--- Whether a touch starting at (x, y) in a viewport `width` by `height`
--- turns the view: anywhere but the control zones, which hold the
--- thumbstick (bottom left) and the talk button (bottom right).
-function CameraModel.turnsView(x: number, y: number, width: number, height: number): boolean
-	local bottom = y > height * (1 - CameraModel.ZONE_HEIGHT)
-	local corner = x < width * CameraModel.ZONE_WIDTH or x > width * (1 - CameraModel.ZONE_WIDTH)
-	return not (bottom and corner)
+-- Whether a touch starting at (x, y) turns the view: anywhere but the touch
+-- control zones, which hold the thumbstick (bottom left) and the
+-- Talk-and-advance button (bottom right). A PC has none.
+function CameraModel.turnsView(x: number, y: number, zones: { Zone }): boolean
+	for _, zone in zones do
+		if x >= zone.x and x < zone.x + zone.width and y >= zone.y and y < zone.y + zone.height then
+			return false
+		end
+	end
+	return true
 end
 
 --[[ The Shots ]]
