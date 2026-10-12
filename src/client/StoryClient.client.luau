@@ -163,11 +163,10 @@ dialogueStroke.Parent = dialogueFrame
 local speakerLabel = Instance.new("TextLabel")
 speakerLabel.Name = "Speaker"
 speakerLabel.AnchorPoint = Vector2.new(0, 1)
-speakerLabel.Position = UDim2.new(0, -4, 0, -12)
-speakerLabel.BackgroundColor3 = Color3.fromRGB(94, 160, 80)
+speakerLabel.Position = UDim2.new(0, -4, 0, ScreenLayout.BOX.tag - ScreenLayout.BOX.top) -- inside the padding
 speakerLabel.BorderSizePixel = 0
 speakerLabel.Font = Enum.Font.FredokaOne
-speakerLabel.TextColor3 = Color3.fromRGB(255, 255, 245)
+speakerLabel.TextColor3 = rgb(DialogueViewModel.NAME_TEXT)
 speakerLabel.Text = ""
 speakerLabel.AutomaticSize = Enum.AutomaticSize.X
 speakerLabel.Parent = dialogueFrame
@@ -402,6 +401,12 @@ titleScreen.ScaleType = Enum.ScaleType.Crop
 titleScreen.ZIndex = 30
 titleScreen.Parent = screenGui
 
+-- The title's words, laid out over the safe area.
+local titleWords = Instance.new("Frame")
+titleWords.Name = "Words"
+titleWords.BackgroundTransparency = 1
+titleWords.Parent = titleScreen
+
 -- A line of title text, white, with a soft dark shadow behind it; `rich`
 -- is the line with its RichText colours, when it has any.
 local function titleText(
@@ -424,7 +429,7 @@ local function titleText(
 	shadow.TextTransparency = 0.45
 	shadow.Text = text
 	shadow.ZIndex = 31
-	shadow.Parent = titleScreen
+	shadow.Parent = titleWords
 	local label = shadow:Clone()
 	label.Name = name
 	label.Position = UDim2.new(0.5, 0, y, 0)
@@ -433,7 +438,7 @@ local function titleText(
 	label.RichText = rich ~= nil
 	label.Text = rich or text
 	label.ZIndex = 32
-	label.Parent = titleScreen
+	label.Parent = titleWords
 	return label
 end
 
@@ -450,7 +455,7 @@ pill.TextScaled = true
 pill.TextColor3 = rgb(palette.deep)
 pill.Text = words.pill
 pill.ZIndex = 32
-pill.Parent = titleScreen
+pill.Parent = titleWords
 addCorner(pill, 999)
 local pillPadding = Instance.new("UIPadding")
 pillPadding.PaddingLeft = UDim.new(0.06, 0)
@@ -971,6 +976,8 @@ local function applyLayout()
 	subtitleLabel.TextSize = cardLayout.subtitle
 	subtitleLabel.Position = UDim2.fromOffset(cardMiddle, cardLayout.centre + cardLayout.gap)
 	subtitleLabel.Size = UDim2.fromOffset(cardLayout.width, 0)
+
+	titleWords.Position, titleWords.Size = offsets(layout.safe)
 
 	local choices = layout.title
 	titleChoices.Position = UDim2.fromOffset(choices.x + choices.width / 2, choices.bottom)

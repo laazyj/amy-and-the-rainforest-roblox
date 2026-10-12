@@ -4,6 +4,7 @@
 	styles, and DialogueFinished once per Dialogue.
 ]]
 
+local Contrast = require("../../../src/core/Contrast")
 local DialogueViewModel = require("../../../src/core/DialogueViewModel")
 
 local STEP = DialogueViewModel.SECONDS_PER_GRAPHEME
@@ -182,12 +183,23 @@ return function(t: any)
 	describe("speaker style", function()
 		it("gives the Narrator and Amy their own styles", function()
 			expect(DialogueViewModel.style("Narrator").tag).toEqual({ r = 120, g = 110, b = 160 })
-			expect(DialogueViewModel.style("Amy").tag).toEqual({ r = 214, g = 120, b = 140 })
+			expect(DialogueViewModel.style("Amy").tag).toEqual({ r = 167, g = 94, b = 109 })
+		end)
+
+		it("puts the name on every name tag at a contrast of at least 4.5:1 (feel.md section 3)", function()
+			local styles = table.clone(DialogueViewModel.STYLES)
+			styles.default = DialogueViewModel.DEFAULT_STYLE
+			for speaker, style in styles do
+				local ratio = Contrast.ratio(DialogueViewModel.NAME_TEXT, style.tag)
+				if ratio < Contrast.MINIMUM then
+					error(`{speaker}'s name tag is {ratio}:1`)
+				end
+			end
 		end)
 
 		it("gives every other Speaker the Character style", function()
 			expect(DialogueViewModel.style("Sam the Dog")).toBe(DialogueViewModel.style("the Golden Lion"))
-			expect(DialogueViewModel.style("Dad").tag).toEqual({ r = 94, g = 160, b = 80 })
+			expect(DialogueViewModel.style("Dad").tag).toEqual({ r = 75, g = 128, b = 64 })
 		end)
 
 		it("styles the view by the Line's Speaker", function()

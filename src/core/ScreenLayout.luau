@@ -77,6 +77,8 @@ export type Layout = {
 		maxHeight: number,
 		-- the text column, inside the box's padding on each side
 		column: number,
+		-- how far the name tag rises above the box's top edge
+		overhang: number,
 		-- the name tag's height, and the hint row's under the Line: at the
 		-- hint size, or the body size for the Onboarding's large Hint
 		speaker: number,
@@ -161,8 +163,10 @@ ScreenLayout.BUTTON_PADDING = 16
 ScreenLayout.TRACKER = table.freeze({ top = 8, bottom = 10, side = 14, between = 4 })
 local TRACKER_EMS = 18
 -- The dialogue box's padding above its text and below its hint row, and
--- the gap between them (its sides are PADDING).
-ScreenLayout.BOX = table.freeze({ top = 18, bottom = 10, between = 6 })
+-- the gap between them (its sides are PADDING); how far below the box's
+-- top edge the Speaker's name tag ends (it rises above the box), and the
+-- tag's padding round its name, above and below.
+ScreenLayout.BOX = table.freeze({ top = 18, bottom = 10, between = 6, tag = 6, tagPadding = 12 })
 local TALK: { [Class]: number } = { Phone = 64, Tablet = 72 }
 local RING: { [Class]: number } = { Phone = 96, Tablet = 112 }
 
@@ -323,6 +327,8 @@ function ScreenLayout.new(screen: Screen): Layout
 		box = { left = safe.x + MARGIN, space = safe.width - 2 * MARGIN, bottom = bottom - BOTTOM_MARGIN }
 	end
 
+	local speaker = text.speaker + ScreenLayout.BOX.tagPadding
+	local overhang = speaker - ScreenLayout.BOX.tag
 	local textColumn = column(box.space, text.body)
 	local boxWidth = textColumn + 2 * ScreenLayout.PADDING
 	local boxX = box.left + (box.space - boxWidth) / 2
@@ -330,11 +336,10 @@ function ScreenLayout.new(screen: Screen): Layout
 	if class == "Phone" and portrait then
 		maxHeight = ScreenLayout.PORTRAIT_BOX * height
 	elseif collapses then
-		-- up to the top of the safe area, or to below the collapsed Objective
-		-- tracker's icon when the box reaches under it
-		local top = if boxX + boxWidth <= icon.x
-			then safe.y + MARGIN
-			else icon.y + icon.height + ScreenLayout.TARGET_GAP
+		-- its name tag up to the top of the safe area, or to below the
+		-- collapsed Objective tracker's icon when the box reaches under it
+		local top = overhang
+			+ if boxX + boxWidth <= icon.x then safe.y else icon.y + icon.height + ScreenLayout.TARGET_GAP
 		maxHeight = box.bottom - top
 	else
 		maxHeight = height / 2
@@ -355,7 +360,8 @@ function ScreenLayout.new(screen: Screen): Layout
 			bottom = box.bottom,
 			maxHeight = maxHeight,
 			column = textColumn,
-			speaker = text.speaker + 12,
+			overhang = overhang,
+			speaker = speaker,
 			hintRow = math.ceil(text.hint * ScreenLayout.LINE),
 			largeHintRow = math.ceil(text.body * ScreenLayout.LINE),
 		},

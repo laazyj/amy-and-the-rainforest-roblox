@@ -145,8 +145,8 @@ end
 
 -- The dialogue box as tall as `text` makes it.
 local function box(layout: Layout, text: string): Rect
-	local height = ScreenLayout.dialogueHeight(layout, text, text == FIRST_LINE)
 	local d = layout.dialogue
+	local height = ScreenLayout.dialogueHeight(layout, text, text == FIRST_LINE) + d.overhang
 	return { x = d.x, y = d.bottom - height, width = d.width, height = height }
 end
 
@@ -194,9 +194,8 @@ return function(t: any)
 
 		each("it sits in the safe area, as tall as it may grow", function(layout)
 			local d = layout.dialogue
-			expect(inside({ x = d.x, y = d.bottom - d.maxHeight, width = d.width, height = d.maxHeight }, layout.safe)).toBe(
-				true
-			)
+			local top = d.bottom - d.maxHeight - d.overhang -- the name tag rises above the box
+			expect(inside({ x = d.x, y = top, width = d.width, height = d.bottom - top }, layout.safe)).toBe(true)
 		end)
 
 		each("every Line of the Story fits it without scrolling", function(layout)

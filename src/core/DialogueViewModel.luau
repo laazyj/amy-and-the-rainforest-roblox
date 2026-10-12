@@ -58,10 +58,16 @@ local DialogueViewModel = {}
 -- (briefs 011 and 016), not a refactor's.
 DialogueViewModel.SECONDS_PER_GRAPHEME = 1 / 30
 
+-- The Speaker's name on the name tag; every tag is dark enough for it to
+-- read at 4.5:1 (feel.md section 3).
+DialogueViewModel.NAME_TEXT = table.freeze({ r = 255, g = 255, b = 245 }) :: Story.RGB
+
 local DEFAULT_STYLE: Style = table.freeze({
-	tag = table.freeze({ r = 94, g = 160, b = 80 }),
+	tag = table.freeze({ r = 75, g = 128, b = 64 }),
 	text = table.freeze({ r = 240, g = 248, b = 235 }),
 })
+
+DialogueViewModel.DEFAULT_STYLE = DEFAULT_STYLE
 
 -- Speaker display name -> Style; every other Speaker has DEFAULT_STYLE.
 local STYLES: { [string]: Style } = table.freeze({
@@ -70,10 +76,12 @@ local STYLES: { [string]: Style } = table.freeze({
 		text = table.freeze({ r = 225, g = 225, b = 245 }),
 	}),
 	Amy = table.freeze({
-		tag = table.freeze({ r = 214, g = 120, b = 140 }),
+		tag = table.freeze({ r = 167, g = 94, b = 109 }),
 		text = table.freeze({ r = 248, g = 240, b = 240 }),
 	}),
 })
+
+DialogueViewModel.STYLES = STYLES
 
 function DialogueViewModel.style(speaker: string): Style
 	return STYLES[speaker] or DEFAULT_STYLE

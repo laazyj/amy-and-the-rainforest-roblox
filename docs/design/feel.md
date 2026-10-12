@@ -65,8 +65,16 @@ The same rules apply to every class; only the numbers differ.
 - **Touch control zones** are the bottom-left and bottom-right corners:
   35% of the width by 40% of the height on phone, 25% by 35% on tablet.
   The Roblox thumbstick sits in the left zone; a talk-and-advance button
-  sits in the right zone, reachable by the right thumb. Thumbs reach from
-  the edges, so no control sits anywhere else.
+  sits in the right zone, reachable by the right thumb, with the
+  Onboarding's Skip button above it while a Hint shows. Thumbs reach from
+  the edges, so no control sits anywhere else. Roblox's jump button is
+  hidden on touch: the Story never asks for a jump, and the right zone is
+  the talk button's.
+- **While a Dialogue shows on touch**, Amy listens: the thumbstick steps
+  aside (as the old full-screen click catcher already took every touch),
+  so the dialogue box may cover the left zone. It keeps clear of the right
+  zone's buttons: beside them in landscape, above them in portrait. The
+  box and the talk-and-advance button both advance.
 - **Nothing covers the subject.** No UI element overlaps the projected
   bounding box of the speaker's head during `shot:Dialogue`, the
   Objective target during free play, or a touch control zone. Tier 3
@@ -127,9 +135,10 @@ as half the text size:
 
 So the **minimum dialogue text size on a 6-inch phone is 20 units**: an
 em of about 3.2 mm and a lower-case height of about 1.6 mm at 30 cm. For
-comparison, Apple's default body text for adults is 17 points, and
-today's client uses 21 for the body, 16 for the Objective and 14 for the
-hint.
+comparison, Apple's default body text for adults is 17 points; the
+client used 21 for the body, 16 for the Objective and 14 for the hint on
+every device until brief 012 gave each class these sizes
+(`src/core/ScreenLayout.luau`).
 
 ### One rule for line length
 
@@ -221,6 +230,15 @@ block play.
 
 By the end of step 6 the player has walked, talked, advanced dialogue and
 read an Objective, on every device class, in about a minute.
+
+The steps are the glossary's [Onboarding steps](../GLOSSARY.md#onboarding-steps),
+played by `src/core/Onboarding.luau`; the Hints' words are in
+`src/content/hints.luau`, new Lines for approval. On touch, step 5's
+pulsing "prompt button" is the talk-and-advance button, which uses the
+nearest prompt. "Shown once per save" is read from what the client
+receives: a Story that begins with its first Chapter card (a new Save, or
+"Start again") shows the Onboarding; a Resume never does. A Skip button
+beside each Hint ends it.
 
 ## 7. Visual rubric
 
