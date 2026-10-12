@@ -28,6 +28,10 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 
+-- The camera first, before anything here yields: every frame is its own.
+local Camera = require(script.Parent:WaitForChild("Camera"))
+Camera.start()
+
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -43,7 +47,6 @@ local palette = require(ReplicatedStorage:WaitForChild("content"):WaitForChild("
 local Shared = ReplicatedStorage:WaitForChild("shared")
 local AssetIds = require(Shared:WaitForChild("AssetIds"))
 local Remotes = require(Shared:WaitForChild("Net"))
-local Camera = require(script.Parent:WaitForChild("Camera"))
 
 local remotes = Remotes.waitForRemotes()
 local ShowDialogue = remotes.ShowDialogue
@@ -413,6 +416,11 @@ end, warn))
 -- Objective tracker
 ----------------------------------------------------------------
 SetObjective.OnClientEvent:Connect(Net.guard("SetObjective", function(text: string?)
+	-- The server never moves on while a Dialogue shows, but for a Resume (a
+	-- Dev shortcut's jump): the camera leaves that Dialogue's Shot.
+	if DialogueViewModel.view(dialogue).open then
+		Camera.resumed()
+	end
 	local view = ObjectiveText.view(text)
 	objectiveFrame.Visible = view.visible
 	objectiveText.Text = view.text
@@ -455,9 +463,8 @@ ShowChapter.OnClientEvent:Connect(Net.guard("ShowChapter", showCard(false), warn
 ShowEnding.OnClientEvent:Connect(Net.guard("ShowEnding", showCard(true), warn))
 
 ----------------------------------------------------------------
--- The camera, and the Shots it frames
+-- The Shots the camera frames
 ----------------------------------------------------------------
-Camera.start()
 FrameShot.OnClientEvent:Connect(Net.guard("FrameShot", Camera.frameShot, warn))
 
 ----------------------------------------------------------------
@@ -491,6 +498,7 @@ local function renderTitle()
 		choice.Activated:Connect(function()
 			local made = TitleScreen.press(title, button.id)
 			if made then
+				Camera.resumed()
 				TitleChoice:FireServer(made)
 			end
 			renderTitle()

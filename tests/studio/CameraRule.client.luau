@@ -9,7 +9,8 @@
 	Play, and play (or jump with /chapter N). It checks, on the real
 	camera and Amy's real character:
 
-	  at every Shot keyframe (the frame a Shot starts, the frame it has
+	  at the first frames after CharacterAdded (spawn and respawn), at
+	  every Shot keyframe (the frame a Shot starts, the frame it has
 	  eased in, the frame it ends) and every 0.25 s of play (feel.md asks
 	  for at least every 0.5 s):
 	    the camera rule      unit(camera − Amy's root) · (−facing) ≥ 0.5
@@ -18,6 +19,8 @@
 	  while shot:Dialogue frames a speaker, once it has eased in:
 	    the head's place     the speaker's head point inside x 0.33-0.67,
 	                         y 0.15-0.5 of the viewport
+	    no name tag shown    every Character's name tag (BillboardGui) is
+	                         hidden while the Shot plays
 	    nothing covers it    no visible UI element overlaps the projected
 	                         bounding box of the speaker's head
 
@@ -154,6 +157,11 @@ local function check(why: string, settled: boolean)
 	if x < HEAD_WINDOW.left or x > HEAD_WINDOW.right or y < HEAD_WINDOW.top or y > HEAD_WINDOW.bottom then
 		fail("the speaker's head", `{why}: {frame.character}'s head at ({string.format("%.2f, %.2f", x, y)})`)
 	end
+	for _, tag in (characters :: Instance):GetDescendants() do
+		if tag:IsA("BillboardGui") and tag.Name == "NameTag" and tag.Enabled then
+			fail("no name tag shown", `{why}: {tag:GetFullName()} shows during shot:Dialogue`)
+		end
+	end
 	local box = screenBox(camera, speakerHead)
 	local over = if box then covering(box) else {}
 	if #over > 0 then
@@ -166,6 +174,16 @@ local function summary()
 end
 
 -- Every Shot keyframe, and a sample every 0.25 s.
+-- the first frames after CharacterAdded (spawn, respawn) are each checked
+local FIRST_FRAMES = 3
+local fresh = 0
+player.CharacterAdded:Connect(function()
+	fresh = FIRST_FRAMES
+end)
+if player.Character then
+	fresh = FIRST_FRAMES
+end
+
 local shot: string? = nil
 local shotStarted = 0
 local eased = false
@@ -174,6 +192,10 @@ RunService:BindToRenderStep("CameraRuleCheck", Enum.RenderPriority.Last.Value, f
 	local frame = Camera.last()
 	local now = os.clock()
 	local framed = frame and frame.shot
+	if fresh > 0 and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+		fresh -= 1
+		check(`frame {FIRST_FRAMES - fresh} after CharacterAdded`, false)
+	end
 	if framed ~= shot then
 		check(if framed then `{framed} starts` else `{shot} ends`, false)
 		shot, shotStarted, eased = framed, now, false

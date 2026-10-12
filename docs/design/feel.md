@@ -189,8 +189,15 @@ The words are game-rendered text, never part of the image.
 
 - One action per verb: move, talk (use a prompt), advance dialogue. No
   jump requirement anywhere in the Story.
-- PC: WASD or arrows to move, E to talk, click, E or Space to advance.
-  Touch: the controls in [§1](#layout-rules).
+- PC: W/S or Up/Down to walk forward and back; A/D or Left/Right to turn
+  Amy and the view together (she never strafes or backs towards the
+  camera); a right-mouse drag turns too. The pointer is never locked, so
+  it stays free for the Title screen, the dialogue box and prompts. E to
+  talk, click, E or Space to advance. The key mapping lives in one place,
+  `CameraModel.TURN_KEYS` (coordinator's choice, awaiting the owner; the
+  alternative is arrows to turn with WASD to strafe).
+  Touch: the controls in [§1](#layout-rules), and a drag outside the
+  control zones turns the view.
 - Every input gets feedback within 100 ms: the client logs a Cue played
   or a named UI tween started, with a timestamp, and tier 3 asserts the
   gap from input to that event.
@@ -208,7 +215,7 @@ block play.
 | 1 | The `chapter1` card, about 3 s, tap or click to skip | none | Card fades |
 | 2 | The first Narrator Line ([canon Line 1](../story/canon.md#canon-lines)) | "Click or press Space to continue" / "Tap to continue", shown large on this first Line only | `DialogueFinished` |
 | 3 | Objective "Ask Dad if you can go outside" appears with a marker over Dad | none; the panel briefly glows | Objective shown |
-| 4 | Amy in the garden, Dad nearby | "Use WASD or the arrow keys to walk" / a glowing ring on the thumbstick and "Drag here to walk" | Amy has moved 4 studs |
+| 4 | Amy in the garden, Dad nearby | "W and S walk, A and D turn (or the arrow keys)" / a glowing ring on the thumbstick and "Drag here to walk" | Amy has moved 4 studs |
 | 5 | Dad's talk prompt | "Press E to talk" / the prompt button pulses | `TalkedTo(Dad)` |
 | 6 | Dad's Dialogue, then the next Objective | none: the advance hint is now learned | `QuestCompleted(chapter1.ask_dad)` |
 
