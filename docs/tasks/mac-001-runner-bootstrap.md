@@ -1,5 +1,9 @@
 # mac-001 — Self-hosted runner bootstrap (Phase 1, run on the MacBook)
 
+**Superseded by [mac-001a](mac-001a-unprivileged-runner.md) (PR #40).**
+Kept for the record. Its Must 1 (sleep and screen lock disabled) no longer
+applies; the working code from its session is mac-001a's starting point.
+
 **Kind:** environment. **Not needed until Phase 1.** Written now so the
 Mac session can be started with a single pointer to this file.
 

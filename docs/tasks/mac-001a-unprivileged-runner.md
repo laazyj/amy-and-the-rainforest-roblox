@@ -1,8 +1,8 @@
 # mac-001a — The Mac runner under an unprivileged account (amends mac-001)
 
 **Kind:** environment and one spike. Run on the MacBook. **Proposed by the
-mac-001 session with the owner; awaiting the coordinator's feedback.**
-Nothing in it is built yet.
+mac-001 session with the owner; accepted by the coordinator in PR #40, whose
+decisions are at the end.** Nothing in it is built yet.
 
 ## Why this brief exists
 
@@ -91,11 +91,21 @@ Everything else depends on this, so it is done before any other work.
    the same figure in the foreground, since mac-002 and brief 016 will
    measure performance there.
 
-**If it fails:** stop, write the evidence into `docs/MAC_RUNNER.md`, and
-build the fallback instead: the runner in the owner's account, **not**
-started at login, started and stopped by hand
-(`tools/mac/runner.sh start|stop`) for the length of a playtest session.
-The isolation is then lost and the document says so plainly.
+**If it fails:** stop and write the evidence into `docs/MAC_RUNNER.md`.
+Then try one more isolated route before giving isolation up: a macOS
+virtual machine on the Mac (Apple's Virtualization framework through Tart
+or UTM) with its own display, the runner and Studio inside it, the image
+kept outside the owner's account. Whether Studio renders and signs in
+inside a VM is not known to us; spend at most one session on it and
+record the result either way. If it works it is the better design:
+disposable per run, no screen takeover, nothing of the owner's reachable,
+at the cost of a VM image to keep current with Studio's updates.
+
+**If that fails too,** build the fallback: the runner in the owner's
+account, **not** started at login, started and stopped by hand
+(`tools/mac/runner.sh start|stop`) for the length of a playtest session
+with the owner present. The isolation is then lost and the document says
+so plainly.
 
 ## Must
 
@@ -124,6 +134,23 @@ The isolation is then lost and the document says so plainly.
 6. **Proof before merge.** One commit on the branch adds a `push` trigger
    limited to that branch so the job runs on the Mac from the cloud; the
    trigger is removed before review and the run is linked in the PR.
+7. **Rules for every job that runs on the Mac**, this smoke and mac-002's
+   playtest alike, checked by `tools/mac/check-repo.sh` where a script can:
+   - it starts only from `workflow_dispatch`, a push to `main` or the
+     `needs-playtest` label; no workflow that targets `self-hosted` has a
+     `pull_request` or `pull_request_target` trigger that checks out a
+     pull request's code;
+   - it checks out the tools from `main` (`ref: main`) and acts on the
+     built `place` artifact, never on a pull request's source; what a
+     pull request can reach on the Mac is therefore what its Luau can do
+     inside Studio, and `docs/MAC_RUNNER.md` says what that is;
+   - `permissions: contents: read, actions: read`, no secrets, no Open
+     Cloud key, a `timeout-minutes`, and `concurrency: studio` so one
+     Studio runs at a time;
+   - the runner is not ephemeral (re-registering needs a fresh token for
+     every job), so the account is the isolation: `docs/MAC_RUNNER.md`
+     says what persists between jobs (the work directory) and how to wipe
+     it.
 
 ## For the owner (cannot be scripted)
 
@@ -135,30 +162,34 @@ The isolation is then lost and the document says so plainly.
 - Confirm the home folder is not readable by other accounts (it is `750`
   today, which is right).
 
-## Questions for the coordinator
+## Coordinator's decisions (PR #40)
 
-1. **mac-001's sleep and lock requirement is dropped.** Plan section 4
-   ("with screen lock and sleep disabled while on power") and mac-001
-   Must 1 need amending to match. Should this brief do it, or will you?
-2. **Which Roblox account does tier 3 use?** A throwaway account is enough
-   for the smoke. mac-002 item 3 (insert a Creator Store model) probably
-   works with any account. The plan's "Studio DataStore access enabled on
-   the Dev experience so Mac playtests can exercise it" (section 6) needs
-   an account with edit access to Dev, which gives a job on a public
-   repository's runner a route to the Dev experience. Proposal: tier 3
-   plays local files only and saves stay tier 2's job.
-3. **Should each run need the owner's approval?** A GitHub environment
-   `studio` with the owner as required reviewer would make every job on
-   the Mac wait for a click. It costs autonomy for perceptual briefs
-   (011, 012, 014, 016), which expect to run the Mac unattended.
-4. **Does this replace mac-001 or follow it?** Proposal: mac-001 closes as
-   superseded, one PR delivers this brief, and its status row replaces
-   mac-001's.
+1. **Sleep and lock stay untouched.** Plan section 4 and section 6 are
+   amended in PR #40, mac-001 is marked superseded, and nothing in this
+   brief or in any script changes a power, screen-saver or lock setting.
+   Tier 3 runs when the Mac is awake, which was already the plan's
+   position.
+2. **A separate Roblox account** with no access to Dev or Release. Tier 3
+   plays local files only; saves stay tier 2's job (Luau Execution on Dev
+   under the test prefix). The plan's "Studio DataStore access on Dev" is
+   for the owner's own playtests in the owner's account and now says so.
+   mac-002's Creator Store insertion uses the runner's account too.
+3. **No per-run approval gate.** Isolation comes from structure, not a
+   click: Must 7. Every way a Mac job can start is already the owner's or
+   the coordinator's doing, fork workflow runs need approval for all
+   outside collaborators, and a job never runs pull-request code. If a
+   second gate is ever wanted, a `studio` environment with the owner as
+   required reviewer can be added without changing the jobs.
+4. **This brief replaces mac-001.** mac-001 stays in the repository marked
+   superseded; its row is gone from the table; mac-002 follows mac-001a.
+   The working code on the local branch `mac-001-runner-bootstrap` (the
+   wrapper and its tests, `tools/mac/setup.sh`, `studio-smoke.yml`) is the
+   starting point, with its known early-query defect fixed first.
 
 ## Done when
 
 The spike's result is written down with its evidence, and either: the
 coordinator triggers `studio-smoke.yml` from the cloud, it completes
-green on the `studio-runner` account, and the screenshot shows the game
-viewport; or the fallback is in place and the same run is green with the
-runner started by hand.
+green on the `studio-runner` account (or inside the VM), and the
+screenshot shows the game viewport; or the fallback is in place and the
+same run is green with the runner started by hand.
