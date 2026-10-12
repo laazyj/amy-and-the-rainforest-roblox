@@ -11,8 +11,9 @@ local StoryEngine = require("../../../src/core/StoryEngine")
 local WorldState = require("../../../src/core/WorldState")
 
 export type Step = {
-	-- the active Quest after the step
+	-- the active Quest after the step, and the Progress
 	quest: string?,
+	progress: StoryEngine.Progress,
 	event: Events.PlayerEvent?,
 	events: { Events.StoryEvent },
 	commands: { Events.WorldCommand },
@@ -72,7 +73,10 @@ function Walker.walk(story: Story.Story, progress: StoryEngine.Progress?, world:
 		for _, command in commands do
 			WorldState.apply(story, state, command)
 		end
-		table.insert(walk.steps, { quest = next.quest, event = event, events = events, commands = commands })
+		table.insert(
+			walk.steps,
+			{ quest = next.quest, progress = next, event = event, events = events, commands = commands }
+		)
 		markPlayable(next)
 	end
 

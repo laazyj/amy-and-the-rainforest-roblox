@@ -43,7 +43,27 @@ local WIRING: { { file: string, label: string, code: string } } = {
 	{
 		file = "StoryHost.luau",
 		label = "a leaving player's session ends",
-		code = "Players.PlayerRemoving:Connect(removePlayer)",
+		code = "Players.PlayerRemoving:Connect(StoryHost.onPlayerRemoving)",
+	},
+	{
+		file = "StoryHost.luau",
+		label = "a leaving player's Save gets their last Progress and is released",
+		code = "Persist.release(player, StoryHost.progress(player))",
+	},
+	{
+		file = "StoryHost.luau",
+		label = "a joining player's Save is opened",
+		code = "newSession(player, nil)\n\t\tPersist.open(player)",
+	},
+	{
+		file = "StoryHost.luau",
+		label = "Progress is recorded after every step that raised Story events",
+		code = "if #events > 0 then\n\t\tPersist.record(session.player, session.engine:snapshot())",
+	},
+	{
+		file = "Persist.luau",
+		label = "BindToClose releases every Save",
+		code = "pcall(game.BindToClose, game, function()\n\t\tPersist.close(progressOf)\n\tend)",
 	},
 	{
 		file = "StoryHost.luau",
@@ -133,7 +153,8 @@ return function(t: any)
 					)
 				end)
 				it(`has the client send {name}`, function()
-					expect(source(CLIENT)).toContain(`{name}:FireServer()`)
+					local call = if #remote.args == 0 then `{name}:FireServer()` else `{name}:FireServer(`
+					expect(source(CLIENT)).toContain(call)
 				end)
 			else
 				it(`has the client render {name}, payload checked`, function()

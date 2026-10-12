@@ -1,2 +1,5 @@
 *.rbxlx.lock
 build/
+ServerPackages/
+# written by `wally install`; not committed until a session can reach the Wally registry
+wally.lock

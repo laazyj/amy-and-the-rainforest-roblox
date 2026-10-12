@@ -41,7 +41,7 @@ describe("golden walkthrough", function()
 			ReplicatedStorage:FindFirstChild("StoryRemotes") == nil,
 			"StoryHost already ran in this task; the walkthrough must start it itself"
 		)
-		local world = include("tests/engine/_world.luau").build(false)
+		local world = include("tests/engine/_world.luau").build(false, "walkthrough")
 		local server = world.StoryHost
 		local play = Driver.new(server, world.CharacterHost)
 		local player = FakePlayer.new(world.spawn)

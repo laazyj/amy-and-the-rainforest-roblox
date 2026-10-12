@@ -22,7 +22,7 @@ describe("place", function()
 			local found = scripts:FindFirstChild(name)
 			expect(found and found.ClassName).toBe("Script")
 		end
-		for _, name in { "StoryHost", "SceneBuilder", "WorldImpl", "PromptBridge", "CharacterHost" } do
+		for _, name in { "StoryHost", "SceneBuilder", "WorldImpl", "PromptBridge", "CharacterHost", "Persist" } do
 			local found = scripts:FindFirstChild(name)
 			expect(found and found.ClassName).toBe("ModuleScript")
 		end
@@ -32,6 +32,12 @@ describe("place", function()
 			local found = folder and folder:FindFirstChild(path[2])
 			expect(found and found.ClassName).toBe("ModuleScript")
 		end
+	end)
+
+	it("contains ProfileStore, which tools/build.sh installs with Wally", function()
+		local packages = game:GetService("ServerScriptService"):FindFirstChild("ServerPackages")
+		local found = packages and packages:FindFirstChild("ProfileStore")
+		expect(found and found.ClassName).toBe("ModuleScript")
 	end)
 
 	it("requires the core and the content by string inside the engine", function()

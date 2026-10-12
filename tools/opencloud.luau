@@ -153,6 +153,11 @@ function OpenCloud.listLogsRequest(apiKey: string, taskPath: string, pageToken: 
 	return { method = "GET", url = url, headers = headers(apiKey, "application/json") }
 end
 
+-- A page's token or cursor for the next page; "" or none means the last page.
+local function nextPage(value: any): string?
+	return if type(value) == "string" and value ~= "" then value else nil
+end
+
 -- The messages on one page of logs, and the token for the next page if any.
 function OpenCloud.parseLogsPage(response: Response): ({ string }, string?)
 	local page = serde.decode("json", response.body)
@@ -160,8 +165,7 @@ function OpenCloud.parseLogsPage(response: Response): ({ string }, string?)
 	for _, chunk in page.luauExecutionSessionTaskLogs or {} do
 		table.move(chunk.messages or {}, 1, #(chunk.messages or {}), #messages + 1, messages)
 	end
-	local token = page.nextPageToken
-	return messages, if token and token ~= "" then token else nil
+	return messages, nextPage(page.nextPageToken)
 end
 
 -- Assets API: upload an image, sound or model to the creator's account.
@@ -339,6 +343,111 @@ end
 -- What happens after an asset is created, for --dry-run (the operation path is not known yet).
 function OpenCloud.describeOperationPolling(): string
 	return `then GET {OpenCloud.BASE_URL}/assets/v1/\{operation.path\} until done`
+end
+
+-- DataStores (v1), for the test-store cleanup (tools/clean-test-stores).
+-- Verified against content/en-us/reference/cloud/datastores-api/v1.json in
+-- github.com/Roblox/creator-docs; see docs/OPEN_CLOUD.md.
+
+local function datastores(universeId: string, path: string, query: { { string } }, cursor: string?): string
+	if cursor then
+		table.insert(query, { "cursor", cursor })
+	end
+	local parts = {}
+	for _, pair in query do
+		table.insert(parts, `{pair[1]}={urlEncode(pair[2])}`)
+	end
+	local url = `{OpenCloud.BASE_URL}/datastores/v1/universes/{universeId}/standard-datastores{path}`
+	return if #parts > 0 then `{url}?{table.concat(parts, "&")}` else url
+end
+
+-- GET the data stores whose names start with `prefix`. Scope
+-- universe-datastores.control:list.
+function OpenCloud.listDataStoresRequest(apiKey: string, universeId: string, prefix: string, cursor: string?): Request
+	return {
+		method = "GET",
+		url = datastores(universeId, "", { { "prefix", prefix }, { "limit", "50" } }, cursor),
+		headers = headers(apiKey, "application/json"),
+	}
+end
+
+-- The data store names on one page, and the cursor for the next. The spec's
+-- schema calls the list `data`, its example `datastores`; both are read.
+function OpenCloud.parseDataStoresPage(response: Response): ({ string }, string?)
+	local decoded = serde.decode("json", response.body)
+	local names = {}
+	for _, store in decoded.datastores or decoded.data or {} do
+		table.insert(names, store.name)
+	end
+	return names, nextPage(decoded.nextPageCursor)
+end
+
+export type EntryKey = { scope: string, key: string }
+
+-- GET the keys of every scope of a data store. Scope
+-- universe-datastores.objects:list.
+function OpenCloud.listEntriesRequest(apiKey: string, universeId: string, datastore: string, cursor: string?): Request
+	local query = { { "datastoreName", datastore }, { "allScopes", "true" }, { "limit", "100" } }
+	return {
+		method = "GET",
+		url = datastores(universeId, "/datastore/entries", query, cursor),
+		headers = headers(apiKey, "application/json"),
+	}
+end
+
+-- The keys on one page, and the cursor for the next. The spec's schema gives
+-- keys as strings, its example as {scope?, key}; both are read.
+function OpenCloud.parseEntriesPage(response: Response): ({ EntryKey }, string?)
+	local decoded = serde.decode("json", response.body)
+	local keys = {}
+	for _, item in decoded.keys or {} do
+		if type(item) == "string" then
+			table.insert(keys, { scope = "global", key = item })
+		else
+			table.insert(keys, { scope = item.scope or "global", key = item.key })
+		end
+	end
+	return keys, nextPage(decoded.nextPageCursor)
+end
+
+-- DELETE one entry. Scope universe-datastores.objects:delete. 204 when done.
+function OpenCloud.deleteEntryRequest(apiKey: string, universeId: string, datastore: string, entry: EntryKey): Request
+	return {
+		method = "DELETE",
+		url = datastores(
+			universeId,
+			"/datastore/entries/entry",
+			{ { "datastoreName", datastore }, { "entryKey", entry.key }, { "scope", entry.scope } }
+		),
+		headers = headers(apiKey, "application/json"),
+	}
+end
+
+-- GET a data store's entries through Open Cloud v2 (openapi.json, List Data
+-- Store Entries), which leaves out entries marked for deletion
+-- (`showDeleted` is false by default); the v1 listing above still lists a
+-- key a while after it is deleted. Scope universe-datastores.objects:list.
+function OpenCloud.listLiveEntriesRequest(
+	apiKey: string,
+	universeId: string,
+	datastore: string,
+	pageToken: string?
+): Request
+	local url = cloudV2(`universes/{universeId}/data-stores/{urlEncode(datastore)}/entries?maxPageSize=256`)
+	if pageToken then
+		url ..= `&pageToken={urlEncode(pageToken)}`
+	end
+	return { method = "GET", url = url, headers = headers(apiKey, "application/json") }
+end
+
+-- The entry ids on one page of a v2 listing, and the token for the next.
+function OpenCloud.parseLiveEntriesPage(response: Response): ({ string }, string?)
+	local decoded = serde.decode("json", response.body)
+	local ids = {}
+	for _, entry in decoded.dataStoreEntries or {} do
+		table.insert(ids, entry.id or entry.path)
+	end
+	return ids, nextPage(decoded.nextPageToken)
 end
 
 -- A request as it would be sent, with the key redacted. For --dry-run.

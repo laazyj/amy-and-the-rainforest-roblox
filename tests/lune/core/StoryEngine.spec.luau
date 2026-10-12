@@ -13,6 +13,16 @@ local fixture = require("./fixtureStory")
 return function(t: any)
 	local describe, it, expect = t.describe, t.it, t.expect
 
+	describe("StoryEngine.started", function()
+		it("is false for fresh Progress and true once a Quest is active, completed or the Story has ended", function()
+			expect(StoryEngine.started(StoryEngine.fresh())).toBe(false)
+			expect(StoryEngine.started(StoryEngine.progressAt(fixture, "chapter1.greet"))).toBe(true)
+			local ended = StoryEngine.fresh()
+			ended.ended = true
+			expect(StoryEngine.started(ended)).toBe(true)
+		end)
+	end)
+
 	describe("StoryEngine.start", function()
 		local progress, events, commands = StoryEngine.start(fixture, StoryEngine.fresh())
 

@@ -2,7 +2,10 @@
 --[[
 	DevShortcuts: Dev builds only (plan section 5.3). Reach any point of
 	the Story in seconds: a jump is a Resume (StoryHost.resume) at the
-	Progress of a player who has just started the Quest.
+	Progress of a player who has just started the Quest. The jump is
+	saved: the player's Save then holds that Progress and the Checkpoints
+	of every Chapter up to it, as if they had played there, so "Continue"
+	on their next visit comes back to it.
 
 	  jumpTo(player, questId)    the jump-to-Quest entry point
 	  onCommand(player, text)    a chat command, parsed by core/DevShortcut

@@ -16,6 +16,7 @@ a real key are for the owner, when debugging a CI failure. Everyone else uses
 | `tools/publish.luau` | Publishes a `.rbxl` as a `Saved` or `Published` version and prints the version number on stdout. |
 | `tools/upload-assets.luau` | Uploads the pending assets in `assets/manifest.json` through the Assets API and writes their ids back. See [`ASSETS.md`](ASSETS.md). |
 | `tools/run-engine-tests.luau` | Runs engine test scripts as Luau Execution tasks, up to 4 at once, and fails unless every one passes. |
+| `tools/clean-test-stores.luau` | Deletes every entry in a run's test stores (`test-<RUN_ID>-*`) through the DataStore API, then lists them again and fails if any entry is left. |
 | `tools/lib/` | Shared argument parsing and the Release guard (`cli.luau`), and the logic behind the tools. |
 | `tests/engine/_prelude.luau` | `describe` / `it` / `expect`, `storeName`, `finish` for engine test scripts. |
 | `tests/engine/*.luau` | Engine tests. Files starting with `_` are helpers and are not run. |
@@ -23,7 +24,7 @@ a real key are for the owner, when debugging a CI failure. Everyone else uses
 | `tests/lune/tools/` | Unit tests for all of the above, against a mocked HTTP function. |
 | `.github/workflows/publish-dev.yml` | After CI succeeds on a push to `main` (or a manual run from `main`): build the commit CI tested, publish it to Dev as `Published`. |
 | `.github/workflows/upload-assets.yml` | By hand from `main`: upload pending assets with the Dev key and open the "Asset ids" PR. |
-| `.github/workflows/engine-tests.yml` | Every PR: build, publish to Dev as `Saved`, run `tests/engine/` against that exact version. |
+| `.github/workflows/engine-tests.yml` | Every PR: build, publish to Dev as `Saved`, run `tests/engine/` against that exact version, then clean the run's test stores (pass or fail) and list them in the job summary. |
 
 ## Running locally
 
@@ -142,10 +143,33 @@ finish()
 - **DataStores are live**, as are MemoryStore and Messaging. Always name
   stores with `storeName`, as in
   `game:GetService("DataStoreService"):GetDataStore(storeName("Saves"))`,
-  which opens `test-<RUN_ID>-Saves`. Deleting test keys after a run is not
-  built yet. No engine test opens a store today, so the
-  cleanup step comes with the first test that does, and needs the DataStore
-  permission described under [API key permissions](#api-key-permissions).
+  which opens `test-<RUN_ID>-Saves`. Game code saves through `Persist`,
+  which the harness points at a test store too
+  ([What protects real DataStores](#what-protects-real-datastores-and-what-does-not)),
+  and [the test-store cleanup](#the-test-store-cleanup) empties them after
+  the run.
+
+### The test-store cleanup
+
+```sh
+lune run tools/clean-test-stores --universe <id> --place <id> --run-id <id> [--dry-run]
+```
+
+It lists the data stores whose names start with `test-<RUN_ID>-`, refuses
+any name the listing returns without that prefix, deletes every entry of
+every scope in each, and lists each store's entries again. **The v1
+listing keeps a deleted key** (seen on Dev, PR #33: every key was still
+listed 50 s after its 204), so the check after the deletes lists through
+Open Cloud v2's List Data Store Entries, which leaves out entries marked for
+deletion; it lists again up to 6 times, 10 s apart, until the stores are
+empty. stdout has one line per store (`<store>: deleted N entries; listed
+after: 0 entries`) and a summary; the run fails if any entry is still
+listed. The engine-tests
+workflow runs it after the tests whether they passed or not, and appends
+its output to the job summary. Data stores themselves cannot be deleted
+through the v1 API, so the empty test stores stay listed in the Creator
+Dashboard; they hold nothing. It takes the same Release refusal and
+`--key-env` as every tool.
 
 ### Physics in a task (decided)
 
@@ -203,10 +227,13 @@ DataStores". The lint and the proxy cover test scripts, and any module that
 reaches these services through the `game` the test hands it. **A module that
 gets the real `DataStoreService` some other way** (its own `game`, which every
 `require`d ModuleScript has, or a reference captured earlier) **is not
-covered.** The rule that closes that gap belongs to Checkpoint B: the
-`Persist` module takes its store prefix from config, as plan 2.3 already
-says, and the engine harness sets that prefix to `test-<RUN_ID>-`. Until
-then, engine tests must not exercise game code that opens stores.
+covered.** Brief 010 closes that gap for the one module that opens stores:
+`src/server/Persist.luau` opens `Config.storePrefix .. "Progress"`, and
+`tests/engine/_world.luau`, the one way engine tests start the server,
+sets `Config.storePrefix` to `storeName("<test>-")` before `StoryHost.start`.
+ProfileStore, which Persist uses, opens only the store Persist names (and,
+in Studio only, `____PS` to probe for API access, never in a task). Any new
+module that opens a store must take its name from `Config` the same way.
 
 ## CI
 
@@ -257,12 +284,9 @@ Create keys at create.roblox.com/credentials. Set the IP restriction to
 The Assets API guide says to add **assets** to the key's access
 permissions with Read and Write for the selected experience; pick the Dev
 experience. Assets are created on the owner's account
-(`ROBLOX_CREATOR_USER_ID`, see [CI](#ci)), not in the experience. Never add asset permissions to the Release key. The
-publish and engine-test tools use no DataStore permission.
+(`ROBLOX_CREATOR_USER_ID`, see [CI](#ci)), not in the experience. Never add asset permissions to the Release key. `publish` and `run-engine-tests` use no DataStore permission.
 
-**Before the test-store cleanup is built, confirm the Dev key can list.** It
-already has DataStore read and delete for the Dev experience; the cleanup must also find
-the `test-<RUN_ID>-*` keys, which needs the two `:list` scopes in the table.
+Without the `:list` scopes the cleanup fails with a 403 naming the request.
 Never add DataStore permissions to the Release key.
 
 ## Safety rules
@@ -360,6 +384,18 @@ Verified:
   (FLAT view, one string per `print`), paginated with `maxPageSize` (up to
   10000), `pageToken` and `nextPageToken`.
 - **Stability.** The spec marks Luau Execution `STABLE` and place publishing `BETA`.
+- **DataStores, for the cleanup** (`content/en-us/reference/cloud/datastores-api/v1.json`,
+  commit `af5f853`, 2026-10-10). Base `https://apis.roblox.com/datastores`.
+  `GET /v1/universes/{u}/standard-datastores?prefix=&limit=&cursor=`
+  (`universe-datastores.control:list`); `GET …/standard-datastores/datastore/entries?datastoreName=&allScopes=true&limit=&cursor=`
+  (`universe-datastores.objects:list`); `DELETE …/datastore/entries/entry?datastoreName=&entryKey=&scope=`
+  (`universe-datastores.objects:delete`, 204). And from `openapi.json`
+  (same commit), `GET /cloud/v2/universes/{u}/data-stores/{store}/entries?maxPageSize=&pageToken=`
+  (`universe-datastores.objects:list`), whose `showDeleted` is false by
+  default; the response is `dataStoreEntries[]` and `nextPageToken`. Pages end when
+  `nextPageCursor` is empty. The schema names the store list `data` and the
+  keys strings; the examples show `datastores` and `{scope, key}` objects.
+  `tools/opencloud.luau` reads both.
 - **Assets** (`content/en-us/reference/cloud/assets/v1.json` and
   `cloud/guides/usage-assets.md`, commit `9dc22ac`, 2026-10-08).
   `POST https://apis.roblox.com/assets/v1/assets`, `multipart/form-data`

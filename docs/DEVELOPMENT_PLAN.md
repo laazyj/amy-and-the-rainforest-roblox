@@ -290,7 +290,9 @@ StoryEngine.step(progress, playerEvent) → progress', storyEvents[], worldComma
   `ShowDialogue`, `SetObjective`, `ShowChapterCard`, `Wait`,
   `MoveCharacter`, `TeleportPlayer`, `SetPropState`, `PlayCue`,
   `SetLighting`, `FrameShot`, `OfferTalk`, `WithdrawTalk`, `SpawnPickups`,
-  `RemovePickup`, `ClearPickups`, `SaveProgress`, `SaveCheckpoint`.
+  `RemovePickup`, `ClearPickups`. (Saving is the adapter's answer to Story
+  events, not a World command; brief 010 dropped the reserved
+  `SaveProgress` and `SaveCheckpoint`.)
 
 A Beat is a list of World commands with optional waits. A Hook maps a
 Quest moment to Beats. The server adapter's only jobs are to turn engine
@@ -481,7 +483,7 @@ Design notes:
   (prefix `test-<RUN_ID>-`) and deletes those keys at the end, in a cleanup
   step through the Open Cloud DataStore API. Never against Release. The
   prefix is enforced only for test scripts and the `game` they hand to
-  modules; Checkpoint B closes the gap through `Persist`'s configured prefix
+  modules; brief 010 closes the gap through `Persist`'s configured prefix
   (2.3). `docs/OPEN_CLOUD.md` states the exact guarantee and the key
   permission the cleanup needs.
 - **Tier 3 is never on the critical path for PRs**, but it is for releases.

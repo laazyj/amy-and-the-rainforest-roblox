@@ -98,7 +98,9 @@ return function(t: any)
 		it("reads the repository's own rokit.toml and wally.toml", function()
 			local fs = require("@lune/fs")
 			expect(#Toolchain.parseRokit(fs.readFile("rokit.toml"))).toBe(6)
-			expect(#Toolchain.parseWally(fs.readFile("wally.toml"))).toBe(0)
+			expect(Toolchain.parseWally(fs.readFile("wally.toml"))).toEqual({
+				{ name = "ProfileStore", repo = "lm-loleris/profilestore", version = "=1.0.3" },
+			})
 		end)
 
 		it("drops a leading v from release tags", function()

@@ -76,9 +76,9 @@ carrying it also needs a line "No test change: <why>" in its body.
 
 The canned faults live in `tools/lib/mutate.luau`. `tools/guard faults`
 (tier 0) fails a PR that leaves a fault no longer matching the code; update
-the fault's edit in the same PR. When core/Save and its migrations arrive
-(brief 010), add a "break a save migration" fault; until then "break a
-Resume" stands in for it.
+the fault's edit in the same PR. "Break a save migration" removes the
+Checkpoints Migration 1 -> 2 adds; when a schema version is added, point it
+at the newest Migration.
 
 ### Luau line coverage (spike, not a gate)
 
@@ -102,6 +102,67 @@ Result of brief 008's spike, 2026-10-09:
   for real means pinning the CLI in `rokit.toml` and
   `tools/toolchain-checksums.txt`, then a `tools/coverage.sh` that reports
   the percentage in the job summary.
+
+## Saves
+
+### ProfileStore (Wally)
+
+`wally.toml` pins `lm-loleris/profilestore` exactly (`=1.0.3`, published from
+github.com/MadStudioRoblox/ProfileStore). `tools/build.sh` runs
+`wally install` when `ServerPackages/` is missing or older than `wally.toml`,
+and fails unless every installed file matches its SHA-256 in
+`tools/package-checksums.txt` (the version pins the name, the checksums pin
+the content); CI fails the build if the install fails. Locally, without the Wally registry (`api.wally.run`; cloud
+sessions are denied it), the build warns and leaves ProfileStore out, and the
+game then plays without saves. `ServerPackages/` and `wally.lock` are not
+committed. The weekly toolchain job bumps the pin like any other.
+
+When the pin moves (by hand, or in the weekly "Toolchain updates" PR, whose
+build then fails on the checksums until they are updated), read
+ProfileStore's changes against the parts Persist uses (the types at the top
+of `src/server/Persist.luau`), then replace the lines in
+`tools/package-checksums.txt` with the new files' SHA-256s from a CI build;
+`tests/engine/persist.luau` is what proves the new version.
+
+### A new schema version
+
+Change `src/core/Save.luau` and its spec together: bump `Save.VERSION`,
+add `Save.MIGRATIONS[old]`, add a test for it in
+`tests/lune/core/Save.spec.luau`, and keep the change additive (new fields
+only), so the previous version still reads the new Save (glossary,
+**Schema version**). Never ship two schema versions between Release
+promotions.
+
+### A Save that is not a Save
+
+Data in a player's key that is no Save of any version (corrupt, or edited
+by hand) is kept whole under `unreadable` in a new Save, and the server logs
+`[Persist] <name>'s Save: <why>`; the player starts the Story afresh and
+saves from then on. To repair one, read the key in the Creator Dashboard's
+data store manager (Dev or Release, store `Progress`, key
+`Player_<user id>`), fix the `unreadable` value into a Save, and write it
+back while the player is away. A Save two or more versions newer is never
+touched (that player plays without saving until the server catches up).
+
+### Studio DataStore access on Dev (Mac playtests)
+
+Studio reaches DataStores only when the experience allows it. Owner, once,
+for the **Dev** experience only: open the Dev place in Studio, then **File →
+Game Settings → Security**, turn on **Enable Studio Access to API Services**
+and **Save**. The setting belongs to the experience, so it holds for every
+Studio session on Dev, the Mac runner's included. Only the setting is
+saved; nothing is published (only CI publishes). Never turn it on for
+Release.
+
+With it on, a Studio playtest of the Dev place (the Mac runner's tier 3,
+or the owner by hand) saves to the Dev experience's real `Progress` store
+under the tester's own user id, exactly as a Dev server does: the Title
+screen appears on the next playtest, with Continue. To start over, use
+"Start again" on the Title screen. With it off, ProfileStore prints
+"Roblox API services unavailable - data will not be saved" and every
+playtest starts fresh, which is fine for a tier 3 run that wants the golden
+first minute. Dev saves never reach Release: each experience has its own
+DataStores (plan section 3).
 
 ## Workflow security checks
 

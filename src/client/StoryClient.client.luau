@@ -7,12 +7,15 @@
 	  SetObjective    -> ObjectiveText: the Objective tracker (top right)
 	  ShowChapter /   -> ChapterCardTimeline: the Chapter card and the end card
 	  ShowEnding
+	  ShowTitle       -> TitleScreen: the Title screen's choices
 
 	Every remote it receives is held to the Net contract first (Net.guard);
 	a malformed payload is dropped with a warning.
 
 	Click, tap, or press E, Space or Enter to advance a Dialogue; when the
 	view-model says it is finished, DialogueFinished goes to the server.
+	The Title screen shows while the client loads; a returning player's
+	Title choice goes to the server as TitleChoice.
 	What is left here is building the UI, turning plain colours into
 	Color3, and connecting remotes, input and the frame loop.
 ]]
@@ -33,7 +36,11 @@ local Events = require(Core:WaitForChild("Events"))
 local ObjectiveText = require(Core:WaitForChild("ObjectiveText"))
 local Story = require(Core:WaitForChild("Story"))
 local Net = require(Core:WaitForChild("Net"))
-local Remotes = require(ReplicatedStorage:WaitForChild("shared"):WaitForChild("Net"))
+local TitleScreen = require(Core:WaitForChild("TitleScreen"))
+local palette = require(ReplicatedStorage:WaitForChild("content"):WaitForChild("palette")).colours
+local Shared = ReplicatedStorage:WaitForChild("shared")
+local AssetIds = require(Shared:WaitForChild("AssetIds"))
+local Remotes = require(Shared:WaitForChild("Net"))
 
 local remotes = Remotes.waitForRemotes()
 local ShowDialogue = remotes.ShowDialogue
@@ -42,6 +49,8 @@ local SetObjective = remotes.SetObjective
 local ShowChapter = remotes.ShowChapter
 local ShowEnding = remotes.ShowEnding
 local ClientReady = remotes.ClientReady
+local ShowTitle = remotes.ShowTitle
+local TitleChoice = remotes.TitleChoice
 
 -- The view-model's colours are a few frozen tables; each becomes a Color3 once.
 local colours: { [Story.RGB]: Color3 } = {}
@@ -220,6 +229,138 @@ subtitleLabel.Text = ""
 subtitleLabel.ZIndex = 21
 subtitleLabel.Parent = titleOverlay
 
+-- Title screen (docs/design/feel.md, "Title screen") ----------
+-- Over Clara's forest wall (ui:title_screen), or plain deep green until it
+-- is uploaded. Every word is game-rendered text.
+local titleScreen = Instance.new("ImageLabel")
+titleScreen.Name = "TitleScreen"
+titleScreen.Size = UDim2.new(1, 0, 1, 0)
+titleScreen.BackgroundColor3 = rgb(palette.deep)
+titleScreen.BorderSizePixel = 0
+titleScreen.Image = AssetIds["ui:title_screen"] or ""
+titleScreen.ScaleType = Enum.ScaleType.Crop
+titleScreen.ZIndex = 30
+titleScreen.Parent = screenGui
+
+-- A line of title text, white, with a soft dark shadow behind it; `rich`
+-- is the line with its RichText colours, when it has any.
+local function titleText(
+	name: string,
+	y: number,
+	height: number,
+	font: Enum.Font,
+	text: string,
+	rich: string?
+): TextLabel
+	local shadow = Instance.new("TextLabel")
+	shadow.Name = name .. "Shadow"
+	shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+	shadow.Position = UDim2.new(0.5, 3, y, 4)
+	shadow.Size = UDim2.new(0.92, 0, height, 0)
+	shadow.BackgroundTransparency = 1
+	shadow.Font = font
+	shadow.TextScaled = true
+	shadow.TextColor3 = rgb(palette.deep)
+	shadow.TextTransparency = 0.45
+	shadow.Text = text
+	shadow.ZIndex = 31
+	shadow.Parent = titleScreen
+	local label = shadow:Clone()
+	label.Name = name
+	label.Position = UDim2.new(0.5, 0, y, 0)
+	label.TextColor3 = Color3.new(1, 1, 1)
+	label.TextTransparency = 0
+	label.RichText = rich ~= nil
+	label.Text = rich or text
+	label.ZIndex = 32
+	label.Parent = titleScreen
+	return label
+end
+
+local words = TitleScreen.WORDS
+local pill = Instance.new("TextLabel")
+pill.Name = "Pill"
+pill.AnchorPoint = Vector2.new(0.5, 0.5)
+pill.Position = UDim2.new(0.5, 0, 0.16, 0)
+pill.Size = UDim2.new(0.5, 0, 0.07, 0)
+pill.BackgroundColor3 = rgb(palette.cream)
+pill.BackgroundTransparency = 0.25
+pill.Font = Enum.Font.Kalam
+pill.TextScaled = true
+pill.TextColor3 = rgb(palette.deep)
+pill.Text = words.pill
+pill.ZIndex = 32
+pill.Parent = titleScreen
+addCorner(pill, 999)
+local pillPadding = Instance.new("UIPadding")
+pillPadding.PaddingLeft = UDim.new(0.06, 0)
+pillPadding.PaddingRight = UDim.new(0.06, 0)
+pillPadding.PaddingTop = UDim.new(0.12, 0)
+pillPadding.PaddingBottom = UDim.new(0.12, 0)
+pillPadding.Parent = pill
+
+titleText("Amy", 0.29, 0.15, Enum.Font.Fondamento, words.name)
+local gold = palette.gold
+titleText(
+	"RainForest",
+	0.43,
+	0.13,
+	Enum.Font.Fondamento,
+	words.the .. words.gold,
+	string.format('%s<font color="#%02x%02x%02x">%s</font>', words.the, gold.r, gold.g, gold.b, words.gold)
+)
+
+-- The choices sit at the bottom, above the safe area, and grow upwards:
+-- the note (the Chapter, or the confirmation's question), then the buttons
+-- in a row that wraps, so they fit a phone in landscape or portrait.
+local function list(parent: Instance, direction: Enum.FillDirection, padding: number): UIListLayout
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = direction
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+	layout.Padding = UDim.new(0, padding)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = parent
+	return layout
+end
+
+local titleChoices = Instance.new("Frame")
+titleChoices.Name = "Choices"
+titleChoices.AnchorPoint = Vector2.new(0.5, 1)
+titleChoices.Position = UDim2.new(0.5, 0, 1, -24)
+titleChoices.Size = UDim2.new(0.94, 0, 0, 0)
+titleChoices.AutomaticSize = Enum.AutomaticSize.Y
+titleChoices.BackgroundTransparency = 1
+titleChoices.ZIndex = 32
+titleChoices.Parent = titleScreen
+list(titleChoices, Enum.FillDirection.Vertical, 10)
+
+local titleNote = Instance.new("TextLabel")
+titleNote.Name = "Note"
+titleNote.LayoutOrder = 1
+titleNote.Size = UDim2.new(1, 0, 0, 0)
+titleNote.AutomaticSize = Enum.AutomaticSize.Y
+titleNote.BackgroundTransparency = 1
+titleNote.Font = Enum.Font.GothamMedium
+titleNote.TextSize = 22
+titleNote.TextWrapped = true
+titleNote.TextColor3 = Color3.new(1, 1, 1)
+titleNote.TextStrokeColor3 = rgb(palette.deep)
+titleNote.TextStrokeTransparency = 0.4
+titleNote.Text = ""
+titleNote.ZIndex = 33
+titleNote.Parent = titleChoices
+
+local titleButtons = Instance.new("Frame")
+titleButtons.Name = "Buttons"
+titleButtons.LayoutOrder = 2
+titleButtons.Size = UDim2.new(1, 0, 0, 0)
+titleButtons.AutomaticSize = Enum.AutomaticSize.Y
+titleButtons.BackgroundTransparency = 1
+titleButtons.ZIndex = 32
+titleButtons.Parent = titleChoices
+list(titleButtons, Enum.FillDirection.Horizontal, 10).Wraps = true -- feel.md: at least 8 between touch targets
+
 ----------------------------------------------------------------
 -- Dialogue
 ----------------------------------------------------------------
@@ -307,6 +448,62 @@ end
 
 ShowChapter.OnClientEvent:Connect(Net.guard("ShowChapter", showCard(false), warn))
 ShowEnding.OnClientEvent:Connect(Net.guard("ShowEnding", showCard(true), warn))
+
+----------------------------------------------------------------
+-- The Title screen
+----------------------------------------------------------------
+local title = TitleScreen.new()
+
+local function renderTitle()
+	local view = TitleScreen.view(title)
+	titleScreen.Visible = view.visible
+	titleNote.Text = view.note or ""
+	titleNote.Visible = view.note ~= nil
+	for _, child in titleButtons:GetChildren() do
+		if child:IsA("TextButton") then
+			child:Destroy()
+		end
+	end
+	for order, button in view.buttons do
+		local choice = Instance.new("TextButton")
+		choice.Name = button.id
+		choice.LayoutOrder = order
+		choice.Size = UDim2.new(0, 240, 0, 52) -- feel.md: at least 48 x 48
+		choice.BackgroundColor3 = rgb(if button.primary then palette.gold else palette.cream)
+		choice.Font = Enum.Font.FredokaOne
+		choice.TextSize = 24
+		choice.TextColor3 = rgb(palette.deep)
+		choice.Text = button.label
+		choice.ZIndex = 33
+		choice.Parent = titleButtons
+		addCorner(choice, 16)
+		choice.Activated:Connect(function()
+			local made = TitleScreen.press(title, button.id)
+			if made then
+				TitleChoice:FireServer(made)
+			end
+			renderTitle()
+		end)
+	end
+end
+renderTitle()
+
+-- The Story has begun, with its first Chapter card or, for a Resume, the
+-- Objective: the Title screen goes.
+local begun: { RBXScriptConnection } = {}
+local function storyBegins()
+	TitleScreen.close(title)
+	renderTitle()
+	for _, connection in begun do
+		connection:Disconnect()
+	end
+end
+begun = { ShowChapter.OnClientEvent:Connect(storyBegins), SetObjective.OnClientEvent:Connect(storyBegins) }
+
+ShowTitle.OnClientEvent:Connect(Net.guard("ShowTitle", function(chapter: string, canContinue: boolean)
+	TitleScreen.show(title, { chapter = chapter, canContinue = canContinue })
+	renderTitle()
+end, warn))
 
 ----------------------------------------------------------------
 -- Every frame: time passes for the Dialogue and the card

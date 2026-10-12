@@ -74,8 +74,14 @@ Scene (look + sound)                     Player
 | **Placeholder** | A plain palette-coloured stand-in with no text for an illustration not drawn yet, until the real piece replaces it. | `card:chapter1` |
 | **Shot** | A named camera framing used by a Beat or a Dialogue. Specified in [`design/feel.md`](design/feel.md). See [enumeration](#shots). | `shot:ForestWallReveal` |
 | **Lighting preset** | A named look for a Scene. See [enumeration](#lighting-presets). | `lighting:paradise` |
-| **Progress** | Where a player is in the Story: current Chapter and Quest, completed Quest ids, the Pickups touched in the current Quest, which Dialogue is showing, and later Collectibles, Bonds, and the Prop states that matter. Saved on every Story event and on leave. | |
-| **Checkpoint** | The Progress snapshot taken at a Chapter start, kept alongside current Progress. "Play this chapter again" restarts from it. | |
+| **Progress** | Where a player is in the Story: current Chapter and Quest, completed Quest ids, the Pickups touched in the current Quest, which Dialogue is showing, and later Collectibles, Bonds, and the Prop states that matter. Kept in the Save. | |
+| **Checkpoint** | The Progress snapshot taken at a Chapter start, kept in the Save alongside current Progress, one per Chapter reached. "Play this chapter again" restarts from it. | the Checkpoint of `chapter2`: every Chapter One Quest completed, `chapter2.walk_to_forest` just started |
+| **Save** | What is kept for a player between visits: their Progress and their Checkpoints, under a schema version (`src/core/Save.luau`). One Save per player, keyed by Roblox user id, kept by `src/server/Persist.luau` with ProfileStore and written on every Story event and on leave. | |
+| **Schema version** | The version of a Save's shape. A version only adds fields, so code reads a Save one version newer as its own (Release can roll back one version); a Save two or more versions newer is not read and never written over. | version 2 |
+| **Fault** | Something that went wrong for a player and is worth counting, by a name that reads as an analytics event name. See [enumeration](#faults). | `save_load_timeout` |
+| **Migration** | Turns a Save of one schema version into the next, with a tier 1 test each. | 1 → 2 adds the Checkpoints |
+| **Title screen** | What a player sees first: feel.md's title over `ui:title_screen`, also shown while the client loads. A returning player is offered the Title choices on it; a player with no Save goes straight to the first Chapter card. Its view-model is `src/core/TitleScreen.luau`. | |
+| **Title choice** | What a returning player picks on the Title screen: `continue` ("Continue", a Resume at the current Quest), `replay` ("Play this chapter again", a Resume at the Chapter's Checkpoint) or `restart` ("Start again", behind a confirmation: a new Save). | `replay` |
 | **Resume** | Rebuilding the world for a returning player from Progress alone: `StoryEngine.resume(progress)` returns the World commands that put every Character, Prop, Lighting preset and Pickup where the current Quest expects them, then shows the Objective. "Continue" on the title screen is a Resume. | |
 | **World state** | What the World looks like to the Story, as plain data: where each Character stands, each Prop's state, the Lighting preset, the Pickups out, the Objective, the offered talk affordances. What the World commands mean without the engine (`src/core/WorldState.luau`); a Resume rebuilds it. | Sam at `spot:Farm`, `lighting:paradise` |
 | **World** | The one interface the core uses to act on the engine. Every Beat is written against it, one method per World command. | `World.moveCharacter(id, spot)` |
@@ -83,7 +89,7 @@ Scene (look + sound)                     Player
 | **Client binder** | The client script (`src/client`): it builds the UI, renders the view-model and forwards the player's input. It holds no logic. | `StoryClient.client.luau` |
 | **View-model** | The client's logic as plain data in core, which the client binder renders: the Dialogue as it types out and advances (`DialogueViewModel`), the Objective tracker (`ObjectiveText`) and how a Chapter card plays over time (`ChapterCardTimeline`). Tested in tier 1, no client needed. | `DialogueViewModel.view(vm)` |
 | **Grapheme** | One character as a reader sees it, which may be several code points: "♥️", "👍🏽". Dialogue types out one grapheme at a time. | `DialogueViewModel.graphemes("♥️") == 1` |
-| **Dev shortcut** | A Dev-only way to reach any point of the Story in seconds: the chat commands `/chapter N` and `/quest <id>`, and the jump-to-Quest entry point (`DevShortcuts.jumpTo`). A jump is a Resume at the Progress of a player who has just started the Quest. Release builds have none: the release job strips them when it publishes. | `/chapter 3` |
+| **Dev shortcut** | A Dev-only way to reach any point of the Story in seconds: the chat commands `/chapter N` and `/quest <id>`, and the jump-to-Quest entry point (`DevShortcuts.jumpTo`). A jump is a Resume at the Progress of a player who has just started the Quest, and is saved: the Save holds that Progress and the Checkpoints of every Chapter up to it. Release builds have none: the release job strips them when it publishes. | `/chapter 3` |
 | **Device class** | One of the three first-class targets, each with its own layout and touch rules: `PC`, `Phone`, `Tablet`. Defined in [`design/feel.md`](design/feel.md). | `Tablet` |
 | **Walkthrough** | A test that plays the Story, or one Chapter, from start to end by driving a player's inputs, and checks what the server sends back. | `tests/engine/walkthrough.luau` |
 | **Fake player** | A stand-in for a Player in a test, where there is no client: a Character to move, plus the identity fields a Player has. | `tests/engine/_fakeplayer.luau` |
@@ -154,8 +160,10 @@ of all three lists below are in `src/core/Events.luau`.
 | `SpawnPickups` | `quest` | Spawns the Quest's Pickups at their Spots |
 | `RemovePickup` | `pickup` | Removes one touched Pickup |
 | `ClearPickups` | `quest` | Removes the Quest's remaining Pickups |
-| `SaveProgress` *later* | none | Writes Progress |
-| `SaveCheckpoint` *later* | `chapter` | Writes the Checkpoint for a Chapter |
+
+Saving is not a World command: the server adapter writes the Save after
+every step that raised Story events, so no Beat can save, skip a save, or
+change what a fresh player is sent.
 
 If a Beat needs something these commands cannot do, the World interface
 grows by one named command, recorded here in the same PR. *Later*:
@@ -167,7 +175,10 @@ predate this glossary and are kept so the golden file still matches:
 `ShowDialogue`, `SetObjective`, and `ShowChapterCard` as `ShowChapter`
 (or `ShowEnding` for the end card). The client sends `DialogueFinished`,
 and `ClientReady` once it has loaded, which starts the Story; that is an
-adapter detail, not a Player event. Both sides hold every payload to the
+adapter detail, not a Player event. The Title screen travels the same way:
+`ShowTitle` (the Chapter a returning player is in, and whether there is a
+Quest to continue) and the client's `TitleChoice`; only a returning player
+is sent `ShowTitle`, so the golden file has none. Both sides hold every payload to the
 contract: the server checks each World command against its schema in
 `src/core/Events.luau` and each message before it sends it, and the client
 binder wraps every remote it receives in `Net.guard`, which drops a
@@ -307,6 +318,21 @@ Framing and where each is used are specified in
 
 None yet. Cue names (`cue:<name>` for sounds, `music:<name>` for music)
 are added here with their manifest entry.
+
+### Faults
+
+What can go wrong for a player and is worth counting
+(`src/core/Fault.luau`). The server reports each through
+`src/server/FaultLog.luau`: today a warning line, `[Fault] <name> player
+<id>: <why>`; from brief 015 an analytics custom event of the same name.
+
+| Fault | Reported when |
+|---|---|
+| `save_unreadable` | The player's data is no Save of any version: kept aside under `unreadable` in a new Save, and the player starts afresh |
+| `save_too_new` | The player's Save is two or more schema versions newer: never written over, and the player plays without saving |
+| `save_load_timeout` | The player's Save did not load within `Persist.LOAD_TIMEOUT`: the player plays without saving |
+| `save_unavailable` | The server has no ProfileStore package: every player plays without saving |
+| `save_close_unbound` | Persist could not bind its release to BindToClose |
 
 ## 5. Lifecycles
 
