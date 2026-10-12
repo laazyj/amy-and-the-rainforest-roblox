@@ -128,7 +128,9 @@ return function(t: any)
 			TitleScreen.show(vm, { chapter = "One — The start", canContinue = true })
 			expect(TitleScreen.press(vm, "restart")).toBeNil()
 			local asking = TitleScreen.view(vm)
-			expect(asking.note).toBe(TitleScreen.CONFIRM)
+			expect(asking.note).toBe(
+				"Start the whole story again from the very beginning? Your place in the story will be gone."
+			)
 			expect(ids(asking)).toEqual({ "confirm", "cancel" })
 			expect(TitleScreen.press(vm, "continue")).toBeNil()
 			expect(TitleScreen.press(vm, "confirm")).toBe("restart")
