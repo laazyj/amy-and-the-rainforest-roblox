@@ -89,10 +89,10 @@ in the [glossary](../GLOSSARY.md#shots).
 
 | Shot | Used by | Subject and framing | Moves |
 |---|---|---|---|
-| `shot:Dialogue` | Every Dialogue whose Speaker is a Character in the world | Two-shot over Amy's shoulder, camera at the speaker's eye height, the projected head point inside x 0.33–0.67 and y 0.15–0.5 of the viewport. Narrator-only Dialogue keeps the current camera. | Eases in over 0.5 s, then still |
-| `shot:ForestWallReveal` | `chapter2.walk_to_forest.onComplete`, with canon Line 6 | Low behind Amy, looking up: the wall of trunks fills the width, the gap is centred, the cream sky and canopies above. Ends with the gap clearly visible, so the next Objective is obvious. | Slow tilt up from Amy to the canopy over about 3 s |
-| `shot:MeetCharacter` | The first `TalkedTo` of each animal in `chapter3`, before its `shot:Dialogue` | The animal in full, facing Amy, as the table below sets | As the table below sets |
-| `shot:MachineFinale` | `chapter4.explain.onComplete` (`beat:machine_stops`) and the Ending | Wide, from behind Amy and the crowd, looking toward the machine and the trees: Amy small between the stopped blade and the giant trees | Holds while the machine reverses, then tilts up to the treetops for the Ending's Lines |
+| `shot:Dialogue` | Every Dialogue whose Speaker is a Character in the world; the core frames it before the Dialogue (`src/core/Shot.luau`), of its first such Speaker | Two-shot over Amy's shoulder, camera at the speaker's eye height, the projected head point inside x 0.33–0.67 and y 0.15–0.5 of the viewport. Narrator-only Dialogue keeps the current camera. | Eases in over 0.5 s, then still |
+| `shot:ForestWallReveal` | `chapter2.walk_to_forest.onComplete`, after canon Line 6 (the Quest's outro), as the next Objective appears | Low behind Amy, looking up: the wall of trunks fills the width, the gap is centred, the cream sky and canopies above. Ends with the gap clearly visible, so the next Objective is obvious. | Slow tilt up from Amy to the canopy over about 3 s |
+| `shot:MeetCharacter` | The first `TalkedTo` of each animal in `chapter3` (its Quest's `onTalkedTo` Hook), before its `shot:Dialogue` | The animal in full, facing Amy, as the table below sets | As the table below sets |
+| `shot:MachineFinale` | `chapter4.explain.onComplete` (`beat:machine_stops`) and the Ending, whose Dialogue it accompanies, so it holds until `DialogueFinished` | Wide, from behind Amy and the crowd, looking toward the machine and the trees: Amy small between the stopped blade and the giant trees | Holds while the machine reverses, then tilts up to the treetops for the Ending's Lines |
 
 `shot:MeetCharacter` takes the Character as its argument
 (`FrameShot(MeetCharacter, Fox)`), so a new animal adds a row here, not a

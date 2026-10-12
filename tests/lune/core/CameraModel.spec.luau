@@ -352,6 +352,7 @@ return function(t: any)
 				end
 			end
 			expect(shots).toEqual({ "MeetCharacter", "Dialogue" })
+			expect(CameraModel.step(camera, 0, amy, find).character).toBe("Fox")
 		end)
 
 		it(

@@ -48,8 +48,9 @@ export type Rig = {
 }
 
 -- What the adapter renders: the camera, the point it looks at, and the
--- way Amy faces, all in world space; and the Shot framed, if any.
-export type Frame = { camera: Vec3, lookAt: Vec3, facing: Vec3, shot: string? }
+-- way Amy faces, all in world space; and the Shot framed, if any, with
+-- its Character.
+export type Frame = { camera: Vec3, lookAt: Vec3, facing: Vec3, shot: string?, character: string? }
 
 -- A FrameShot: the Shot, and the Character it frames when it takes one.
 export type Framing = { shot: string, character: string? }
@@ -450,7 +451,9 @@ function CameraModel.step(camera: Camera, seconds: number, amy: Vec3, subject: S
 	rig = CameraModel.clamp(rig)
 	camera.last = rig
 	local frame = CameraModel.frame(rig, amy)
-	frame.shot = if playing then playing.framing.shot else nil
+	if playing then
+		frame.shot, frame.character = playing.framing.shot, playing.framing.character
+	end
 	return frame
 end
 

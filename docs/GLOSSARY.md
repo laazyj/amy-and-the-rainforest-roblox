@@ -73,6 +73,9 @@ Scene (look + sound)                     Player
 | **Moderation status** | Where Roblox moderation is with an Asset. See [Lifecycles](#5-lifecycles). | `approved` |
 | **Placeholder** | A plain palette-coloured stand-in with no text for an illustration not drawn yet, until the real piece replaces it. | `card:chapter1` |
 | **Shot** | A named camera framing used by a Beat or a Dialogue. Specified in [`design/feel.md`](design/feel.md). See [enumeration](#shots). | `shot:ForestWallReveal` |
+| **Camera rule** | The camera stays within 60° of directly behind Amy: unit(camera − Amy) · (−facing) ≥ 0.5, at every frame. Specified in [`design/feel.md`](design/feel.md#invariants). | |
+| **Follow camera** | The camera in free play: behind Amy, who turns with the view as with shift-lock. Every Shot takes the camera from it and hands it back. | |
+| **Camera model** | The camera as plain data (`src/core/CameraModel.luau`): a **Rig** is a camera placement relative to Amy (her facing, the camera's angles from directly behind her, its distance, its look-at), and a **Frame** is what one frame renders (camera, look-at, Amy's facing, the Shot). `src/client/Camera.luau` renders it. | `CameraModel.step(camera, seconds, amy, subject)` |
 | **Lighting preset** | A named look for a Scene. See [enumeration](#lighting-presets). | `lighting:paradise` |
 | **Progress** | Where a player is in the Story: current Chapter and Quest, completed Quest ids, the Pickups touched in the current Quest, which Dialogue is showing, and later Collectibles, Bonds, and the Prop states that matter. Kept in the Save. | |
 | **Checkpoint** | The Progress snapshot taken at a Chapter start, kept in the Save alongside current Progress, one per Chapter reached. "Play this chapter again" restarts from it. | the Checkpoint of `chapter2`: every Chapter One Quest completed, `chapter2.walk_to_forest` just started |

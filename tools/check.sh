@@ -41,6 +41,9 @@ echo "== luau-lsp: src (Roblox)"
 rojo sourcemap default.project.json -o build/sourcemap.json
 luau-lsp analyze --platform=roblox --sourcemap=build/sourcemap.json --definitions=@roblox="$defs" src
 
+echo "== luau-lsp: tests/studio (Roblox, tier 3 scripts run by hand in Studio)"
+luau-lsp analyze --platform=roblox --definitions=@roblox="$defs" tests/studio
+
 echo "== luau-lsp: tests/engine (Roblox, with the names the runner injects)"
 luau-lsp analyze --platform=roblox --definitions=@roblox="$defs" \
 	--definitions=@engine=tests/engine/globals.d.luau --ignore="**/*.d.luau" tests/engine
