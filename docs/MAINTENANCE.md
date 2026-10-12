@@ -122,7 +122,11 @@ build then fails on the checksums until they are updated), read
 ProfileStore's changes against the parts Persist uses (the types at the top
 of `src/server/Persist.luau`), then replace the lines in
 `tools/package-checksums.txt` with the new files' SHA-256s from a CI build;
-`tests/engine/persist.luau` is what proves the new version.
+`tests/engine/persist.luau` is what proves the new version. The registry
+copy is published from Windows and carries CRLF line endings, so its
+SHA-256 never matches the file on GitHub; `diff -w` against the GitHub
+file is the comparison that shows whether the code is the same (it was for
+1.0.3, see PR #33).
 
 ### A new schema version
 
