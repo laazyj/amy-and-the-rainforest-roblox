@@ -1,0 +1,370 @@
+--!strict
+--[[
+	ScreenLayout: where everything on screen goes, and how big its text is,
+	for one Device class, orientation, safe area and Text scale
+	(docs/design/feel.md sections 1, 3 and 4), as plain numbers. The client
+	binder builds one whenever the viewport, the safe-area insets or the
+	Device class change, and sets what it says; all the rules are here, so
+	tier 1 checks them at Text scale 1 and 1.5 without a client.
+
+	  new(screen)        the Screen layout: every Rect in UI units from the
+	                     viewport's top left (the binder's ScreenGui ignores
+	                     the top bar's inset; the safe area accounts for it)
+	  lines(text, size, width)
+	                     about how many lines `text` wraps to
+	  dialogueHeight(layout, text, largeHint)
+	                     about how tall the dialogue box grows for a Line
+
+	The rules, the same for every class with its own numbers:
+
+	  text sizes      body, speaker and Objective, and hints: 20/18/14 on
+	                  a Phone, 24/20/16 on a Tablet and a PC, times the
+	                  Text scale (1 to 1.5)
+	  dialogue box    at the bottom; its text column is the space there
+	                  minus 24 units of padding each side, never wider
+	                  than 30 x the body size (60 characters); it grows up
+	                  to fit its Line, at most 40% of the height in phone
+	                  portrait
+	  Objective       the top right; on a Phone it collapses to an icon
+	  tracker         while a Dialogue shows
+	  touch control   the bottom-left and bottom-right corners of the
+	  zones           viewport: 35% x 40% on a Phone, 25% x 35% on a
+	                  Tablet; none on a PC. The thumbstick has the left
+	                  one, the Talk-and-advance button (and the Skip button
+	                  while a Hint shows) sit in the right one
+	  touch targets   at least 48 x 48, 8 apart
+
+	While a Dialogue shows on touch, Amy listens: the thumbstick steps
+	aside (the old full-screen click catcher already took every touch), so
+	the box may use the left zone, and keeps clear of the right zone's
+	buttons, beside them in landscape and above them in portrait.
+]]
+
+local DeviceClass = require("./DeviceClass")
+local DialogueViewModel = require("./DialogueViewModel")
+local TitleScreen = require("./TitleScreen")
+
+type DeviceClass = DeviceClass.DeviceClass
+
+export type Rect = { x: number, y: number, width: number, height: number }
+-- The safe-area insets from each edge of the viewport: the notch, the home
+-- bar, rounded corners and Roblox's top bar.
+export type Insets = { left: number, top: number, right: number, bottom: number }
+export type Screen = {
+	class: DeviceClass,
+	width: number,
+	height: number,
+	insets: Insets,
+	-- 1 to 1.5; brief 015 adds the setting
+	textScale: number,
+}
+
+export type TextSizes = { body: number, speaker: number, objective: number, hint: number }
+
+export type Layout = {
+	class: DeviceClass,
+	portrait: boolean,
+	textScale: number,
+	safe: Rect,
+	text: TextSizes,
+	dialogue: {
+		-- the box's left edge, width and bottom edge; it grows upwards
+		x: number,
+		width: number,
+		bottom: number,
+		maxHeight: number,
+		-- the text column, inside the box's padding on each side
+		column: number,
+	},
+	objective: { x: number, y: number, width: number, collapses: boolean, icon: Rect },
+	-- the touch control zones, left then right; none on a PC
+	zones: { Rect },
+	-- touch only: the Talk-and-advance button, and the ring the onboarding
+	-- draws round where the thumb goes
+	talk: Rect?,
+	ring: Rect?,
+	-- the onboarding: where a Hint shows in free play, and its Skip button
+	hint: Rect,
+	skip: Rect,
+	card: { x: number, width: number, centre: number, title: number, subtitle: number },
+	title: {
+		x: number,
+		width: number,
+		bottom: number,
+		note: number,
+		button: { width: number, height: number, text: number },
+		gap: number,
+	},
+}
+
+local ScreenLayout = {}
+
+-- A Tablet and a PC subtend the same angles (feel.md section 3), so they
+-- share their sizes.
+local LARGE: TextSizes = table.freeze({ body = 24, speaker = 20, objective = 20, hint = 16 })
+ScreenLayout.SIZES = table.freeze({
+	Phone = table.freeze({ body = 20, speaker = 18, objective = 18, hint = 14 }),
+	Tablet = LARGE,
+	PC = LARGE,
+} :: { [DeviceClass]: TextSizes })
+
+-- The card's title and subtitle, before the Text scale.
+local LARGE_CARD = { title = 52, subtitle = 26 }
+local CARD: { [DeviceClass]: { title: number, subtitle: number } } = {
+	Phone = { title = 40, subtitle = 22 },
+	Tablet = LARGE_CARD,
+	PC = LARGE_CARD,
+}
+
+-- Each touch control zone's share of the viewport's width and height.
+ScreenLayout.ZONES = table.freeze({
+	Phone = table.freeze({ width = 0.35, height = 0.4 }),
+	Tablet = table.freeze({ width = 0.25, height = 0.35 }),
+} :: { [DeviceClass]: { width: number, height: number } })
+
+ScreenLayout.MIN_SCALE = 1
+ScreenLayout.MAX_SCALE = 1.5
+-- 60 characters of about half the text size each.
+ScreenLayout.COLUMN_EMS = 30
+ScreenLayout.PADDING = 24
+-- The tallest a box may grow in phone portrait, as a share of the height.
+ScreenLayout.PORTRAIT_BOX = 0.4
+ScreenLayout.TARGET = 48
+ScreenLayout.TARGET_GAP = 8
+-- The longest Skip label the Skip button is sized for, in characters: it
+-- fits beside the phone's portrait zone at Text scale 1.5.
+ScreenLayout.SKIP_CHARACTERS = 6
+
+-- For the estimates: a character is a little over half the text size wide
+-- (feel.md says about half; this leaves room), and a line of text is 1.1
+-- times its size tall.
+ScreenLayout.CHARACTER = 0.55
+ScreenLayout.LINE = 1.1
+
+-- The space between the safe area's edge and what sits at it, and above
+-- the bottom edge for the dialogue box, a Hint and the Title screen on a PC.
+local MARGIN = 12
+local BOTTOM_MARGIN = 24
+-- A Title screen button's padding each side of its label.
+ScreenLayout.BUTTON_PADDING = 16
+-- The Objective tracker: the header's top, the gap below it, the bottom,
+-- each side; and its width, in Objective text sizes.
+local HEADER_TOP, HEADER_GAP, TRACKER_BOTTOM, TRACKER_SIDE = 8, 4, 10, 14
+local TRACKER_EMS = 18
+-- The dialogue box's padding above its text, below its hint, and between.
+local TOP, BOTTOM, BETWEEN = 18, 10, 6
+local TALK: { [DeviceClass]: number } = { Phone = 64, Tablet = 72 }
+local RING: { [DeviceClass]: number } = { Phone = 96, Tablet = 112 }
+
+-- The longest Title screen label, in graphemes.
+local LABEL_LENGTH = 0
+for _, label in TitleScreen.LABELS do
+	LABEL_LENGTH = math.max(LABEL_LENGTH, DialogueViewModel.graphemes(label))
+end
+
+local function rect(x: number, y: number, width: number, height: number): Rect
+	return { x = x, y = y, width = width, height = height }
+end
+
+-- About how many lines `text` wraps to at `size` in a column `width` wide.
+function ScreenLayout.lines(text: string, size: number, width: number): number
+	local perLine = math.max(1, math.floor(width / (size * ScreenLayout.CHARACTER)))
+	local lines, used = 1, 0
+	for word in string.gmatch(text, "%S+") do
+		local length = DialogueViewModel.graphemes(word)
+		if used > 0 and used + 1 + length > perLine then
+			lines += 1
+			used = 0
+		end
+		used += if used > 0 then 1 + length else length
+		while used > perLine do -- a word longer than a line breaks
+			lines += 1
+			used -= perLine
+		end
+	end
+	return lines
+end
+
+-- About how tall a block of `text` is at `size` in a column `width` wide.
+local function textHeight(text: string, size: number, width: number): number
+	return ScreenLayout.lines(text, size, width) * size * ScreenLayout.LINE
+end
+
+-- About how tall the dialogue box grows for a Line of `text`, its hint row
+-- at the body size when `largeHint` (the onboarding's first Line).
+function ScreenLayout.dialogueHeight(layout: Layout, text: string, largeHint: boolean): number
+	local hint = if largeHint then layout.text.body else layout.text.hint
+	return TOP
+		+ textHeight(text, layout.text.body, layout.dialogue.column)
+		+ BETWEEN
+		+ hint * ScreenLayout.LINE
+		+ BOTTOM
+end
+
+-- About how tall the Objective tracker grows for an Objective.
+function ScreenLayout.objectiveHeight(layout: Layout, text: string): number
+	local size = layout.text.objective
+	return HEADER_TOP
+		+ size * ScreenLayout.LINE
+		+ HEADER_GAP
+		+ textHeight(text, size, layout.objective.width - 2 * TRACKER_SIDE)
+		+ TRACKER_BOTTOM
+end
+
+local function round(size: number, scale: number): number
+	return math.floor(size * scale + 0.5)
+end
+
+local function scaled(sizes: TextSizes, scale: number): TextSizes
+	return {
+		body = round(sizes.body, scale),
+		speaker = round(sizes.speaker, scale),
+		objective = round(sizes.objective, scale),
+		hint = round(sizes.hint, scale),
+	}
+end
+
+-- A text column as wide as `space` allows, padding taken off, up to the cap.
+local function column(space: number, body: number): number
+	return math.min(space - 2 * ScreenLayout.PADDING, ScreenLayout.COLUMN_EMS * body)
+end
+
+function ScreenLayout.new(screen: Screen): Layout
+	local class = screen.class
+	local width, height, insets = screen.width, screen.height, screen.insets
+	local scale = math.clamp(screen.textScale, ScreenLayout.MIN_SCALE, ScreenLayout.MAX_SCALE)
+	local portrait = DeviceClass.portrait(width, height)
+	local text = scaled(ScreenLayout.SIZES[class], scale)
+	local safe = rect(insets.left, insets.top, width - insets.left - insets.right, height - insets.top - insets.bottom)
+	local right, bottom = safe.x + safe.width, safe.y + safe.height
+	local touch = class ~= "PC"
+	local collapses = class == "Phone"
+
+	local objectiveWidth = math.min(safe.width - 2 * MARGIN, TRACKER_EMS * text.objective)
+	local objectiveX = right - MARGIN - objectiveWidth
+	local icon = rect(right - MARGIN - ScreenLayout.TARGET, safe.y + MARGIN, ScreenLayout.TARGET, ScreenLayout.TARGET)
+	local skipWidth = math.max(
+		ScreenLayout.TARGET,
+		math.ceil(ScreenLayout.SKIP_CHARACTERS * ScreenLayout.CHARACTER * text.hint) + 2 * MARGIN
+	)
+	-- a Hint in free play is two lines high, at most 60 characters wide
+	local hintHeight = 2 * text.hint * ScreenLayout.LINE + MARGIN
+	local hintWidth = math.min(safe.width - 2 * MARGIN, ScreenLayout.COLUMN_EMS * text.hint)
+	local zones: { Rect } = {}
+	local talk, ring, skip, hint, box
+	if touch then
+		local share = ScreenLayout.ZONES[class]
+		local zoneWidth, zoneHeight = width * share.width, height * share.height
+		zones = {
+			rect(0, height - zoneHeight, zoneWidth, zoneHeight),
+			rect(width - zoneWidth, height - zoneHeight, zoneWidth, zoneHeight),
+		}
+
+		-- the right zone's buttons, in a column at the bottom-right corner
+		local size = TALK[class]
+		talk = rect(right - MARGIN - size, bottom - MARGIN - size, size, size)
+		skip = rect(
+			right - MARGIN - skipWidth,
+			talk.y - ScreenLayout.TARGET_GAP - ScreenLayout.TARGET,
+			skipWidth,
+			ScreenLayout.TARGET
+		)
+		local buttons = math.min(talk.x, skip.x)
+
+		local reach = RING[class]
+		local left = zones[1]
+		ring = rect(
+			math.max(safe.x + MARGIN, left.x + left.width * 0.4 - reach / 2),
+			math.min(bottom - MARGIN - reach, left.y + left.height * 0.6 - reach / 2),
+			reach,
+			reach
+		)
+		-- a Hint: just above the thumbstick's zone, at the left, and in
+		-- landscape clear of the Objective tracker to its right
+		if not portrait then
+			hintWidth = math.min(hintWidth, objectiveX - ScreenLayout.TARGET_GAP - (safe.x + MARGIN))
+		end
+		hint = rect(safe.x + MARGIN, left.y - ScreenLayout.TARGET_GAP - hintHeight, hintWidth, hintHeight)
+
+		if portrait then
+			box = { left = safe.x, space = safe.width, bottom = skip.y - ScreenLayout.TARGET_GAP }
+		else
+			local space = buttons - ScreenLayout.TARGET_GAP - (safe.x + MARGIN)
+			box = { left = safe.x + MARGIN, space = space, bottom = bottom - MARGIN }
+		end
+	else
+		skip = rect(safe.x + MARGIN, safe.y + MARGIN, skipWidth, ScreenLayout.TARGET)
+		hint = rect(safe.x + (safe.width - hintWidth) / 2, bottom - BOTTOM_MARGIN - hintHeight, hintWidth, hintHeight)
+		box = { left = safe.x + MARGIN, space = safe.width - 2 * MARGIN, bottom = bottom - BOTTOM_MARGIN }
+	end
+
+	local textColumn = column(box.space, text.body)
+	local boxWidth = textColumn + 2 * ScreenLayout.PADDING
+	local boxX = box.left + (box.space - boxWidth) / 2
+	local maxHeight
+	if class == "Phone" and portrait then
+		maxHeight = ScreenLayout.PORTRAIT_BOX * height
+	elseif collapses then
+		-- up to the top of the safe area, or to below the collapsed Objective
+		-- tracker's icon when the box reaches under it
+		local top = if boxX + boxWidth <= icon.x
+			then safe.y + MARGIN
+			else icon.y + icon.height + ScreenLayout.TARGET_GAP
+		maxHeight = box.bottom - top
+	else
+		maxHeight = height / 2
+	end
+
+	local titleWidth = safe.width - 2 * MARGIN
+
+	return {
+		class = class,
+		portrait = portrait,
+		textScale = scale,
+		safe = safe,
+		text = text,
+		dialogue = {
+			x = boxX,
+			width = boxWidth,
+			bottom = box.bottom,
+			maxHeight = maxHeight,
+			column = textColumn,
+		},
+		objective = {
+			x = objectiveX,
+			y = icon.y,
+			width = objectiveWidth,
+			collapses = collapses,
+			icon = icon,
+		},
+		zones = zones,
+		talk = talk,
+		ring = ring,
+		hint = hint,
+		skip = skip,
+		card = {
+			x = safe.x + 2 * MARGIN,
+			width = safe.width - 4 * MARGIN,
+			centre = safe.y + safe.height * 0.44,
+			title = round(CARD[class].title, scale),
+			subtitle = round(CARD[class].subtitle, scale),
+		},
+		title = {
+			x = safe.x + MARGIN,
+			width = titleWidth,
+			bottom = bottom - BOTTOM_MARGIN,
+			note = text.body,
+			button = {
+				width = math.min(
+					titleWidth,
+					math.ceil(LABEL_LENGTH * ScreenLayout.CHARACTER * text.body) + 2 * ScreenLayout.BUTTON_PADDING
+				),
+				height = math.max(ScreenLayout.TARGET, 2 * text.body),
+				text = text.body,
+			},
+			gap = 10,
+		},
+	}
+end
+
+return ScreenLayout
