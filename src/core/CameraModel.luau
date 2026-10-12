@@ -61,7 +61,8 @@ export type Subject = (framing: Framing) -> Vec3?
 
 -- A Shot being played: since when, the Rig it eases in from, and the way
 -- Amy turns to face its subject.
-type Playing = { framing: Framing, started: number, from: Rig, heading: number }
+-- `ease`: how long it eases in, set on its first frame.
+type Playing = { framing: Framing, started: number, from: Rig, heading: number, ease: number? }
 
 export type Camera = {
 	-- the follow camera's view: Amy's facing, and how high it looks down on her
@@ -90,7 +91,8 @@ CameraModel.CLAMP_COSINE = math.cos(math.rad(CameraModel.CLAMP_DEGREES))
 -- may go, and where it looks (above her root, ahead of her).
 CameraModel.FOLLOW_DISTANCE = 13
 CameraModel.DEFAULT_PITCH = math.rad(18)
-CameraModel.MIN_PITCH = math.rad(-15)
+-- (low enough to look up a little, high enough to stay above flat ground)
+CameraModel.MIN_PITCH = math.rad(-5)
 CameraModel.MAX_PITCH = math.rad(CameraModel.CLAMP_DEGREES)
 CameraModel.LOOK_HEIGHT = 2
 CameraModel.LOOK_AHEAD = 4
@@ -236,6 +238,25 @@ function CameraModel.turn(camera: Camera, yaw: number, pitch: number)
 	camera.pitch = math.clamp(camera.pitch + pitch, CameraModel.MIN_PITCH, CameraModel.MAX_PITCH)
 end
 
+-- PC turning (feel.md section 5): these keys turn Amy and the view
+-- together, by KeyCode name, +1 to her left and -1 to her right; W/S and
+-- Up/Down walk. The one place the key mapping lives.
+CameraModel.TURN_KEYS = table.freeze({ A = 1, Left = 1, D = -1, Right = -1 }) :: { [string]: number }
+-- how fast a held turn key turns her, in radians a second
+CameraModel.KEY_TURN_SPEED = math.rad(120)
+
+-- How far the keys held (by KeyCode name) turn Amy over `seconds`: a yaw
+-- for `turn`. Left and right together cancel.
+function CameraModel.keyTurn(held: { [string]: boolean }, seconds: number): number
+	local direction = 0
+	for key, sign in CameraModel.TURN_KEYS do
+		if held[key] then
+			direction += sign
+		end
+	end
+	return math.sign(direction) * CameraModel.KEY_TURN_SPEED * seconds
+end
+
 -- Turned by something else than the camera by more than this, Amy was
 -- put somewhere (TeleportPlayer, a respawn), and the camera follows.
 CameraModel.TURNED_ELSEWHERE = math.rad(3)
@@ -271,6 +292,8 @@ local function smooth(t: number): number
 	local x = math.clamp(t, 0, 1)
 	return x * x * (3 - 2 * x)
 end
+-- how much faster than its mean `smooth` moves at its fastest (t = 0.5)
+local SMOOTH_PEAK = 1.5
 
 -- What a Shot's path is given: Amy, its subject, the way she faces it,
 -- and the Character it frames.
@@ -415,6 +438,15 @@ local function subjectNow(camera: Camera, amy: Vec3, subject: Subject, from: Rig
 	return nil
 end
 
+-- How long easing from `from` to `to` takes: Shot.EASE_IN, or longer so
+-- the camera never swings round Amy faster than Shot.TURN_SPEED.
+local function easeFor(from: Rig, to: Rig): number
+	local swing = math.abs(wrap(to.yaw - from.yaw))
+		+ math.abs(to.azimuth - from.azimuth)
+		+ math.abs(to.elevation - from.elevation)
+	return math.max(Shot.EASE_IN, SMOOTH_PEAK * swing / Shot.TURN_SPEED)
+end
+
 local function nowhere(): Vec3?
 	return nil
 end
@@ -438,7 +470,10 @@ function CameraModel.step(camera: Camera, seconds: number, amy: Vec3, subject: S
 	if playing and at then
 		local t = camera.clock - playing.started
 		local scene = { amy = amy, subject = at, heading = playing.heading, character = playing.framing.character }
-		rig = CameraModel.blend(playing.from, PATHS[playing.framing.shot](scene, t), smooth(t / Shot.EASE_IN))
+		local path = PATHS[playing.framing.shot]
+		local ease = playing.ease or easeFor(playing.from, path(scene, 0))
+		playing.ease = ease
+		rig = CameraModel.blend(playing.from, path(scene, t), smooth(t / ease))
 	elseif camera.handBack then
 		local t = camera.clock - camera.handBack.started
 		if t >= Shot.HAND_BACK then

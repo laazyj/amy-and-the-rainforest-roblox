@@ -78,20 +78,27 @@ local function apart(a: Vec3, b: Vec3): number
 	return math.abs(a.x - b.x) + math.abs(a.y - b.y) + math.abs(a.z - b.z)
 end
 
+local function sub(a: Vec3, b: Vec3): Vec3
+	return { x = a.x - b.x, y = a.y - b.y, z = a.z - b.z }
+end
+
+local function dot(a: Vec3, b: Vec3): number
+	return a.x * b.x + a.y * b.y + a.z * b.z
+end
+
+local function unit(a: Vec3): Vec3
+	local length = math.sqrt(dot(a, a))
+	return { x = a.x / length, y = a.y / length, z = a.z / length }
+end
+
+local function angleBetween(a: Vec3, b: Vec3): number
+	return math.acos(math.clamp(dot(a, b), -1, 1))
+end
+
 -- Where `point` lands in a viewport (0 to 1 across and down) seen from
 -- `frame`'s camera, with Roblox's default vertical field of view of 70°.
 local FIELD_OF_VIEW = math.rad(70)
 local function project(frame: CameraModel.Frame, point: Vec3, aspect: number): (number, number)
-	local function sub(a: Vec3, b: Vec3): Vec3
-		return { x = a.x - b.x, y = a.y - b.y, z = a.z - b.z }
-	end
-	local function dot(a: Vec3, b: Vec3): number
-		return a.x * b.x + a.y * b.y + a.z * b.z
-	end
-	local function unit(a: Vec3): Vec3
-		local length = math.sqrt(dot(a, a))
-		return { x = a.x / length, y = a.y / length, z = a.z / length }
-	end
 	local forward = unit(sub(frame.lookAt, frame.camera))
 	local right = unit({ x = -forward.z, y = 0, z = forward.x })
 	local up = { -- right × forward
@@ -192,6 +199,31 @@ return function(t: any)
 			expect(frame.camera.z < amy.z).toBe(true)
 			expect(frame.camera.y > amy.y).toBe(true)
 			expect(frame.lookAt.z > amy.z).toBe(true)
+		end)
+	end)
+
+	describe("turning", function()
+		it("turns Amy's facing by exactly the turn the player makes", function()
+			for _, theta in { 0.3, -0.3, 1, -2, math.rad(170) } do
+				local camera = CameraModel.new({ x = 0, y = 0, z = 1 })
+				local amy = { x = 0, y = 3, z = 0 }
+				local before = CameraModel.step(camera, 1 / 60, amy).facing
+				CameraModel.turn(camera, theta, 0)
+				local after = CameraModel.step(camera, 1 / 60, amy).facing
+				expect(math.abs(angleBetween(before, after) - math.abs(theta)) < 1e-9).toBe(true)
+				-- a positive turn is to her left: facing +z, left is +x
+				expect(math.sign(after.x)).toBe(math.sign(theta))
+			end
+		end)
+
+		it("turns Amy and the view with the turn keys: A or Left to her left, D or Right to her right", function()
+			local speed = CameraModel.KEY_TURN_SPEED
+			expect(CameraModel.keyTurn({ A = true }, 0.5)).toBe(speed * 0.5)
+			expect(CameraModel.keyTurn({ Left = true }, 0.5)).toBe(speed * 0.5)
+			expect(CameraModel.keyTurn({ D = true }, 0.25)).toBe(-speed * 0.25)
+			expect(CameraModel.keyTurn({ Right = true, D = true }, 0.25)).toBe(-speed * 0.25)
+			expect(CameraModel.keyTurn({ A = true, D = true }, 1)).toBe(0)
+			expect(CameraModel.keyTurn({ W = true, S = true, Up = true, Down = true }, 1)).toBe(0)
 		end)
 	end)
 
@@ -400,6 +432,58 @@ return function(t: any)
 			expect(frame.facing.x).toBe(-1)
 		end)
 
+		it("clamps a Shot path that would leave the cone, in the Frame step returns", function()
+			local paths: any = CameraModel.PATHS
+			paths.InFrontOfAmy = function(scene)
+				return { yaw = scene.heading, azimuth = math.pi, elevation = 0, distance = 9, lookAt = scene.amy }
+			end
+			local ok, failure = pcall(function()
+				local camera = CameraModel.new({ x = 0, y = 0, z = 1 })
+				local amy = { x = 0, y = 3, z = 0 }
+				CameraModel.frameShot(camera, "InFrontOfAmy")
+				local frame
+				for _ = 1, 30 do
+					frame = CameraModel.step(camera, SAMPLE, amy, always({ x = 0, y = 3, z = 10 }))
+					holds(frame, amy, "a path in front of Amy")
+				end
+				expect(math.abs(CameraModel.cosine(frame, amy) - CameraModel.CLAMP_COSINE) < 1e-6).toBe(true)
+			end)
+			paths.InFrontOfAmy = nil
+			assert(ok, failure)
+		end)
+
+		it("never swings the camera or Amy round faster than Shot.TURN_SPEED while a Shot plays", function()
+			local rng = random(120)
+			local function towardCamera(frame: CameraModel.Frame, amy: Vec3): Vec3
+				return unit(sub(frame.camera, amy))
+			end
+			local dt = 1 / 120
+			local peak = 0
+			for _, framing in FRAMINGS do
+				for _ = 1, 40 do
+					local camera = CameraModel.new(direction(rng))
+					local amy = { x = 0, y = 3, z = 0 }
+					local subject = placeSubject(rng, amy, framing) -- often behind her
+					CameraModel.frameShot(camera, framing.shot, framing.character)
+					local last = CameraModel.step(camera, 0, amy, always(subject))
+					for _ = 1, 6 / dt do
+						local frame = CameraModel.step(camera, dt, amy, always(subject))
+						if not frame.shot then
+							break
+						end
+						local speed = math.max(
+							angleBetween(towardCamera(last, amy), towardCamera(frame, amy)),
+							angleBetween(last.facing, frame.facing)
+						) / dt
+						peak = math.max(peak, speed)
+						last = frame
+					end
+				end
+			end
+			print(`  peak Shot turn: {string.format("%.0f", math.deg(peak))}°/s`)
+			expect(peak <= Shot.TURN_SPEED * 1.02).toBe(true)
+		end)
+
 		it("refuses a Shot the glossary does not name", function()
 			t.expectError(function()
 				CameraModel.frameShot(CameraModel.new({ x = 0, y = 0, z = 1 }), "Orbit")
@@ -460,7 +544,7 @@ return function(t: any)
 					local camera = CameraModel.new(direction(rng))
 					CameraModel.frameShot(camera, "Dialogue", character)
 					local frame
-					for _ = 1, 20 do -- eased in after 0.5 s; then still
+					for _ = 1, 50 do -- eased in (at most 4.5 s when Amy turns round); then still
 						frame = CameraModel.step(camera, SAMPLE, amy, always(head))
 					end
 					for device, aspect in VIEWPORTS do

@@ -24,8 +24,12 @@ Shot.SECONDS = table.freeze({ ForestWallReveal = 3.5, MeetCharacter = 3.5 } :: {
 -- The longest any Shot that is not held may last.
 Shot.LONGEST = 4
 
--- A Shot eases in from the camera before it over this long.
+-- A Shot eases in from the camera before it over at least this long, and
+-- longer when it turns the camera a long way: never faster than
+-- TURN_SPEED (radians a second) round Amy, so a subject behind her is no
+-- whip-pan (feel.md: Shots move slowly).
 Shot.EASE_IN = 0.5
+Shot.TURN_SPEED = math.rad(120)
 -- The follow camera returns over this long when the last Shot ends.
 Shot.HAND_BACK = 0.5
 
