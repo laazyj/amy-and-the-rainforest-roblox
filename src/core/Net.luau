@@ -18,6 +18,9 @@
 	at join only when they are not the defaults, which the client starts
 	from, so the golden file (a fresh player) has none; the client sends
 	each change, and the server keeps it in the Save.
+
+	SetPaused tells the server the player opened or closed the Pause
+	screen (World.waitLeft).
 ]]
 
 local Events = require("./Events")
@@ -50,6 +53,8 @@ Net.REMOTES = table.freeze({
 	ApplySettings = { direction = "toClient", args = { "settings" }, sometimes = true },
 	-- the player changed their Settings
 	ChangeSettings = { direction = "toServer", args = { "settings" } },
+	-- the player opened (true) or closed (false) the Pause screen
+	SetPaused = { direction = "toServer", args = { "boolean" } },
 } :: { [string]: Remote })
 
 -- Holds a remote's arguments (from table.pack) to its payload: the right

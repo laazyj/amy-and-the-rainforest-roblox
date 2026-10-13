@@ -19,7 +19,7 @@
 	                     ChangeSettings. While it is open the Story does not
 	                     advance: no input reaches it, a Dialogue stops
 	                     typing, a Chapter card holds, Amy cannot walk or
-	                     talk
+	                     talk, and the server holds its Waits (SetPaused)
 
 	Every remote it receives is held to the Net contract first (Net.guard);
 	a malformed payload is dropped with a warning.
@@ -90,6 +90,9 @@ local TitleChoice = remotes.TitleChoice
 local FrameShot = remotes.FrameShot
 local ApplySettings = remotes.ApplySettings
 local ChangeSettings = remotes.ChangeSettings
+local SetPaused = remotes.SetPaused
+-- whether the server was last told the Pause screen is open
+local sentPaused = false
 
 -- Every sound plays through this SoundGroup (default.project.json), whose
 -- volume is the volume Setting; brief 013's Cues set their SoundGroup to it.
@@ -1089,6 +1092,10 @@ end
 -- The Pause screen as the view-model says, built again on every change.
 renderPause = function()
 	local view = PauseScreen.view(pause)
+	if view.visible ~= sentPaused then
+		sentPaused = view.visible
+		SetPaused:FireServer(view.visible)
+	end
 	pauseButton.Visible = not titleScreen.Visible and not view.visible
 	pauseOverlay.Visible = view.visible
 	ProximityPromptService.Enabled = not view.visible -- Amy cannot talk while paused

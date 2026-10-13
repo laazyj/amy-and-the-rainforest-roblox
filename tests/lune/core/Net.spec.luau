@@ -25,6 +25,7 @@ return function(t: any)
 			local settings = Settings.change(Settings.DEFAULTS, "textScale", 1)
 			expect(Net.check("ApplySettings", table.pack(settings))).toBe(true)
 			expect(Net.check("ChangeSettings", table.pack(Settings.DEFAULTS))).toBe(true)
+			expect(Net.check("SetPaused", table.pack(true))).toBe(true)
 		end)
 
 		local malformed: { { any } } = {
@@ -54,6 +55,8 @@ return function(t: any)
 				table.pack({ volume = 1, textScale = 1, highContrast = false, font = "standard", admin = true }),
 				"argument 1 must be settings",
 			},
+			{ "SetPaused", table.pack("yes"), "argument 1 must be boolean" },
+			{ "SetPaused", { n = 0 }, "argument 1 must be boolean" },
 		}
 		for _, case in malformed do
 			it(`rejects a malformed {case[1]} payload: {case[3]}`, function()

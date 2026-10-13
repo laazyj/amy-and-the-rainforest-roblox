@@ -82,7 +82,8 @@ The same rules apply to every class; only the numbers differ.
   It opens the Pause screen, a panel centred in the safe area: Resume,
   and the Settings page, its rows touch targets, as tall as the safe area
   at most at every Text scale. While it is open the Story does not
-  advance.
+  advance: the client takes no input to it, and the server holds every
+  Wait, so a Beat stops where it is until the player resumes.
 - **Nothing covers the subject.** No UI element overlaps the projected
   bounding box of the speaker's head during `shot:Dialogue`, the
   Objective target during free play, or a touch control zone's controls

@@ -2,10 +2,11 @@
 --[[
 	PauseScreen: the Pause screen and its Settings page, as the view-model
 	the client binder renders (plan section 2.3, "UI"). The pause button
-	(or P on a PC) opens it; while it is open the Story does not advance:
-	the binder takes no input to the Story, a Dialogue does not type on,
-	a Chapter card holds, and Amy cannot walk or talk. Nothing the server
-	waits on can then happen, since every step waits on the player.
+	(or P on a PC) opens it; while it is open the Story does not advance.
+	On the client the binder takes no input to the Story, a Dialogue does
+	not type on, a Chapter card holds, and Amy cannot walk or talk. On the
+	server (told by SetPaused) a Wait holds (World.waitLeft), so a Beat
+	stops where it is; every other step already waits on the player.
 
 	  new()              closed
 	  toggle(vm)         the pause button or key: opens it, or closes it

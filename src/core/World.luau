@@ -26,6 +26,13 @@ export type World = {
 
 local World = {}
 
+-- How long a Wait of which `left` seconds remain has left after `elapsed`
+-- more: none passes while `held` (the player has the Pause screen open),
+-- so a Beat stops where it is and goes on when they resume.
+function World.waitLeft(left: number, elapsed: number, held: boolean): number
+	return if held then left else math.max(0, left - elapsed)
+end
+
 -- Carries out `command` through `world`, once it holds to its schema in
 -- Events; a malformed command is an error.
 function World.execute(world: World, command: Events.WorldCommand)

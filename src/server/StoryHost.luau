@@ -4,7 +4,8 @@
 	Player events, feeds them to the player's StoryEngine, and carries out
 	the World commands that come back, in order, through WorldImpl:
 
-	  - a Wait pauses for its seconds (the Chapter card, Sam's catch);
+	  - a Wait pauses for its seconds (the Chapter card, Sam's catch), and
+	    holds while the player has the Pause screen open (SetPaused);
 	  - a ShowDialogue is sent; once the step's commands are carried out,
 	    if the engine is showing a Dialogue, the host waits until the client
 	    says DialogueFinished, however long that takes, and feeds that to
@@ -71,6 +72,8 @@ type Session = {
 	busy: boolean,
 	dialogueDone: boolean,
 	alive: boolean,
+	-- the player has the Pause screen open: a Wait holds
+	paused: boolean,
 }
 
 local story = Content.story
@@ -173,16 +176,22 @@ local function newSession(player: any, progress: StoryEngine.Progress?)
 		old.alive = false
 		PickupHost.clear(player)
 	end
-	sessions[player] = {
+	local session: Session
+	session = {
 		player = player,
 		engine = StoryEngine.new(player.UserId, progress, story),
 		world = WorldImpl.new(story, player, function(command)
 			toClient(player, command)
+		end, function()
+			return session.alive and session.paused
 		end),
 		busy = false,
 		dialogueDone = false,
 		alive = true,
+		-- the Pause screen stays open across a Resume
+		paused = old ~= nil and old.paused,
 	}
+	sessions[player] = session
 end
 
 local function initPlayer(player: any)
@@ -261,6 +270,15 @@ end
 function StoryHost.idle(player: any): boolean
 	local session = sessions[player]
 	return session ~= nil and not session.busy
+end
+
+-- The player opened or closed the Pause screen: while it is open, a Wait
+-- holds, so a Beat stops where it is.
+function StoryHost.onSetPaused(player: any, paused: boolean)
+	local session = sessions[player]
+	if session then
+		session.paused = paused
+	end
 end
 
 -- The player changed their Settings (held to the contract by fromClient).
@@ -348,6 +366,7 @@ function StoryHost.start()
 	made.ClientReady.OnServerEvent:Connect(fromClient("ClientReady", StoryHost.onClientReady))
 	made.TitleChoice.OnServerEvent:Connect(fromClient("TitleChoice", StoryHost.onTitleChoice))
 	made.ChangeSettings.OnServerEvent:Connect(fromClient("ChangeSettings", StoryHost.onChangeSettings))
+	made.SetPaused.OnServerEvent:Connect(fromClient("SetPaused", StoryHost.onSetPaused))
 	Players.PlayerRemoving:Connect(StoryHost.onPlayerRemoving)
 
 	print("[StoryServer] Story engine ready: " .. story.title)
