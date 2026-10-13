@@ -117,6 +117,10 @@ export type Layout = {
 	-- the title's bottom edge is at `centre`, the subtitle's top `gap` below
 	card: { x: number, width: number, centre: number, gap: number, title: number, subtitle: number },
 	title: {
+		-- the pill label, as wide as its words and padding (estimated),
+		-- centred at (x + width / 2, y + height / 2) and tilted by `rotation`
+		-- degrees, its left end lower; its words at `text`
+		pill: Rect & { text: number, rotation: number },
 		x: number,
 		width: number,
 		bottom: number,
@@ -181,6 +185,18 @@ local MARGIN = 12
 local BOTTOM_MARGIN = 24
 -- A Title screen button's padding each side of its label.
 ScreenLayout.BUTTON_PADDING = 16
+-- The title's lines over the safe area, as shares of it: the centre and
+-- height of "Amy" and of "& the Rain Forest", and the pill label's centre
+-- across (left of the middle, as the website has it); the pill sits just
+-- above "Amy".
+ScreenLayout.TITLE = table.freeze({
+	pill = 0.44,
+	name = table.freeze({ y = 0.29, height = 0.15 }),
+	rest = table.freeze({ y = 0.43, height = 0.13 }),
+})
+-- The pill's padding each side of and above and below its words, and its
+-- tilt in degrees.
+ScreenLayout.PILL = table.freeze({ side = 18, ends = 6, rotation = -4 })
 -- The Objective tracker's padding (above, below and each side) and the gap
 -- under its header; and its width, in Objective text sizes.
 ScreenLayout.TRACKER = table.freeze({ top = 8, bottom = 10, side = 14, between = 4 })
@@ -371,6 +387,29 @@ function ScreenLayout.new(screen: Screen): Layout
 	end
 
 	local titleWidth = safe.width - 2 * MARGIN
+	-- the pill's words at the body size, smaller (down to the hint size)
+	-- until the pill, tilted, fits across the safe area and above "Amy"
+	local pill = ScreenLayout.PILL
+	local tilt = math.rad(math.abs(pill.rotation))
+	local pillCharacters = DialogueViewModel.graphemes(TitleScreen.WORDS.pill)
+	local nameTop = safe.y + safe.height * (ScreenLayout.TITLE.name.y - ScreenLayout.TITLE.name.height / 2)
+	local pillText, pillWidth, pillHeight, pillTall
+	for size = text.body, text.hint, -1 do
+		pillText = size
+		pillWidth = math.ceil(pillCharacters * ScreenLayout.CHARACTER * size) + 2 * pill.side
+		pillHeight = math.ceil(size * ScreenLayout.LINE) + 2 * pill.ends
+		pillTall = pillWidth * math.sin(tilt) + pillHeight * math.cos(tilt)
+		local pillWide = pillWidth * math.cos(tilt) + pillHeight * math.sin(tilt)
+		if pillWide <= titleWidth and pillTall <= nameTop - safe.y then
+			break
+		end
+	end
+	local pillCentre = math.clamp(
+		safe.x + safe.width * ScreenLayout.TITLE.pill,
+		safe.x + MARGIN + pillWidth / 2,
+		right - MARGIN - pillWidth / 2
+	)
+	local pillMiddle = math.max(safe.y + pillTall / 2, nameTop - pillTall / 2)
 
 	return {
 		class = class,
@@ -412,6 +451,14 @@ function ScreenLayout.new(screen: Screen): Layout
 			subtitle = round(CARD[class].subtitle, scale),
 		},
 		title = {
+			pill = {
+				x = pillCentre - pillWidth / 2,
+				y = pillMiddle - pillHeight / 2,
+				width = pillWidth,
+				height = pillHeight,
+				text = pillText,
+				rotation = pill.rotation,
+			},
 			x = safe.x + MARGIN,
 			width = titleWidth,
 			bottom = bottom - BOTTOM_MARGIN,

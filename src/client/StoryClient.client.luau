@@ -66,6 +66,7 @@ local TitleScreen = require(Core:WaitForChild("TitleScreen"))
 local ContentFolder = ReplicatedStorage:WaitForChild("content")
 local palette = require(ContentFolder:WaitForChild("palette")).colours
 local hints = require(ContentFolder:WaitForChild("hints"))
+local lettering = require(ContentFolder:WaitForChild("title"))
 local Content = require(ContentFolder:WaitForChild("Story"))
 local Shared = ReplicatedStorage:WaitForChild("shared")
 local AssetIds = require(Shared:WaitForChild("AssetIds"))
@@ -420,23 +421,27 @@ titleWords.Name = "Words"
 titleWords.BackgroundTransparency = 1
 titleWords.Parent = titleScreen
 
+-- The content's lettering (src/content/title) as a FontFace.
+local function fontFace(font: typeof(lettering.pill)): Font
+	return Font.new(font.family, (Enum.FontWeight :: any)[font.weight])
+end
+
 -- A line of title text, white, with a soft dark shadow behind it; `rich`
 -- is the line with its RichText colours, when it has any.
 local function titleText(
 	name: string,
-	y: number,
-	height: number,
-	font: Enum.Font,
+	line: { y: number, height: number },
+	font: Font,
 	text: string,
 	rich: string?
 ): TextLabel
 	local shadow = Instance.new("TextLabel")
 	shadow.Name = name .. "Shadow"
 	shadow.AnchorPoint = Vector2.new(0.5, 0.5)
-	shadow.Position = UDim2.new(0.5, 3, y, 4)
-	shadow.Size = UDim2.new(0.92, 0, height, 0)
+	shadow.Position = UDim2.new(0.5, 3, line.y, 4)
+	shadow.Size = UDim2.new(0.92, 0, line.height, 0)
 	shadow.BackgroundTransparency = 1
-	shadow.Font = font
+	shadow.FontFace = font
 	shadow.TextScaled = true
 	shadow.TextColor3 = rgb(palette.deep)
 	shadow.TextTransparency = 0.45
@@ -445,7 +450,7 @@ local function titleText(
 	shadow.Parent = titleWords
 	local label = shadow:Clone()
 	label.Name = name
-	label.Position = UDim2.new(0.5, 0, y, 0)
+	label.Position = UDim2.new(0.5, 0, line.y, 0)
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.TextTransparency = 0
 	label.RichText = rich ~= nil
@@ -455,35 +460,29 @@ local function titleText(
 	return label
 end
 
+-- The pill: as wide as its words and padding, tilted (ScreenLayout places it).
 local words = TitleScreen.WORDS
 local pill = Instance.new("TextLabel")
 pill.Name = "Pill"
 pill.AnchorPoint = Vector2.new(0.5, 0.5)
-pill.Position = UDim2.new(0.5, 0, 0.16, 0)
-pill.Size = UDim2.new(0.5, 0, 0.07, 0)
+pill.AutomaticSize = Enum.AutomaticSize.X
 pill.BackgroundColor3 = rgb(palette.cream)
 pill.BackgroundTransparency = 0.25
-pill.Font = Enum.Font.Kalam
-pill.TextScaled = true
+pill.FontFace = fontFace(lettering.pill)
 pill.TextColor3 = rgb(palette.deep)
 pill.Text = words.pill
 pill.ZIndex = 32
 pill.Parent = titleWords
 addCorner(pill, 999)
-local pillPadding = Instance.new("UIPadding")
-pillPadding.PaddingLeft = UDim.new(0.06, 0)
-pillPadding.PaddingRight = UDim.new(0.06, 0)
-pillPadding.PaddingTop = UDim.new(0.12, 0)
-pillPadding.PaddingBottom = UDim.new(0.12, 0)
-pillPadding.Parent = pill
+addPadding(pill, 0, 0, ScreenLayout.PILL.side)
 
-titleText("Amy", 0.29, 0.15, Enum.Font.Fondamento, words.name)
+local scriptFace = fontFace(lettering.heading)
+titleText("Amy", ScreenLayout.TITLE.name, scriptFace, words.name)
 local gold = palette.gold
 titleText(
 	"RainForest",
-	0.43,
-	0.13,
-	Enum.Font.Fondamento,
+	ScreenLayout.TITLE.rest,
+	scriptFace,
 	words.the .. words.gold,
 	string.format('%s<font color="#%02x%02x%02x">%s</font>', words.the, gold.r, gold.g, gold.b, words.gold)
 )
@@ -1066,6 +1065,15 @@ local function applyLayout()
 	subtitleLabel.Size = UDim2.fromOffset(cardLayout.width, 0)
 
 	titleWords.Position, titleWords.Size = offsets(layout.safe)
+	local pillLayout = layout.title.pill
+	pill.TextSize = pillLayout.text
+	pill.Rotation = pillLayout.rotation
+	pill.Position = UDim2.fromOffset(
+		pillLayout.x + pillLayout.width / 2 - layout.safe.x,
+		pillLayout.y + pillLayout.height / 2 - layout.safe.y
+	)
+	-- as wide as its words (AutomaticSize), round the layout's centre
+	pill.Size = UDim2.fromOffset(0, pillLayout.height)
 
 	local choices = layout.title
 	titleChoices.Position = UDim2.fromOffset(choices.x + choices.width / 2, choices.bottom)

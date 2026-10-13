@@ -438,6 +438,35 @@ return function(t: any)
 		end)
 	end)
 
+	describe("ScreenLayout Title screen pill", function()
+		each("fits its words, sits left of centre above Amy, tilted left end down, in the safe area", function(layout)
+			local pill = layout.title.pill
+			local safe = layout.safe
+			-- as wide as its words and padding, never the old half screen
+			local words = TitleScreen.WORDS.pill
+			expect(ScreenLayout.lines(words, pill.text, pill.width - 2 * ScreenLayout.PILL.side)).toBe(1)
+			expect(pill.text >= layout.text.hint).toBe(true)
+			-- tilted about 4 degrees, its left end lower
+			expect(pill.rotation).toBe(-4)
+			-- its tilted outline stays inside the safe area
+			local angle = math.rad(math.abs(pill.rotation))
+			local wide = pill.width * math.cos(angle) + pill.height * math.sin(angle)
+			local tall = pill.width * math.sin(angle) + pill.height * math.cos(angle)
+			local cx, cy = pill.x + pill.width / 2, pill.y + pill.height / 2
+			expect(inside({ x = cx - wide / 2, y = cy - tall / 2, width = wide, height = tall }, safe)).toBe(true)
+			-- left of centre (or as far left as it fits), and above "Amy"
+			expect(cx <= safe.x + safe.width / 2).toBe(true)
+			local name = ScreenLayout.TITLE.name
+			expect(cy + tall / 2 <= safe.y + safe.height * (name.y - name.height / 2) + 1e-6).toBe(true)
+		end)
+
+		it("is sized to its words on a PC, not to the screen", function()
+			local small, large = at(DEVICES[12], 1).title.pill, at(DEVICES[14], 1).title.pill
+			expect(small.width).toBe(large.width)
+			expect(small.width < 1280 / 2).toBe(true)
+		end)
+	end)
+
 	describe("ScreenLayout Chapter card", function()
 		each("fits every Chapter's title and subtitle in the safe area", function(layout)
 			local card = layout.card
