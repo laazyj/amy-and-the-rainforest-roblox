@@ -119,6 +119,21 @@ Mutate.FAULTS = {
 		file = "src/core/CameraModel.luau",
 		edits = { { from = "if cosine >= CameraModel.CLAMP_COSINE then", to = "if true then" } },
 	},
+	{
+		name = "move the phone/tablet boundary (a 600-unit shorter side is a Phone)",
+		file = "src/core/DeviceClass.luau",
+		edits = { { from = "< DeviceClass.PHONE_SHORTER_SIDE", to = "<= DeviceClass.PHONE_SHORTER_SIDE" } },
+	},
+	{
+		name = "drop the dialogue column's cap (wider than 30 x the text size on a tablet)",
+		file = "src/core/ScreenLayout.luau",
+		edits = {
+			{
+				from = "math.min(space - 2 * ScreenLayout.PADDING, ScreenLayout.COLUMN_EMS * body)",
+				to = "space - 2 * ScreenLayout.PADDING",
+			},
+		},
+	},
 } :: { Fault }
 
 -- Why each fault no longer applies to the files `read` returns; empty when

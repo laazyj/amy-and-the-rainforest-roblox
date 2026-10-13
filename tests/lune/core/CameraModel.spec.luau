@@ -7,6 +7,7 @@
 ]]
 
 local CameraModel = require("../../../src/core/CameraModel")
+local ScreenLayout = require("../../../src/core/ScreenLayout")
 local Shot = require("../../../src/core/Shot")
 local Story = require("../../../src/core/Story")
 local Walker = require("./walker")
@@ -267,13 +268,34 @@ return function(t: any)
 	end)
 
 	describe("CameraModel.turnsView", function()
+		local function zones(class: "Phone" | "Tablet", width: number, height: number): { CameraModel.Zone }
+			return ScreenLayout.new({
+				class = class,
+				width = width,
+				height = height,
+				insets = { left = 0, top = 0, right = 0, bottom = 0 },
+				textScale = 1,
+			}).zones
+		end
+
 		it("turns the view for a touch anywhere but the thumbstick's and the talk button's zones", function()
-			local width, height = 844, 390
-			expect(CameraModel.turnsView(422, 100, width, height)).toBe(true) -- the middle
-			expect(CameraModel.turnsView(50, 50, width, height)).toBe(true) -- top left
-			expect(CameraModel.turnsView(422, 380, width, height)).toBe(true) -- bottom middle
-			expect(CameraModel.turnsView(100, 350, width, height)).toBe(false) -- the thumbstick
-			expect(CameraModel.turnsView(800, 350, width, height)).toBe(false) -- the talk button
+			local phone = zones("Phone", 844, 390)
+			expect(CameraModel.turnsView(422, 100, phone)).toBe(true) -- the middle
+			expect(CameraModel.turnsView(50, 50, phone)).toBe(true) -- top left
+			expect(CameraModel.turnsView(422, 380, phone)).toBe(true) -- bottom middle
+			expect(CameraModel.turnsView(100, 350, phone)).toBe(false) -- the thumbstick
+			expect(CameraModel.turnsView(800, 350, phone)).toBe(false) -- the talk button
+		end)
+
+		it("reads the zones from the Screen layout: a tablet's are smaller than a phone's", function()
+			-- 30% across, near the bottom: in a phone's 35% zone, not a tablet's 25%
+			expect(CameraModel.turnsView(0.3 * 844, 380, zones("Phone", 844, 390))).toBe(false)
+			expect(CameraModel.turnsView(0.3 * 1376, 1000, zones("Tablet", 1376, 1032))).toBe(true)
+			expect(CameraModel.turnsView(0.2 * 1376, 1000, zones("Tablet", 1376, 1032))).toBe(false)
+		end)
+
+		it("turns the view anywhere on a PC, which has no zones", function()
+			expect(CameraModel.turnsView(10, 710, {})).toBe(true)
 		end)
 	end)
 

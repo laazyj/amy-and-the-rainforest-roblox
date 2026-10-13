@@ -65,11 +65,21 @@ The same rules apply to every class; only the numbers differ.
 - **Touch control zones** are the bottom-left and bottom-right corners:
   35% of the width by 40% of the height on phone, 25% by 35% on tablet.
   The Roblox thumbstick sits in the left zone; a talk-and-advance button
-  sits in the right zone, reachable by the right thumb. Thumbs reach from
-  the edges, so no control sits anywhere else.
+  sits in the right zone, reachable by the right thumb, with the
+  Onboarding's Skip button above it while a Hint shows in free play.
+  Thumbs reach from
+  the edges, so no control sits anywhere else. Roblox's jump button is
+  hidden on touch: the Story never asks for a jump, and the right zone is
+  the talk button's.
+- **While a Dialogue shows on touch**, Amy listens: the player's controls
+  are disabled (as the old full-screen click catcher already took every
+  touch), so the dialogue box may cover the left zone. It keeps clear of
+  the talk-and-advance button: beside it in landscape, above it in
+  portrait. The box and the talk-and-advance button both advance.
 - **Nothing covers the subject.** No UI element overlaps the projected
   bounding box of the speaker's head during `shot:Dialogue`, the
-  Objective target during free play, or a touch control zone. Tier 3
+  Objective target during free play, or a touch control zone's controls
+  (the thumbstick in free play, the talk-and-advance button always). Tier 3
   asserts this by projecting the head's bounds with
   `WorldToViewportPoint` and intersecting them with every visible UI
   element's `AbsolutePosition` and `AbsoluteSize`.
@@ -127,9 +137,10 @@ as half the text size:
 
 So the **minimum dialogue text size on a 6-inch phone is 20 units**: an
 em of about 3.2 mm and a lower-case height of about 1.6 mm at 30 cm. For
-comparison, Apple's default body text for adults is 17 points, and
-today's client uses 21 for the body, 16 for the Objective and 14 for the
-hint.
+comparison, Apple's default body text for adults is 17 points; the
+client used 21 for the body, 16 for the Objective and 14 for the hint on
+every device until brief 012 gave each class these sizes
+(`src/core/ScreenLayout.luau`).
 
 ### One rule for line length
 
@@ -214,12 +225,23 @@ block play.
 | 1 | The `chapter1` card, about 3 s, tap or click to skip | none | Card fades |
 | 2 | The first Narrator Line ([canon Line 1](../story/canon.md#canon-lines)) | "Click or press Space to continue" / "Tap to continue", shown large on this first Line only | `DialogueFinished` |
 | 3 | Objective "Ask Dad if you can go outside" appears with a marker over Dad | none; the panel briefly glows | Objective shown |
-| 4 | Amy in the garden, Dad nearby | "W and S walk, A and D turn (or the arrow keys)" / a glowing ring on the thumbstick and "Drag here to walk" | Amy has moved 4 studs |
+| 4 | Amy in the garden, Dad nearby | "Walk with W and S, turn with A and D, or use the arrow keys" / a glowing ring on the thumbstick and "Drag here to walk" | Amy has moved 4 studs |
 | 5 | Dad's talk prompt | "Press E to talk" / the prompt button pulses | `TalkedTo(Dad)` |
 | 6 | Dad's Dialogue, then the next Objective | none: the advance hint is now learned | `QuestCompleted(chapter1.ask_dad)` |
 
 By the end of step 6 the player has walked, talked, advanced dialogue and
 read an Objective, on every device class, in about a minute.
+
+The steps are the glossary's [Onboarding steps](../GLOSSARY.md#onboarding-steps),
+played by `src/core/Onboarding.luau`; the Hints' words are in
+`src/content/hints.luau`, new Lines for approval. On touch, step 5's
+pulsing "prompt button" is the talk-and-advance button, which uses the
+nearest prompt. "Shown once per save" is read from what the client
+receives: a Story that begins with its first Chapter card (a new Save, or
+"Start again") shows the Onboarding; a Resume never does. While a Hint
+shows in free play, a Skip button ends the Onboarding: above the
+talk-and-advance button on touch, at the top left of the safe area on a
+PC. The first Line's Hint has none: tapping is how it is done.
 
 ## 7. Visual rubric
 

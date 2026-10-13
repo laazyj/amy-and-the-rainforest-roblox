@@ -191,6 +191,43 @@ mac-001's runner runs it, the owner runs it by hand on the Mac:
 What it checks, and when, is in the script's header. Close the place
 without saving the script into anything you keep.
 
+## Device classes and the Onboarding in Studio (tier 3, by hand until the Mac runner)
+
+`tests/studio/DeviceLayout.client.luau` holds the tier 3 assertions for the
+Screen layout (feel.md sections 1, 3 and 4): text fits, the 60-character
+column, the safe area, contrast of at least 4.5:1, no overlapping
+interactive elements and touch targets of at least 44 units. It also
+follows the Onboarding of a fresh Save (section 6). Until brief mac-001's
+runner runs it, the owner runs it by hand on the Mac:
+
+1. Build the place (`tools/build.sh`, or download the `place` artifact
+   of the PR's CI run) and open `build/AmyAndTheRainforest.rbxl` in
+   Studio. Do not publish it: only CI publishes.
+2. In the Explorer, add a **LocalScript** under **StarterPlayer →
+   StarterPlayerScripts**, name it `DeviceLayout`, and paste the file's
+   contents into it. It can run beside `CameraRule`.
+3. Open **Test → Device** (the device emulator) and pick a phone preset
+   (an iPhone of about 844 × 390, such as iPhone 14) in landscape.
+4. Press **Play**. With no Save in Studio the Story is fresh, so the
+   Onboarding runs: let the Chapter card fade (or tap it), tap past the
+   first Line, walk, and talk to Dad. Then rotate to portrait with the
+   emulator's rotate button and play on: the layout is checked again on
+   every viewport change.
+5. Stop, switch to a tablet preset (an iPad Pro of about 1366 × 1024),
+   and repeat in landscape and portrait. Use **Start again** on the Title
+   screen to see the Onboarding again on a Save that has one.
+6. Read the Output: every failure is a `[DeviceLayout] FAIL` line, every
+   Onboarding expectation met is a `[DeviceLayout] ok:` line, and a
+   summary (`N checks, M failures`, with the viewport) prints every 30 s.
+   A pass is `0 failures`, with the four Onboarding `ok:` lines on a fresh
+   Save, on each preset and orientation.
+
+Contrast is computed as feel.md section 3 says, against the 3D world at
+its worst (black or white), because a LocalScript cannot read pixels;
+text over an image (the Title screen's words) is counted, not measured,
+and is the visual rubric's to judge. Close the place without saving the
+script into anything you keep.
+
 ## Workflow security checks
 
 `tools/check.sh` runs actionlint and zizmor (pedantic persona) on every PR;

@@ -90,10 +90,20 @@ Scene (look + sound)                     Player
 | **World** | The one interface the core uses to act on the engine. Every Beat is written against it, one method per World command. | `World.moveCharacter(id, spot)` |
 | **Objective tracker** | Where the client shows the active Quest's Objective, under the header "✦ Objective". | "Ask Dad if you can go outside" |
 | **Client binder** | The client script (`src/client`): it builds the UI, renders the view-model and forwards the player's input. It holds no logic. | `StoryClient.client.luau` |
-| **View-model** | The client's logic as plain data in core, which the client binder renders: the Dialogue as it types out and advances (`DialogueViewModel`), the Objective tracker (`ObjectiveText`) and how a Chapter card plays over time (`ChapterCardTimeline`). Tested in tier 1, no client needed. | `DialogueViewModel.view(vm)` |
+| **View-model** | The client's logic as plain data in core, which the client binder renders: the Dialogue as it types out and advances (`DialogueViewModel`), the Objective tracker (`ObjectiveText`), how a Chapter card plays over time (`ChapterCardTimeline`), the Title screen (`TitleScreen`), the Onboarding (`Onboarding`) and the Talk-and-advance button (`TalkAndAdvance`); the Screen layout (`ScreenLayout`) says where they go. Tested in tier 1, no client needed. | `DialogueViewModel.view(vm)` |
 | **Grapheme** | One character as a reader sees it, which may be several code points: "♥️", "👍🏽". Dialogue types out one grapheme at a time. | `DialogueViewModel.graphemes("♥️") == 1` |
 | **Dev shortcut** | A Dev-only way to reach any point of the Story in seconds: the chat commands `/chapter N` and `/quest <id>`, and the jump-to-Quest entry point (`DevShortcuts.jumpTo`). A jump is a Resume at the Progress of a player who has just started the Quest, and is saved: the Save holds that Progress and the Checkpoints of every Chapter up to it. Release builds have none: the release job strips them when it publishes. | `/chapter 3` |
-| **Device class** | One of the three first-class targets, each with its own layout and touch rules: `PC`, `Phone`, `Tablet`. Defined in [`design/feel.md`](design/feel.md). | `Tablet` |
+| **Device class** | One of the three first-class targets, each with its own layout and touch rules: `PC`, `Phone`, `Tablet`. Defined in [`design/feel.md`](design/feel.md). Picked by `src/core/DeviceClass.luau` from the Input kind and the viewport's shorter side (under 600 units is a Phone), again on every viewport change. | `Tablet` |
+| **Input kind** | What the player last used: `pointer` (a keyboard or a mouse), `touch` or `gamepad`. A Device class is picked from it. | `touch` |
+| **Screen layout** | Where everything on screen goes and how big its text is, for one Device class, orientation, safe area and Text scale (`src/core/ScreenLayout.luau`): the dialogue box and its 60-character column, the Objective tracker, the touch control zones, the Chapter card and the Title screen. Tier 1 holds feel.md's rules on it. Not the content's `layout.luau`, which places things in the world. | `ScreenLayout.new(screen)` |
+| **Safe area** | The part of the screen clear of the notch, the home bar, rounded corners and Roblox's top bar. All UI sits inside it. | |
+| **Text scale** | How much larger than its size for the Device class all text is drawn: 1 to 1.5. Every layout rule holds at 1.5. The setting arrives with brief 015. | `1.5` |
+| **Touch control zone** | The bottom-left (the thumbstick's) and bottom-right (the Talk-and-advance button's) corners of the screen on a Phone (35% x 40%) or a Tablet (25% x 35%). A drag that starts outside them turns the view. | |
+| **Talk-and-advance button** | The touch button in the right touch control zone: it advances a Dialogue, or else uses the nearest talk prompt (`src/core/TalkAndAdvance.luau`). | "Talk", "Next" |
+| **Onboarding** | The first minute of a fresh Save, which teaches the three verbs (walk, talk, advance) inside Chapter One, in Onboarding steps with Hints (`src/core/Onboarding.luau`). Never blocks play and can be skipped. A Resume never shows it. | |
+| **Onboarding step** | One step of the Onboarding, with what the player sees, its Hint and when it is done. See [enumeration](#onboarding-steps). | `onboarding:walk` |
+| **Hint** | A short UI Line in Clara's voice that teaches a verb during the Onboarding, shown when needed and gone on success. Hints are kept in `src/content/hints.luau`; they are not canon. | "Drag here to walk" |
+| **Contrast** | How well text stands out from what is behind it: WCAG 2's ratio of their luminances, at least 4.5:1 for all text (`src/core/Contrast.luau`). | name tags at 4.68:1 |
 | **Walkthrough** | A test that plays the Story, or one Chapter, from start to end by driving a player's inputs, and checks what the server sends back. | `tests/engine/walkthrough.luau` |
 | **Fake player** | A stand-in for a Player in a test, where there is no client: a Character to move, plus the identity fields a Player has. | `tests/engine/_fakeplayer.luau` |
 | **Golden file** | The recorded, deterministic output of a Walkthrough: every message the server sends, in order, with the active Quest. A behaviour change shows as a diff to it. | `tests/fixtures/golden/walkthrough.json` |
@@ -323,6 +333,20 @@ Framing and where each is used are specified in
 | `shot:MeetCharacter` | the Character being met |
 | `shot:MachineFinale` | none |
 
+### Onboarding steps
+
+In order; specified in [`design/feel.md`](design/feel.md#6-onboarding-the-first-minute).
+`src/content/hints.luau` gives a Hint only for these steps.
+
+| Step | Shows | Done when |
+|---|---|---|
+| `onboarding:card` | The `chapter1` card; a tap or click skips it | The card is gone |
+| `onboarding:advance` | The first Narrator Line, with its Hint large | `DialogueFinished` |
+| `onboarding:objective` | The first Objective, a marker over Dad; the tracker glows | The Objective is shown |
+| `onboarding:walk` | The walk Hint; on touch a ring on the thumbstick | Amy has moved 4 studs |
+| `onboarding:talk` | The talk Hint once Dad's prompt shows; on touch the Talk-and-advance button pulses | `TalkedTo(Dad)` |
+| `onboarding:listen` | Dad's Dialogue, no Hint | The next Objective (`QuestCompleted(chapter1.ask_dad)`) |
+
 ### Cues
 
 None yet. Cue names (`cue:<name>` for sounds, `music:<name>` for music)
@@ -372,6 +396,7 @@ position or raw coordinate.
 | Beat | `beat:<snake_case>` | `beat:sam_catches` |
 | Cue | `cue:<snake_case>`, `music:<snake_case>` | `cue:sam_bark` |
 | Lighting preset | `lighting:<snake_case>` | `lighting:paradise` |
+| Onboarding step | `onboarding:<snake_case>` | `onboarding:walk` |
 | Asset: Chapter card or end card | `card:<chapter id>`, `card:end` | `card:chapter2` |
 | Asset: UI frame, motif or screen | `ui:<snake_case>` | `ui:dialogue_frame`, `ui:title_screen` |
 | Asset: store page art | `store:<snake_case>` | `store:icon`, `store:thumbnail_1` |
