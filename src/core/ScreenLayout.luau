@@ -41,6 +41,11 @@
 	                  one, the Talk-and-advance button (and the Skip button
 	                  while a Hint shows) sit in the right one
 	  touch targets   at least 48 x 48, 8 apart
+	  Pause screen    its button at the top left of the safe area, on
+	                  every class (the PC's Skip button beside it); the
+	                  panel centred in the safe area, its rows and buttons
+	                  touch targets, the Settings page as tall as the
+	                  safe area at most
 
 	While a Dialogue shows on touch, Amy listens: the player's controls are
 	disabled (the old full-screen click catcher already took every touch),
@@ -52,6 +57,7 @@
 
 local DeviceClass = require("./DeviceClass")
 local DialogueViewModel = require("./DialogueViewModel")
+local PauseScreen = require("./PauseScreen")
 local Settings = require("./Settings")
 local TitleScreen = require("./TitleScreen")
 
@@ -116,6 +122,32 @@ export type Layout = {
 		note: number,
 		button: { width: number, height: number, text: number },
 		gap: number,
+	},
+	-- the pause button, and the Pause screen's panel, centred on `centre`:
+	-- a Settings row is a label and two step buttons round a value (or one
+	-- toggle button as wide); `height` is the Settings page's, its tallest
+	pauseButton: Rect,
+	pause: {
+		x: number,
+		width: number,
+		centre: number,
+		-- between rows and controls, and round the panel's edge
+		gap: number,
+		heading: number,
+		row: number,
+		-- whether each label sits above its controls, and its size
+		stacked: boolean,
+		label: number,
+		labelHeight: number,
+		-- the value between the step buttons, and the controls' width: the
+		-- step buttons and the value, or one toggle button as wide
+		value: number,
+		controls: number,
+		-- the note's width, beside the Back button, and their row's height
+		note: number,
+		footer: number,
+		button: { width: number, height: number },
+		height: number,
 	},
 }
 
@@ -187,11 +219,18 @@ ScreenLayout.BOX = table.freeze({ top = 18, bottom = 10, between = 6, tag = 6, t
 local TALK: { [Class]: number } = { Phone = 64, Tablet = 72 }
 local RING: { [Class]: number } = { Phone = 96, Tablet = 112 }
 
--- The longest Title screen label, in graphemes.
-local LABEL_LENGTH = 0
-for _, label in TitleScreen.LABELS do
-	LABEL_LENGTH = math.max(LABEL_LENGTH, DialogueViewModel.graphemes(label))
+-- The longest of `labels`, in graphemes.
+local function longest(labels: { [any]: string }): number
+	local most = 0
+	for _, label in labels do
+		most = math.max(most, DialogueViewModel.graphemes(label))
+	end
+	return most
 end
+local LABEL_LENGTH = longest(TitleScreen.LABELS)
+local PAUSE_LABEL_LENGTH = longest(PauseScreen.LABELS)
+-- The Pause screen's panel is at most this many body sizes wide.
+local PANEL_EMS = 24
 
 local function rect(x: number, y: number, width: number, height: number): Rect
 	return { x = x, y = y, width = width, height = height }
@@ -284,7 +323,10 @@ function ScreenLayout.new(screen: Screen): Layout
 	local touch = class ~= "PC"
 	local collapses = class == "Phone"
 
-	local objectiveWidth = math.min(safe.width - 2 * MARGIN, TRACKER_EMS * text.objective)
+	-- the pause button at the top left; the Objective tracker keeps right of it
+	local pauseButton = rect(safe.x + MARGIN, safe.y + MARGIN, ScreenLayout.TARGET, ScreenLayout.TARGET)
+	local beyondPause = pauseButton.x + pauseButton.width + ScreenLayout.TARGET_GAP
+	local objectiveWidth = math.min(right - MARGIN - beyondPause, TRACKER_EMS * text.objective)
 	local objectiveX = right - MARGIN - objectiveWidth
 	local icon = rect(right - MARGIN - ScreenLayout.TARGET, safe.y + MARGIN, ScreenLayout.TARGET, ScreenLayout.TARGET)
 	local skipWidth = math.max(
@@ -338,7 +380,7 @@ function ScreenLayout.new(screen: Screen): Layout
 			box = { left = safe.x + MARGIN, space = space, bottom = bottom - MARGIN }
 		end
 	else
-		skip = rect(safe.x + MARGIN, safe.y + MARGIN, skipWidth, ScreenLayout.TARGET)
+		skip = rect(beyondPause, pauseButton.y, skipWidth, ScreenLayout.TARGET)
 		hint = rect(safe.x + (safe.width - hintWidth) / 2, bottom - BOTTOM_MARGIN - hintHeight, hintWidth, hintHeight)
 		box = { left = safe.x + MARGIN, space = safe.width - 2 * MARGIN, bottom = bottom - BOTTOM_MARGIN }
 	end
@@ -356,6 +398,37 @@ function ScreenLayout.new(screen: Screen): Layout
 	end
 
 	local titleWidth = safe.width - 2 * MARGIN
+
+	-- the Pause screen's panel. A Settings row is its label beside its
+	-- controls, or above them where a label does not fit beside them in
+	-- one line; the last row is the note beside the Back button.
+	local gap = ScreenLayout.TARGET_GAP
+	local panelWidth = math.min(safe.width - 2 * MARGIN, PANEL_EMS * text.body + 2 * gap)
+	local inner = panelWidth - 2 * gap
+	local value = math.ceil(Settings.LONGEST_VALUE * ScreenLayout.CHARACTER * text.body)
+	local controls = 2 * ScreenLayout.TARGET + value + 2 * gap
+	local beside = inner - controls - gap
+	local stacked = false
+	for _, label in Settings.LABELS do
+		stacked = stacked or ScreenLayout.lines(label, text.body, beside) > 1
+	end
+	local labelWidth = if stacked then inner else beside
+	local labelHeight = 0
+	for _, label in Settings.LABELS do
+		labelHeight = math.max(labelHeight, math.ceil(textHeight(label, text.body, labelWidth)))
+	end
+	labelHeight = if stacked then labelHeight else math.max(ScreenLayout.TARGET, labelHeight)
+	local row = if stacked then labelHeight + gap + ScreenLayout.TARGET else labelHeight
+	local heading = math.ceil(text.body * ScreenLayout.LINE)
+	local pauseButtonSize = {
+		width = math.min(
+			inner,
+			math.ceil(PAUSE_LABEL_LENGTH * ScreenLayout.CHARACTER * text.body) + 2 * ScreenLayout.BUTTON_PADDING
+		),
+		height = math.max(ScreenLayout.TARGET, heading + 2 * gap),
+	}
+	local noteWidth = inner - pauseButtonSize.width - gap
+	local footer = math.max(pauseButtonSize.height, math.ceil(textHeight(Settings.CAPPED, text.hint, noteWidth)))
 
 	return {
 		class = class,
@@ -410,6 +483,24 @@ function ScreenLayout.new(screen: Screen): Layout
 				text = text.body,
 			},
 			gap = ScreenLayout.TARGET_GAP + 2,
+		},
+		pauseButton = pauseButton,
+		pause = {
+			x = safe.x + (safe.width - panelWidth) / 2,
+			width = panelWidth,
+			centre = safe.y + safe.height / 2,
+			gap = gap,
+			heading = heading,
+			row = row,
+			stacked = stacked,
+			label = labelWidth,
+			labelHeight = labelHeight,
+			value = value,
+			controls = controls,
+			note = noteWidth,
+			footer = footer,
+			button = pauseButtonSize,
+			height = 2 * gap + #Settings.ORDER * (row + gap) + footer,
 		},
 	}
 end

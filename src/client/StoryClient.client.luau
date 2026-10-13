@@ -12,6 +12,14 @@
 	                     advance, in src/content/hints
 	  FrameShot       -> Camera (src/client/Camera, over CameraModel): the
 	                     Shot, framed from behind Amy
+	  ApplySettings   -> Settings: the player's Settings, applied to the
+	                     volume, the dialogue box, the fonts and the layout
+	  the pause button -> PauseScreen: the Pause screen and its Settings
+	  (or P)             page; each change goes to the server as
+	                     ChangeSettings. While it is open the Story does not
+	                     advance: no input reaches it, a Dialogue stops
+	                     typing, a Chapter card holds, Amy cannot walk or
+	                     talk
 
 	Every remote it receives is held to the Net contract first (Net.guard);
 	a malformed payload is dropped with a warning.
@@ -37,6 +45,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ContextActionService = game:GetService("ContextActionService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
+local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
@@ -56,7 +65,9 @@ local ObjectiveText = require(Core:WaitForChild("ObjectiveText"))
 local Story = require(Core:WaitForChild("Story"))
 local Net = require(Core:WaitForChild("Net"))
 local Onboarding = require(Core:WaitForChild("Onboarding"))
+local PauseScreen = require(Core:WaitForChild("PauseScreen"))
 local ScreenLayout = require(Core:WaitForChild("ScreenLayout"))
+local Settings = require(Core:WaitForChild("Settings"))
 local TalkAndAdvance = require(Core:WaitForChild("TalkAndAdvance"))
 local TitleScreen = require(Core:WaitForChild("TitleScreen"))
 local ContentFolder = ReplicatedStorage:WaitForChild("content")
@@ -77,6 +88,12 @@ local ClientReady = remotes.ClientReady
 local ShowTitle = remotes.ShowTitle
 local TitleChoice = remotes.TitleChoice
 local FrameShot = remotes.FrameShot
+local ApplySettings = remotes.ApplySettings
+local ChangeSettings = remotes.ChangeSettings
+
+-- Every sound plays through this SoundGroup (default.project.json), whose
+-- volume is the volume Setting; brief 013's Cues set their SoundGroup to it.
+local masterVolume = SoundService:WaitForChild("Master") :: SoundGroup
 
 -- The view-model's colours are a few frozen tables; each becomes a Color3 once.
 local colours: { [Story.RGB]: Color3 } = {}
@@ -141,9 +158,7 @@ dialogueFrame.Name = "DialogueFrame"
 dialogueFrame.AnchorPoint = Vector2.new(0, 1)
 dialogueFrame.AutoButtonColor = false
 dialogueFrame.Text = ""
-dialogueFrame.BackgroundColor3 = Color3.fromRGB(24, 44, 30)
-dialogueFrame.BackgroundTransparency = 0.12
-dialogueFrame.BorderSizePixel = 0
+dialogueFrame.BorderSizePixel = 0 -- its colours are the Settings' (renderBox)
 dialogueFrame.Visible = false
 dialogueFrame.Parent = screenGui
 addCorner(dialogueFrame, 16)
@@ -151,7 +166,6 @@ addCorner(dialogueFrame, 16)
 addPadding(dialogueFrame, ScreenLayout.BOX.top, ScreenLayout.BOX.bottom, ScreenLayout.PADDING)
 
 local dialogueStroke = Instance.new("UIStroke")
-dialogueStroke.Color = Color3.fromRGB(140, 200, 120)
 dialogueStroke.Thickness = 2.5
 dialogueStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 dialogueStroke.Parent = dialogueFrame
@@ -212,7 +226,6 @@ hintLabel.Name = "Hint"
 hintLabel.LayoutOrder = 2
 hintLabel.BackgroundTransparency = 1
 hintLabel.Font = Enum.Font.Gotham
-hintLabel.TextColor3 = Color3.fromRGB(190, 215, 180)
 hintLabel.TextXAlignment = Enum.TextXAlignment.Right
 hintLabel.TextWrapped = true
 hintLabel.Parent = dialogueLines
@@ -528,6 +541,45 @@ titleButtons.Parent = titleChoices
 local titleButtonList = list(titleButtons, Enum.FillDirection.Horizontal, 0)
 titleButtonList.Wraps = true
 
+-- The Pause screen ------------------------------------------------
+-- Its button at the top left; the panel over a dimmed screen, which takes
+-- every click and tap while it is open. Its rows are built by renderPause.
+local pauseColours = PauseScreen.COLOURS
+local pauseButton = Instance.new("TextButton")
+pauseButton.Name = "Pause"
+pauseButton.BackgroundColor3 = rgb(pauseColours.button)
+pauseButton.Font = Enum.Font.FredokaOne
+pauseButton.TextColor3 = rgb(pauseColours.label)
+pauseButton.Text = PauseScreen.GLYPH
+pauseButton.ZIndex = 6 -- over the PC's click catcher
+pauseButton.Parent = screenGui
+addCorner(pauseButton, 12)
+
+local pauseOverlay = Instance.new("TextButton")
+pauseOverlay.Name = "PauseScreen"
+pauseOverlay.AutoButtonColor = false
+pauseOverlay.Text = ""
+pauseOverlay.Size = UDim2.fromScale(1, 1)
+pauseOverlay.BackgroundColor3 = Color3.new(0, 0, 0)
+pauseOverlay.BackgroundTransparency = 0.45
+pauseOverlay.Modal = true -- the pointer stays free
+pauseOverlay.Visible = false
+pauseOverlay.ZIndex = 40
+pauseOverlay.Parent = screenGui
+
+local pausePanel = Instance.new("Frame")
+pausePanel.Name = "Panel"
+pausePanel.AnchorPoint = Vector2.new(0, 0.5)
+pausePanel.AutomaticSize = Enum.AutomaticSize.Y
+pausePanel.BackgroundColor3 = rgb(pauseColours.panel)
+pausePanel.BorderSizePixel = 0
+pausePanel.ZIndex = 41
+pausePanel.Parent = pauseOverlay
+addCorner(pausePanel, 16)
+addPadding(pausePanel, ScreenLayout.TARGET_GAP, ScreenLayout.TARGET_GAP, ScreenLayout.TARGET_GAP)
+local pauseList = list(pausePanel, Enum.FillDirection.Vertical, ScreenLayout.TARGET_GAP)
+pauseList.HorizontalAlignment = Enum.HorizontalAlignment.Left
+
 ----------------------------------------------------------------
 -- Dialogue
 ----------------------------------------------------------------
@@ -537,10 +589,17 @@ local layout: ScreenLayout.Layout
 local objectiveView = ObjectiveText.view(nil)
 -- the touch controls, shown for the Dialogue (Touch controls, below)
 local renderTouch: () -> ()
+-- the Pause screen (The Pause screen and the Settings, below)
+local renderPause: () -> ()
 -- the Chapter card showing, and when it started
 local card: ChapterCardTimeline.Card? = nil
 local cardStarted = 0
 local onboarding = Onboarding.new(Content.story)
+-- the player's Settings (the defaults until ApplySettings says otherwise),
+-- the Pause screen, and the device's largest Text scale (set by applyLayout)
+local settings: Settings.Settings = table.clone(Settings.DEFAULTS)
+local pause = PauseScreen.new()
+local textCap: number? = nil
 
 -- The Objective tracker, or its icon on a Phone while a Dialogue shows.
 local function renderObjective()
@@ -562,18 +621,18 @@ dialogueLines:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
 end)
 
 -- the Line the box shows, to set its text and colours only when it changes
-local shownLines, shownIndex = nil, 0
+local shownLines, shownIndex, shownContrast = nil, 0, false
 
 local function renderDialogue()
-	local view = DialogueViewModel.view(dialogue)
+	local view = DialogueViewModel.view(dialogue, settings.highContrast)
 	if dialogueFrame.Visible ~= view.open then
 		dialogueFrame.Visible = view.open
 		renderObjective()
 		renderTouch()
 	end
 	clickCatcher.Visible = view.open and not layout.touch
-	if dialogue.lines ~= shownLines or dialogue.index ~= shownIndex then
-		shownLines, shownIndex = dialogue.lines, dialogue.index
+	if dialogue.lines ~= shownLines or dialogue.index ~= shownIndex or settings.highContrast ~= shownContrast then
+		shownLines, shownIndex, shownContrast = dialogue.lines, dialogue.index, settings.highContrast
 		speakerLabel.Text = view.speaker
 		speakerLabel.Visible = view.speaker ~= ""
 		speakerLabel.BackgroundColor3 = rgb(view.style.tag)
@@ -584,6 +643,9 @@ local function renderDialogue()
 end
 
 local function advance()
+	if PauseScreen.paused(pause) then
+		return -- the Story does not advance while the Pause screen is open
+	end
 	-- the first press skips a Chapter card, not the Line under it
 	if card and ChapterCardTimeline.skip(card, os.clock() - cardStarted) then
 		return
@@ -654,7 +716,7 @@ local function promptDistances(): { [ProximityPrompt]: number }
 end
 
 local function talkOrAdvance(_: string, state: Enum.UserInputState): Enum.ContextActionResult
-	if state == Enum.UserInputState.Begin then
+	if state == Enum.UserInputState.Begin and not PauseScreen.paused(pause) then
 		local action = TalkAndAdvance.press(dialogue.lines ~= nil, promptDistances())
 		if action == "advance" then
 			advance()
@@ -718,8 +780,9 @@ renderTouch = function()
 	if talkBound then
 		ContextActionService:SetTitle(TALK_ACTION, TalkAndAdvance.title(open, TALK_LABELS))
 	end
-	-- on touch Amy listens while a Dialogue shows: the controls are disabled
-	local listening = open and layout.touch
+	-- on touch Amy listens while a Dialogue shows, and on every class she
+	-- waits while the Pause screen is open: the controls are disabled
+	local listening = (open and layout.touch) or PauseScreen.paused(pause)
 	local found = if listening ~= controlsDisabled then playerControls() else nil
 	if found then
 		if listening then
@@ -869,6 +932,7 @@ local function renderTitle()
 			renderTitle()
 		end)
 	end
+	renderPause() -- its button shows once the Title screen has gone
 end
 
 -- The Story has begun, with its first Chapter card or, for a Resume, the
@@ -947,9 +1011,166 @@ skipButton.Activated:Connect(function()
 end)
 
 ----------------------------------------------------------------
+-- The Pause screen and the Settings
+----------------------------------------------------------------
+-- The fonts each body text has with the standard font Setting.
+local OWN_FONTS: { [TextLabel]: Enum.Font } = {}
+for _, label in { bodyLabel, objectiveText, hintLabel, onboardingHint } do
+	OWN_FONTS[label] = label.Font
+end
+local DYSLEXIA_FONT = Enum.Font:FromName(Settings.DYSLEXIA_FACE) or Enum.Font.GothamMedium
+
+-- The dialogue box's colours and the body texts' font, for the Settings.
+local function renderBox()
+	local box = DialogueViewModel.box(settings.highContrast)
+	dialogueFrame.BackgroundColor3 = rgb(box.background)
+	dialogueFrame.BackgroundTransparency = box.transparency
+	dialogueStroke.Color = rgb(box.stroke)
+	hintLabel.TextColor3 = rgb(box.hint)
+	for label, own in OWN_FONTS do
+		label.Font = if settings.font == "dyslexia" then DYSLEXIA_FONT else own
+	end
+end
+renderBox()
+
+local applySettings: (Settings.Settings) -> ()
+
+-- A label of the panel, `width` wide (0: as wide as its text).
+local function pauseLabel(parent: Instance, text: string, size: number, width: number, height: number): TextLabel
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromOffset(width, height)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.GothamMedium
+	label.TextColor3 = rgb(pauseColours.text)
+	label.TextSize = size
+	label.TextWrapped = true
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Text = text
+	label.ZIndex = 42
+	label.Parent = parent
+	return label
+end
+
+-- A button of the panel; one that cannot be pressed is faded and inert.
+local function pauseControl(parent: Instance, text: string, width: number, height: number, onPress: (() -> ())?)
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.fromOffset(width, height)
+	button.BackgroundColor3 = rgb(pauseColours.button)
+	button.BackgroundTransparency = if onPress then 0 else 0.6
+	button.AutoButtonColor = onPress ~= nil
+	button.Active = onPress ~= nil
+	button.Font = Enum.Font.FredokaOne
+	button.TextColor3 = rgb(pauseColours.label)
+	button.TextSize = layout.text.body
+	button.Text = text
+	button.ZIndex = 42
+	button.Parent = parent
+	addCorner(button, 12)
+	if onPress then
+		button.Activated:Connect(onPress)
+	end
+	return button
+end
+
+-- A frame of the panel that lays its children out in a row or a column.
+local function pauseGroup(parent: Instance, order: number, direction: Enum.FillDirection): Frame
+	local frame = Instance.new("Frame")
+	frame.LayoutOrder = order
+	frame.AutomaticSize = Enum.AutomaticSize.XY
+	frame.BackgroundTransparency = 1
+	frame.ZIndex = 41
+	frame.Parent = parent
+	local layoutList = list(frame, direction, layout.pause.gap)
+	layoutList.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	layoutList.VerticalAlignment = Enum.VerticalAlignment.Center
+	return frame
+end
+
+-- The Pause screen as the view-model says, built again on every change.
+renderPause = function()
+	local view = PauseScreen.view(pause)
+	pauseButton.Visible = not titleScreen.Visible and not view.visible
+	pauseOverlay.Visible = view.visible
+	ProximityPromptService.Enabled = not view.visible -- Amy cannot talk while paused
+	for _, child in pausePanel:GetChildren() do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+	if not view.visible then
+		return
+	end
+	local panel = layout.pause
+	local body = layout.text.body
+	local order = 0
+	local function nextOrder(): number
+		order += 1
+		return order
+	end
+	if view.heading then
+		pauseLabel(pausePanel, view.heading, body, panel.width - 2 * panel.gap, panel.heading).LayoutOrder = nextOrder()
+	end
+	local note: string? = nil
+	if view.settings then
+		local rows
+		rows, note = Settings.rows(settings, textCap)
+		local rowDirection = if panel.stacked then Enum.FillDirection.Vertical else Enum.FillDirection.Horizontal
+		local target = ScreenLayout.TARGET
+		for _, row in rows do
+			local function change(direction: number): () -> ()
+				return function()
+					applySettings(Settings.change(settings, row.id, direction))
+					ChangeSettings:FireServer(Settings.known(settings))
+				end
+			end
+			local group = pauseGroup(pausePanel, nextOrder(), rowDirection)
+			pauseLabel(group, row.label, body, panel.label, panel.labelHeight).LayoutOrder = 1
+			local stepper = pauseGroup(group, 2, Enum.FillDirection.Horizontal)
+			if row.toggle then
+				pauseControl(stepper, row.value, panel.controls, target, change(1))
+			else
+				pauseControl(stepper, "−", target, target, if row.lower then change(-1) else nil).LayoutOrder = 1
+				local value = pauseLabel(stepper, row.value, body, panel.value, target)
+				value.TextXAlignment = Enum.TextXAlignment.Center
+				value.LayoutOrder = 2
+				pauseControl(stepper, "+", target, target, if row.higher then change(1) else nil).LayoutOrder = 3
+			end
+		end
+	end
+	-- the buttons, after the note when the Text scale is capped
+	local footer = pauseGroup(pausePanel, nextOrder(), Enum.FillDirection.Horizontal)
+	if note then
+		pauseLabel(footer, note, layout.text.hint, panel.note, panel.footer).LayoutOrder = 0
+	end
+	for i, button in view.buttons do
+		local control = pauseControl(footer, button.label, panel.button.width, panel.button.height, function()
+			PauseScreen.press(pause, button.id)
+			renderPause()
+			renderTouch()
+		end)
+		control.LayoutOrder = i
+		if button.primary then
+			control.BackgroundColor3 = rgb(palette.gold)
+		end
+	end
+end
+
+local function togglePause()
+	if not titleScreen.Visible then
+		PauseScreen.toggle(pause)
+		renderPause()
+		renderTouch()
+	end
+end
+pauseButton.Activated:Connect(togglePause)
+
+----------------------------------------------------------------
 -- The Screen layout: for the Device class, the viewport and the safe area
 ----------------------------------------------------------------
-local TEXT_SCALE = 1 -- brief 015 adds the setting, from 1 to 1.5
+-- Every Line of the Story: the Text scale is capped so that each fits.
+local LINES = Story.lineTexts(Content.story)
+-- the device textCap was worked out for
+local cappedFor: string? = nil
 
 local preferred = nil
 pcall(function() -- PreferredInput is newer than some clients
@@ -969,13 +1190,23 @@ end
 
 local function applyLayout()
 	local screen = absolute(root)
-	layout = ScreenLayout.new({
+	local device: ScreenLayout.Screen = {
 		class = DeviceClass.pick(inputKind, screen.width, screen.height),
 		width = screen.width,
 		height = screen.height,
 		insets = ScreenLayout.insets(screen, absolute(safeArea)),
-		textScale = TEXT_SCALE,
-	})
+		textScale = ScreenLayout.MAX_SCALE,
+	}
+	-- the cap depends on the device alone: worked out again when it changes
+	local insets = device.insets
+	local key =
+		`{device.class} {device.width}x{device.height} {insets.left},{insets.top},{insets.right},{insets.bottom}`
+	if key ~= cappedFor then
+		cappedFor = key
+		textCap = ScreenLayout.largestScale(device, LINES, LINES[1])
+	end
+	device.textScale = Settings.textScale(settings, textCap)
+	layout = ScreenLayout.new(device)
 	local text = layout.text
 	Camera.setZones(layout.zones)
 	placeTouchControls()
@@ -1024,9 +1255,15 @@ local function applyLayout()
 	titleNote.TextSize = choices.note
 	titleButtonList.Padding = UDim.new(0, choices.gap)
 
+	pauseButton.Position, pauseButton.Size = offsets(layout.pauseButton)
+	pauseButton.TextSize = text.speaker
+	pausePanel.Position = UDim2.fromOffset(layout.pause.x, layout.pause.centre)
+	pausePanel.Size = UDim2.fromOffset(layout.pause.width, 0)
+
 	renderObjective()
 	renderDialogue()
 	renderOnboarding()
+	renderPause()
 	if titleScreen.Visible then
 		renderTitle() -- its buttons are built at the layout's size
 	end
@@ -1060,6 +1297,27 @@ do
 	end)
 end
 applyLayout()
+
+applySettings = function(new: Settings.Settings)
+	local rescaled = new.textScale ~= settings.textScale
+	settings = new
+	masterVolume.Volume = settings.volume
+	renderBox()
+	renderDialogue()
+	if rescaled then
+		applyLayout()
+	else
+		renderPause()
+	end
+end
+ApplySettings.OnClientEvent:Connect(Net.guard("ApplySettings", applySettings, warn))
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if not gameProcessed and input.KeyCode == Enum.KeyCode.P then
+		togglePause()
+	end
+end)
+
 -- The player module builds its touch controls when touch is first used.
 local function watchTouchGui(touchGui: Instance)
 	if touchGui.Name == "TouchGui" then
@@ -1082,6 +1340,10 @@ end
 ----------------------------------------------------------------
 local wasTeaching = false
 RunService.RenderStepped:Connect(function(seconds)
+	if PauseScreen.paused(pause) then
+		cardStarted += seconds -- a Chapter card holds; nothing else moves on
+		return
+	end
 	if dialogue.lines then
 		DialogueViewModel.tick(dialogue, seconds)
 		renderDialogue()

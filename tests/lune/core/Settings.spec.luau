@@ -29,10 +29,9 @@ return function(t: any)
 			expect(Settings.TEXT_SCALES[#Settings.TEXT_SCALES]).toBe(1.5)
 		end)
 
-		it("give each font a Roblox font", function()
-			for _, font: Settings.Font in Settings.FONTS do
-				expect(type(Settings.FACES[font])).toBe("string")
-			end
+		it("name the dyslexia-friendly font, a font Roblox has: Cartoon, Comic Neue Angular", function()
+			expect(Settings.DYSLEXIA_FACE).toBe("Cartoon")
+			expect(Settings.FONTS).toEqual({ "standard", "dyslexia" })
 		end)
 	end)
 

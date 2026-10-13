@@ -14,7 +14,8 @@
 	                applies
 	  highContrast  the dialogue box at 7:1 (DialogueViewModel.box)
 	  font          "standard", or "dyslexia": the dyslexia-friendly font,
-	                for the Lines, the Objective and the Hints (FACES)
+	                for the Lines, the Objective and the Hints
+	                (DYSLEXIA_FACE)
 
 	  problem(value)     why `value` is not Settings for the wire: exactly
 	                     the known fields, each an allowed value
@@ -72,14 +73,11 @@ Settings.DEFAULTS = table.freeze({
 	font = "standard",
 } :: Settings)
 
--- Each font's Roblox Enum.Font name, which the client binder sets on the
--- Lines, the Objective and the Hints. Cartoon is Comic Neue Angular: its
--- b, d, p and q are not mirror images and its capital I has bars, so it
--- is not confused with l, which is what a dyslexia-friendly font needs.
-Settings.FACES = table.freeze({
-	standard = "GothamMedium",
-	dyslexia = "Cartoon",
-} :: { [Font]: string })
+-- The dyslexia-friendly font's Roblox Enum.Font name, which the client
+-- binder sets on the Lines, the Objective and the Hints in place of their
+-- own. Cartoon is Comic Neue Angular: its b, d, p and q are not mirror
+-- images and its capital I has bars, so it is not confused with l.
+Settings.DYSLEXIA_FACE = "Cartoon"
 
 Settings.LABELS = table.freeze({
 	volume = "Volume",
