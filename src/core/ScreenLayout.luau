@@ -20,6 +20,10 @@
 	                     the largest Text scale at which every Line fits
 	                     the screen's dialogue box: brief 015's setting is
 	                     capped at it
+	  ringAround(layout, control, area)
+	                     where the Onboarding's ring goes: round Roblox's
+	                     thumbstick as it really is on screen, or the left
+	                     zone's bottom-left corner while it is not found
 
 	The rules, the same for every class with its own numbers:
 
@@ -37,9 +41,10 @@
 	  tracker         while a Dialogue shows
 	  touch control   the bottom-left and bottom-right corners of the
 	  zones           viewport: 35% x 40% on a Phone, 25% x 35% on a
-	                  Tablet; none on a PC. The thumbstick has the left
-	                  one, the Talk-and-advance button (and the Skip button
-	                  while a Hint shows) sit in the right one
+	                  Tablet; none on a PC. Roblox's thumbstick has the
+	                  left one, where the player module puts it (the binder
+	                  never moves it); the Talk-and-advance button (and
+	                  the Skip button while a Hint shows) sit in the right one
 	  touch targets   at least 48 x 48, 8 apart
 
 	While a Dialogue shows on touch, Amy listens: the player's controls are
@@ -99,7 +104,9 @@ export type Layout = {
 	-- the touch control zones, left then right; none on a PC
 	zones: { Rect },
 	-- touch only: the Talk-and-advance button, the ring the Onboarding
-	-- draws round where the thumb goes, and the one it pulses round the button
+	-- draws round where the thumb goes while the thumbstick is not found
+	-- (ringAround has it where the thumbstick is), and the one it pulses
+	-- round the button
 	talk: Rect?,
 	ring: Rect?,
 	pulse: Rect?,
@@ -314,11 +321,13 @@ function ScreenLayout.new(screen: Screen): Layout
 		local around = 6
 		pulse = rect(talk.x - around, talk.y - around, size + 2 * around, size + 2 * around)
 
+		-- the left zone's bottom-left corner, inside the safe area, where
+		-- Roblox puts its thumbstick
 		local reach = RING[class]
 		local left = zones[1]
 		ring = rect(
-			math.max(safe.x + MARGIN, left.x + left.width * 0.4 - reach / 2),
-			math.min(bottom - MARGIN - reach, left.y + left.height * 0.6 - reach / 2),
+			math.max(safe.x, left.x) + MARGIN,
+			math.min(bottom, left.y + left.height) - MARGIN - reach,
 			reach,
 			reach
 		)
@@ -410,6 +419,34 @@ function ScreenLayout.new(screen: Screen): Layout
 			gap = ScreenLayout.TARGET_GAP + 2,
 		},
 	}
+end
+
+-- Where the Onboarding's ring goes round `control`, Roblox's thumbstick's
+-- frame as it is on screen (in layout units), or nil while it is not
+-- found: then the layout's ring, in the left zone's bottom-left corner.
+-- The classic thumbstick's frame is the stick itself, and the ring is
+-- centred on it; the dynamic thumbstick's (`area`) is its touch area, and
+-- the ring sits in its bottom-left corner, where the stick rests. Always
+-- inside the safe area; nil on a PC.
+function ScreenLayout.ringAround(layout: Layout, control: Rect?, area: boolean): Rect?
+	local fallback = layout.ring
+	if not (fallback and control and control.width > 0 and control.height > 0) then
+		return fallback
+	end
+	local reach = fallback.width
+	local x, y
+	if area then
+		x, y = control.x + MARGIN, control.y + control.height - MARGIN - reach
+	else
+		x, y = control.x + (control.width - reach) / 2, control.y + (control.height - reach) / 2
+	end
+	local safe = layout.safe
+	return rect(
+		math.clamp(x, safe.x, safe.x + safe.width - reach),
+		math.clamp(y, safe.y, safe.y + safe.height - reach),
+		reach,
+		reach
+	)
 end
 
 -- The first Line of `lines` that would not fit `layout`'s dialogue box

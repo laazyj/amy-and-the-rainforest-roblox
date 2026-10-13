@@ -272,17 +272,22 @@ objectiveText.TextYAlignment = Enum.TextYAlignment.Top
 objectiveText.Text = ""
 objectiveText.Parent = objectiveFrame
 
+-- the collapsed tracker: a drawn marker, a gold disc with a mark on it
 local objectiveIcon = Instance.new("TextLabel")
 objectiveIcon.Name = "ObjectiveIcon"
-objectiveIcon.BackgroundColor3 = Color3.fromRGB(24, 44, 30)
-objectiveIcon.BackgroundTransparency = ObjectiveText.RESTING_TRANSPARENCY
+objectiveIcon.BackgroundColor3 = rgb(palette.gold)
 objectiveIcon.BorderSizePixel = 0
 objectiveIcon.Font = Enum.Font.FredokaOne
-objectiveIcon.TextColor3 = Color3.fromRGB(255, 214, 120)
-objectiveIcon.Text = "✦"
+objectiveIcon.TextColor3 = rgb(palette.deep)
+objectiveIcon.Text = ObjectiveText.ICON_MARK
 objectiveIcon.Visible = false
 objectiveIcon.Parent = screenGui
-addCorner(objectiveIcon, 12)
+addCorner(objectiveIcon, 999)
+local objectiveIconStroke = Instance.new("UIStroke")
+objectiveIconStroke.Color = rgb(palette.deep)
+objectiveIconStroke.Thickness = 2
+objectiveIconStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+objectiveIconStroke.Parent = objectiveIcon
 
 -- Title / chapter card -----------------------------------------
 -- a button: a tap or a click skips a Chapter card
@@ -621,15 +626,18 @@ end, warn))
 -- Touch controls (feel.md sections 1 and 4)
 ----------------------------------------------------------------
 -- The Talk-and-advance button, a ContextActionService touch button in the
--- right zone: it advances a Dialogue, or else uses the nearest prompt
--- shown, which stays the universal talk affordance. Roblox's thumbstick
--- has the left zone; while a Dialogue shows the player's controls are
--- disabled (Amy listens; the box may cover the zone). The jump button
--- goes: the Story never asks for a jump, and the right zone is the talk
--- button's.
+-- right zone, bound only while TalkAndAdvance.shown says (a Dialogue
+-- shows or a prompt is within reach): it advances a Dialogue, or else uses
+-- the nearest prompt shown, which stays the universal talk affordance.
+-- Roblox's thumbstick has the left zone, where the player module puts it;
+-- while a Dialogue shows the player's controls are disabled (Amy listens;
+-- the box may cover the zone). The jump button goes: the Story never asks
+-- for a jump, and the right zone is the talk button's.
 local TALK_ACTION = "TalkAndAdvance"
 local TALK_LABELS: TalkAndAdvance.Labels = hints.button
-local talkBound = false
+-- whether it is bound, and whether its button has been placed (Roblox
+-- builds the button a little after the action is bound)
+local talkBound, talkPlaced = false, false
 local prompts: { [ProximityPrompt]: true } = {}
 
 -- Each prompt shown, by its distance from Amy.
@@ -667,6 +675,10 @@ local function talkOrAdvance(_: string, state: Enum.UserInputState): Enum.Contex
 	return Enum.ContextActionResult.Sink
 end
 
+local function offsets(rect: ScreenLayout.Rect): (UDim2, UDim2)
+	return UDim2.fromOffset(rect.x, rect.y), UDim2.fromOffset(rect.width, rect.height)
+end
+
 -- Puts `gui` at `rect`, in the layout's units, whatever its parent.
 local function place(gui: GuiObject, rect: ScreenLayout.Rect)
 	local parent = gui.Parent
@@ -695,8 +707,25 @@ local function eachControl(each: (control: GuiObject, kind: string) -> ())
 	end
 end
 
+-- Roblox's thumbstick's frame, as placeTouchControls last found it.
+local thumbstickFrame: GuiObject? = nil
+
+-- That frame as it is on screen, in layout units, or nil while the player
+-- module has not built it (or it is hidden); and whether it is the dynamic
+-- thumbstick's touch area rather than the classic stick.
+local function thumbstick(): (ScreenLayout.Rect?, boolean)
+	local frame = thumbstickFrame
+	if not (frame and frame.Parent and frame.Visible) then
+		return nil, false
+	end
+	local at, size = frame.AbsolutePosition - root.AbsolutePosition, frame.AbsoluteSize
+	return { x = at.X, y = at.Y, width = size.X, height = size.Y }, frame.Name == "DynamicThumbstickFrame"
+end
+
 -- The player module's controls (PlayerModule:GetControls), found once.
 local controls: any = nil
+-- whether the controls were last disabled for a Dialogue; renderTouch
+-- runs every frame until the module has done what it was asked
 local controlsDisabled = false
 local function playerControls(): any
 	if controls then
@@ -713,41 +742,52 @@ local function playerControls(): any
 	return controls
 end
 
-renderTouch = function()
-	local open = dialogue.lines ~= nil
-	if talkBound then
-		ContextActionService:SetTitle(TALK_ACTION, TalkAndAdvance.title(open, TALK_LABELS))
-	end
-	-- on touch Amy listens while a Dialogue shows: the controls are disabled
-	local listening = open and layout.touch
-	local found = if listening ~= controlsDisabled then playerControls() else nil
-	if found then
-		if listening then
-			found:Disable()
-		else
-			found:Enable()
-		end
-		controlsDisabled = listening
-	end
+-- On touch Amy listens while a Dialogue shows: the controls are disabled.
+local function listening(): boolean
+	return dialogue.lines ~= nil and layout.touch
 end
 
--- Lays the touch controls out in the Screen layout's zones.
-local function placeTouchControls()
-	if layout.touch ~= talkBound then
-		if layout.touch then
+renderTouch = function()
+	local open = dialogue.lines ~= nil
+	local wanted = listening()
+	local shown = layout.touch and TalkAndAdvance.shown(open, prompts)
+	if shown ~= talkBound then
+		if shown then
 			ContextActionService:BindAction(TALK_ACTION, talkOrAdvance, true)
 		else
 			ContextActionService:UnbindAction(TALK_ACTION)
 		end
-		talkBound = layout.touch
+		talkBound = shown
 	end
-	local button = if talkBound then ContextActionService:GetButton(TALK_ACTION) else nil
-	if button and layout.talk then
-		place(button, layout.talk)
+	if talkBound then
+		ContextActionService:SetTitle(TALK_ACTION, TalkAndAdvance.title(open, TALK_LABELS))
+		local button = ContextActionService:GetButton(TALK_ACTION)
+		if button and layout.talk then
+			place(button, layout.talk)
+		end
+		talkPlaced = button ~= nil
 	end
+	-- Every path that ends a Dialogue (the last Line advanced, by a tap,
+	-- the box or a key) comes back here, and so does every frame until the
+	-- player module is found and has been told: the controls come back.
+	local found = if wanted ~= controlsDisabled then playerControls() else nil
+	if found then
+		if wanted then
+			found:Disable()
+		else
+			found:Enable(true)
+		end
+		controlsDisabled = wanted
+	end
+end
+
+-- Hides Roblox's jump button, finds the thumbstick, and lays the
+-- Talk-and-advance button out. The thumbstick stays where the player
+-- module puts it.
+local function placeTouchControls()
 	eachControl(function(control, kind)
-		if kind == "thumbstick" and layout.touch then
-			place(control, layout.zones[1])
+		if kind == "thumbstick" then
+			thumbstickFrame = control
 		elseif kind == "jump" and not hiddenJumps[control] then
 			-- the player module shows it again on its own; it stays hidden
 			hiddenJumps[control] = true
@@ -763,10 +803,12 @@ end
 ProximityPromptService.PromptShown:Connect(function(prompt: ProximityPrompt)
 	prompts[prompt] = true
 	Onboarding.promptShown(onboarding, true)
+	renderTouch()
 end)
 ProximityPromptService.PromptHidden:Connect(function(prompt: ProximityPrompt)
 	prompts[prompt] = nil
 	Onboarding.promptShown(onboarding, next(prompts) ~= nil)
+	renderTouch()
 end)
 
 ----------------------------------------------------------------
@@ -911,7 +953,12 @@ local function renderOnboarding()
 	onboardingHint.Text = view.hint or ""
 	onboardingHint.Visible = view.hint ~= nil
 	skipButton.Visible = view.skip
-	thumbRing.Visible = view.ring and layout.ring ~= nil
+	-- round the thumbstick where the player module has it, found each frame
+	local around = if view.ring then ScreenLayout.ringAround(layout, thumbstick()) else nil
+	thumbRing.Visible = around ~= nil
+	if around then
+		thumbRing.Position, thumbRing.Size = offsets(around)
+	end
 	talkRing.Visible = view.pulse and layout.pulse ~= nil
 	if talkRing.Visible then -- the pulse: the ring's stroke fades in and out
 		talkStroke.Transparency = 0.5 - 0.5 * math.cos(os.clock() * 2 * math.pi / PULSE_SECONDS)
@@ -958,10 +1005,6 @@ end)
 local inputKind: DeviceClass.InputKind =
 	DeviceClass.starting(preferred, UserInputService.TouchEnabled, UserInputService.KeyboardEnabled)
 
-local function offsets(rect: ScreenLayout.Rect): (UDim2, UDim2)
-	return UDim2.fromOffset(rect.x, rect.y), UDim2.fromOffset(rect.width, rect.height)
-end
-
 local function absolute(gui: GuiObject): ScreenLayout.Rect
 	local at, size = gui.AbsolutePosition, gui.AbsoluteSize
 	return { x = at.X, y = at.Y, width = size.X, height = size.Y }
@@ -983,9 +1026,6 @@ local function applyLayout()
 	onboardingHint.TextSize = text.hint
 	skipButton.Position, skipButton.Size = offsets(layout.skip)
 	skipButton.TextSize = text.hint
-	if layout.ring then
-		thumbRing.Position, thumbRing.Size = offsets(layout.ring)
-	end
 	if layout.pulse then
 		talkRing.Position, talkRing.Size = offsets(layout.pulse)
 	end
@@ -1085,6 +1125,9 @@ RunService.RenderStepped:Connect(function(seconds)
 	if dialogue.lines then
 		DialogueViewModel.tick(dialogue, seconds)
 		renderDialogue()
+	end
+	if listening() ~= controlsDisabled or (talkBound and not talkPlaced) then
+		renderTouch() -- the player module or the button was not ready yet
 	end
 	if card then
 		renderCard()

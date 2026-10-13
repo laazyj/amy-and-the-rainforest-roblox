@@ -289,6 +289,42 @@ return function(t: any)
 		end)
 	end)
 
+	describe("ScreenLayout.ringAround", function()
+		each("puts the ring round the thumbstick as it is, inside the safe area", function(layout)
+			if not layout.touch then
+				expect(ScreenLayout.ringAround(layout, { x = 0, y = 0, width = 100, height = 100 }, false)).toBeNil()
+				return
+			end
+			local fallback = layout.ring :: Rect
+			-- not found yet: the left zone's bottom-left corner
+			expect(ScreenLayout.ringAround(layout, nil, true)).toEqual(fallback)
+			local left = layout.zones[1]
+			expect(fallback.x - math.max(layout.safe.x, left.x) < left.width / 4).toBe(true)
+			expect(left.y + left.height - (fallback.y + fallback.height) < left.height / 4).toBe(true)
+			-- the classic stick: centred on it
+			local stick = { x = layout.safe.x + 40, y = left.y + 30, width = 90, height = 90 }
+			local round = ScreenLayout.ringAround(layout, stick, false) :: Rect
+			expect(round.x + round.width / 2).toBe(stick.x + 45)
+			expect(round.y + round.height / 2).toBe(stick.y + 45)
+			-- the dynamic thumbstick's touch area, as the player module lays
+			-- it out (40% x 2/3 in landscape, all the width x 40% in
+			-- portrait): its bottom-left corner, never its middle
+			local share = if layout.portrait then { 1, 0.4 } else { 0.4, 2 / 3 }
+			local width, height = left.width / ScreenLayout.ZONES[layout.class].width, left.y + left.height
+			local area = { x = 0, y = height * (1 - share[2]), width = width * share[1], height = height * share[2] }
+			local corner = ScreenLayout.ringAround(layout, area, true) :: Rect
+			expect(inside(corner, layout.safe)).toBe(true)
+			expect(inside(corner, left)).toBe(true)
+			expect(corner.x + corner.width < area.x + area.width / 2).toBe(true)
+			expect(corner.y > area.y + area.height / 2).toBe(true)
+			-- one off the screen is brought back inside the safe area
+			local off =
+				ScreenLayout.ringAround(layout, { x = -200, y = height + 100, width = 50, height = 50 }, false) :: Rect
+			expect(inside(off, layout.safe)).toBe(true)
+			expect(ScreenLayout.ringAround(layout, { x = 10, y = 10, width = 0, height = 0 }, true)).toEqual(fallback)
+		end)
+	end)
+
 	describe("ScreenLayout touch targets", function()
 		each("are at least 48 x 48 and 8 apart", function(layout)
 			local targets: { Rect } = { layout.skip }

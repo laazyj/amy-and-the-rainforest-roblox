@@ -2,9 +2,12 @@
 --[[
 	TalkAndAdvance: what the Talk-and-advance button does, as plain data
 	(docs/design/feel.md sections 1 and 4). The client binder shows it on a
-	Phone or a Tablet, in the right touch control zone, and calls `press`
-	when it is pressed.
+	Phone or a Tablet, in the right touch control zone, when `shown` says,
+	and calls `press` when it is pressed.
 
+	  shown(open, prompts)  whether the button shows: while a Dialogue
+	                        shows, or while a prompt is within reach (shown);
+	                        with neither it would do nothing, so it hides
 	  press(open, prompts)  "advance" while a Dialogue shows (a Line still
 	                        typing shows in full first, as DialogueViewModel
 	                        has it); otherwise the nearest prompt shown, to
@@ -30,6 +33,10 @@ function TalkAndAdvance.press<Prompt>(open: boolean, prompts: { [Prompt]: number
 		end
 	end
 	return nearest
+end
+
+function TalkAndAdvance.shown<Prompt>(open: boolean, prompts: { [Prompt]: any }): boolean
+	return open or next(prompts) ~= nil
 end
 
 function TalkAndAdvance.title(open: boolean, labels: Labels): string
