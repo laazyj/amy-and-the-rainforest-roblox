@@ -76,8 +76,9 @@ The same rules apply to every class; only the numbers differ.
   touch), so the dialogue box may cover the left zone. It keeps clear of
   the talk-and-advance button: beside it in landscape, above it in
   portrait. The box and the talk-and-advance button both advance.
-- **The pause button** sits at the top left of the safe area on every
-  class, a 48 × 48 touch target; the Objective tracker keeps right of it.
+- **The pause button** sits at the top right of the safe area on every
+  class, a 48 × 48 touch target, clear of Roblox's own buttons at the top
+  left. The Objective tracker, and on a Phone its icon, keep to its left.
   It opens the Pause screen, a panel centred in the safe area: Resume,
   and the Settings page, its rows touch targets, as tall as the safe area
   at most at every Text scale. While it is open the Story does not
@@ -256,8 +257,7 @@ receives: a Story that begins with its first Chapter card (a new Save, or
 "Start again") shows the Onboarding; a Resume never does. While a Hint
 shows in free play, a Skip button ends the Onboarding: above the
 talk-and-advance button on touch, at the top left of the safe area on a
-PC, beside the pause button. The first Line's Hint has none: tapping is
-how it is done.
+PC. The first Line's Hint has none: tapping is how it is done.
 
 ## 7. Visual rubric
 

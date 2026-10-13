@@ -542,7 +542,7 @@ local titleButtonList = list(titleButtons, Enum.FillDirection.Horizontal, 0)
 titleButtonList.Wraps = true
 
 -- The Pause screen ------------------------------------------------
--- Its button at the top left; the panel over a dimmed screen, which takes
+-- Its button at the top right; the panel over a dimmed screen, which takes
 -- every click and tap while it is open. Its rows are built by renderPause.
 local pauseColours = PauseScreen.COLOURS
 local pauseButton = Instance.new("TextButton")

@@ -41,11 +41,12 @@
 	                  one, the Talk-and-advance button (and the Skip button
 	                  while a Hint shows) sit in the right one
 	  touch targets   at least 48 x 48, 8 apart
-	  Pause screen    its button at the top left of the safe area, on
-	                  every class (the PC's Skip button beside it); the
-	                  panel centred in the safe area, its rows and buttons
-	                  touch targets, the Settings page as tall as the
-	                  safe area at most
+	  Pause screen    its button at the top right of the safe area, on
+	                  every class, clear of Roblox's buttons at the top
+	                  left; the Objective tracker (and its icon) keeps to
+	                  its left. The panel centred in the safe area, its
+	                  rows and buttons touch targets, the Settings page as
+	                  tall as the safe area at most
 
 	While a Dialogue shows on touch, Amy listens: the player's controls are
 	disabled (the old full-screen click catcher already took every touch),
@@ -323,12 +324,16 @@ function ScreenLayout.new(screen: Screen): Layout
 	local touch = class ~= "PC"
 	local collapses = class == "Phone"
 
-	-- the pause button at the top left; the Objective tracker keeps right of it
-	local pauseButton = rect(safe.x + MARGIN, safe.y + MARGIN, ScreenLayout.TARGET, ScreenLayout.TARGET)
-	local beyondPause = pauseButton.x + pauseButton.width + ScreenLayout.TARGET_GAP
-	local objectiveWidth = math.min(right - MARGIN - beyondPause, TRACKER_EMS * text.objective)
-	local objectiveX = right - MARGIN - objectiveWidth
-	local icon = rect(right - MARGIN - ScreenLayout.TARGET, safe.y + MARGIN, ScreenLayout.TARGET, ScreenLayout.TARGET)
+	-- the pause button in the top-right corner of the safe area; the
+	-- Objective tracker, and its icon, keep to its left
+	local function topTarget(x: number): Rect
+		return rect(x, safe.y + MARGIN, ScreenLayout.TARGET, ScreenLayout.TARGET)
+	end
+	local pauseButton = topTarget(right - MARGIN - ScreenLayout.TARGET)
+	local trackerRight = pauseButton.x - ScreenLayout.TARGET_GAP
+	local objectiveWidth = math.min(trackerRight - (safe.x + MARGIN), TRACKER_EMS * text.objective)
+	local objectiveX = trackerRight - objectiveWidth
+	local icon = topTarget(trackerRight - ScreenLayout.TARGET)
 	local skipWidth = math.max(
 		ScreenLayout.TARGET,
 		math.ceil(ScreenLayout.SKIP_CHARACTERS * ScreenLayout.CHARACTER * text.hint) + 2 * MARGIN
@@ -380,7 +385,7 @@ function ScreenLayout.new(screen: Screen): Layout
 			box = { left = safe.x + MARGIN, space = space, bottom = bottom - MARGIN }
 		end
 	else
-		skip = rect(beyondPause, pauseButton.y, skipWidth, ScreenLayout.TARGET)
+		skip = rect(safe.x + MARGIN, safe.y + MARGIN, skipWidth, ScreenLayout.TARGET)
 		hint = rect(safe.x + (safe.width - hintWidth) / 2, bottom - BOTTOM_MARGIN - hintHeight, hintWidth, hintHeight)
 		box = { left = safe.x + MARGIN, space = safe.width - 2 * MARGIN, bottom = bottom - BOTTOM_MARGIN }
 	end

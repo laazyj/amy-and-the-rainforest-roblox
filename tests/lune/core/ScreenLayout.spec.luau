@@ -365,11 +365,21 @@ return function(t: any)
 	end)
 
 	describe("ScreenLayout Pause screen", function()
-		each("its button sits at the top left of the safe area", function(layout)
+		each(
+			"its button sits at the top right of the safe area, clear of Roblox's buttons at the top left",
+			function(layout)
+				local button = layout.pauseButton
+				expect(inside(button, layout.safe)).toBe(true)
+				expect(button.x > layout.safe.x + layout.safe.width / 2).toBe(true)
+				expect(button.y < layout.safe.y + layout.safe.height / 2).toBe(true)
+			end
+		)
+
+		each("the Objective tracker and its icon keep to the left of its button", function(layout)
 			local button = layout.pauseButton
-			expect(inside(button, layout.safe)).toBe(true)
-			expect(button.x < layout.safe.x + layout.safe.width / 2).toBe(true)
-			expect(button.y < layout.safe.y + layout.safe.height / 2).toBe(true)
+			local objective = layout.objective
+			expect(objective.x + objective.width + ScreenLayout.TARGET_GAP <= button.x).toBe(true)
+			expect(gap(objective.icon, button) >= ScreenLayout.TARGET_GAP).toBe(true)
 		end)
 
 		each("the Settings page fits the safe area, every label, value and note in its place", function(layout)
