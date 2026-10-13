@@ -171,7 +171,12 @@ says so plainly.
 
 ## For the owner (cannot be scripted)
 
-- Install Tart (Homebrew) and have about 60 GB free.
+- Install Tart from its own Homebrew tap, not the core formulae (which
+  have no `tart`): `brew install openai/tools/tart` as its README says
+  (the project moved from github.com/cirruslabs to github.com/openai;
+  its base images still live at `ghcr.io/cirruslabs/`, for example
+  `macos-tahoe-base`). Have about 60 GB free; the base image alone is
+  about 25 GB.
 - Inside the guest, once: sign Studio in to the separate Roblox account,
   enable "Studio as MCP server", and approve the Screen Recording prompt
   on the wrapper's first run.
