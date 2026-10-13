@@ -32,10 +32,10 @@ Rules every build session follows, regardless of brief:
 | 009 Asset pipeline | Phase 1 | done (#26); first upload run opened #30 |
 | 010 Saves and resume | Phase 1 | done (#33) |
 | 011 Locked-behind camera and Shots | Phase 1 | done (#36); visual pass waits on the Mac runner |
-| 012 Device classes, touch and onboarding | Phase 1 | in review (#39); Mac for emulation |
+| 012 Device classes, touch and onboarding | Phase 1 | done (#39); device pass waits on the Mac runner and real devices |
 | 013 Audio and narration | Phase 1 | after 009 and 006; owner's recordings |
 | 014 Characters and Sam's chase | Phase 1 | after 006; Mac for the look |
-| 015 Settings, accessibility, store page, compliance | Phase 1 | after 011 and 012 |
+| 015 Settings, accessibility, store page, compliance | Phase 1 | running (B7) |
 | 016 Visual pass | Phase 1 | after 011, 012, 014; Mac required |
 | 017 Agent bootstrap and Selene standard library | tooling | done (#24) |
 | mac-001 Runner bootstrap | Phase 1 | on the MacBook, any time |
