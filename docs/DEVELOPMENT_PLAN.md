@@ -522,11 +522,13 @@ Design notes:
 ### Mac runner specifics
 
 - A GitHub Actions self-hosted runner on the MacBook, labelled `studio`,
-  in a standard macOS account of its own (`studio-runner`, brief
-  mac-001a) that holds none of the owner's files, keys or logins, running
-  as a launchd *agent* in that account's logged-in GUI session (never a
-  daemon). No power, screen-saver or lock setting is changed: tier 3 runs
-  when the Mac is awake. Studio there is signed in to a separate Roblox
+  isolated from the owner's account: inside a macOS virtual machine on
+  the Mac (brief mac-001a; its fallback is a standard macOS account of
+  its own), holding none of the owner's files, keys or logins, the runner
+  a launchd *agent* in the VM's logged-in GUI session (never a daemon).
+  The VM image is also what moves to a dedicated machine later. No host
+  power, screen-saver or lock setting is changed: tier 3 runs when the
+  Mac is awake. Studio there is signed in to a separate Roblox
   account with no access to Dev or Release and plays local files only.
 - A job on the Mac never runs code from a pull request: it checks out the
   tools from `main` and acts on the built `place` artifact. Mac workflows
@@ -882,7 +884,7 @@ Outcome: players return because there is more to discover.
 |---|---|
 | Open Cloud Luau Execution is beta and may change or have outages | Tier 2 is isolated behind one runner script; failures are reported, not hidden; tier 3 and Lune cover most of the same logic |
 | Mac runner is often off | Tier 3 optional on PRs, mandatory for releases; perceptual briefs scheduled when the Mac is on |
-| A self-hosted runner on a public repository | The runner lives in an unprivileged macOS account with nothing of the owner's in it; Mac jobs never run pull-request code and hold no secrets; fork workflow runs need approval (mac-001a) |
+| A self-hosted runner on a public repository | The runner lives in a macOS VM (or, failing that, an unprivileged account) with nothing of the owner's in it; Mac jobs never run pull-request code and hold no secrets; fork workflow runs need approval (mac-001a) |
 | Studio version drift breaks the Mac bridge | Studio version pinned and reported by the job; bridge wrapped behind one module |
 | Agent cannot see or hear the game | Perceptual scope declared per brief; contact sheets and baselines; human review is part of the definition of done for perceptual work |
 | A PR job could publish to the public experience | Separate Dev and Release keys; Release key only in the gated environment; agent never holds a key; no `pull_request_target` |
@@ -917,7 +919,7 @@ Outcome: players return because there is more to discover.
    others) into `assets/images/` or a shared folder.
 6. Add testers as friends of the owning account when Dev is ready.
 7. In Phase 1, install Roblox Studio and the self-hosted runner on the
-   MacBook, in a standard account of its own (brief mac-001a); the agent
+   MacBook, isolated in a virtual machine (brief mac-001a); the agent
    provides a setup script and checklist.
 
 Phase 0 agent work starts as soon as item 3 is done; items 1–2 can be done
