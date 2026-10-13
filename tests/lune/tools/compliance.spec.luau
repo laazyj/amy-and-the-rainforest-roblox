@@ -20,8 +20,25 @@ return function(t: any)
 			})
 		end)
 
-		it("does not match a surname inside a longer word", function()
-			expect(Compliance.names("assets/manifest.json", "Smithson and blacksmith", { "Smith" })).toEqual({})
+		for _, joined in { "ClaraSmith", "clarasmith", "clara_smith", "SMITH's", "@smith", "Smithson" } do
+			it(`finds a surname joined to other words: {joined}`, function()
+				expect(#Compliance.names("src/content/x.luau", `by {joined}`, { "Smith" })).toBe(1)
+			end)
+		end
+
+		it("allows only the exact provenance string, and only in the Manifest", function()
+			local exact = Compliance.ALLOWED["assets/manifest.json"][1]
+			local surname: string? = nil
+			for _, name in Compliance.SURNAMES do
+				if string.find(string.lower(exact), string.lower(name), 1, true) then
+					surname = name
+				end
+			end
+			assert(surname, "the allowed string holds a surname")
+			expect(Compliance.names("assets/manifest.json", `"origin": "{exact}@4940d10"`)).toEqual({})
+			-- the same string anywhere else, or the name on its own in the Manifest, is caught
+			expect(#Compliance.names("docs/store/x.md", exact)).toBe(1)
+			expect(#Compliance.names("assets/manifest.json", `"creator": "Clara {surname}"`)).toBe(1)
 		end)
 
 		it("guards the family's surnames by default, and a double-barrelled name by either half", function()
@@ -51,6 +68,45 @@ return function(t: any)
 		it("finds nothing to buy or type under src/", function()
 			expect(Files.each({ "src" }, Compliance.purchasesAndText)).toEqual({})
 		end)
+	end)
+
+	describe("Compliance.isLink", function()
+		-- the reviewer's table: each was missed before, or caught already
+		for _, text in
+			{
+				"visit roblox.com/games/1",
+				"discord.gg/abc",
+				"amyforest.co.uk",
+				"a@b.com",
+				"follow @amyforest",
+				"example[.]com",
+				"example (dot) com",
+				"x.y.com",
+				"HTTPS://x",
+				"WWW.example",
+				"[[https://example]]",
+			}
+		do
+			it(`finds a web address in "{text}"`, function()
+				expect(Compliance.isLink(text)).toBe(true)
+			end)
+		end
+
+		for _, text in
+			{
+				"chapter3.meet_fox",
+				"zone:ForestGap",
+				"src/core/Story.luau",
+				"description.md",
+				"Dr. Who and Mrs. Smith",
+				"It was a bautyfull paradise!",
+				"Dad... can I go?",
+			}
+		do
+			it(`leaves "{text}" alone`, function()
+				expect(Compliance.isLink(text)).toBe(false)
+			end)
+		end
 	end)
 
 	describe("the store page kit's links guard", function()

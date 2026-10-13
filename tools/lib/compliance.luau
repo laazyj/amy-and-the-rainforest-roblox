@@ -7,13 +7,19 @@
 	(docs/story/style-guide.md section 4), so no surname of the family
 	appears in the game's source, its assets' text or the store page kit.
 	SURNAMES lists them; the owner adds one by adding a line. A surname
-	matches as a whole word, in any case: "Smith" and "SMITH" match,
-	"Smithson" does not.
+	matches anywhere, in any case, joined to other words or not: "Smith",
+	"ClaraSmith" and "SMITHS" all match. ALLOWED lists the exact strings a
+	file may hold that contain one: the Manifest's provenance, the owner's
+	own repository, which is never built into the place.
 
-	No external links in the store page kit: the description, the art
-	specifications and the questionnaire draft are pasted into Roblox, so
-	none of them holds a web address. (Links in Luau text are
-	tools/lib/purity.luau's check.)
+	No web address: a scheme (`https://`), a `www.` host, a bare domain
+	ending in a common top-level domain (`roblox.com/games/1`,
+	`discord.gg/x`, `amyforest.co.uk`), an email address or handle (`@`),
+	or a dot written out (`example[.]com`, `(dot)`). A bare domain needs a
+	top-level domain from a short list, so ids such as `chapter3.meet_fox` and
+	file names such as `Story.luau` are not addresses. The store page kit
+	is held to it here; Luau text is tools/lib/purity.luau's check, which
+	asks `isLink` too.
 
 	Nothing to buy and nothing to write: no Luau under src/ reaches
 	MarketplaceService or prompts a purchase, and none makes a TextBox, so
@@ -41,8 +47,27 @@ Compliance.UNLINKED = { "docs/store" }
 -- The text files the guards read; images and models are not text.
 local TEXT = { "%.luau$", "%.json$", "%.md$", "%.txt$", "%.csv$" }
 
--- What reads as a web address: a scheme, or a www. host.
-local LINK_PATTERNS = { "https?://", "%f[%w]www%." }
+-- Exact strings a file may hold although they contain a surname: the
+-- Manifest's provenance names the owner's own repository.
+Compliance.ALLOWED = {
+	["assets/manifest.json"] = { "laazyj/jasonduffett.net" },
+} :: { [string]: { string } }
+
+-- The top-level domains a bare domain is recognised by.
+local DOMAINS: { [string]: true } = {}
+for _, domain in
+	string.split(
+		"com net org gg io co uk tv me ly app dev xyz info biz us ca au ie nz gl link site online edu gov",
+		" "
+	)
+do
+	DOMAINS[domain] = true
+end
+
+-- What reads as a web address, in lowercased text: a scheme, a www. host,
+-- an `@` before a name, or a dot written out; and (in isLink) a word, a
+-- dot and one of DOMAINS, as a whole word.
+local LINK_PATTERNS = { "https?://", "%f[%w]www%.", "@%w", "%[%.%]", "[%(%[]dot[%)%]]" }
 
 -- Whether `text` holds a web address, in any case; tools/lib/purity.luau
 -- asks the same of Luau's strings.
@@ -52,6 +77,17 @@ function Compliance.isLink(text: string): boolean
 		if string.find(lower, pattern) then
 			return true
 		end
+	end
+	-- each word, a dot and a name after it, overlapping ("a.b.com")
+	local from = 1
+	while true do
+		local at, _, domain = string.find(lower, "%w%.(%a+)%f[^%w_]", from)
+		if not at then
+			break
+		elseif DOMAINS[domain :: string] then
+			return true
+		end
+		from = at + 1
 	end
 	return false
 end
@@ -80,17 +116,21 @@ local function scan(path: string, text: string, matches: (line: string) -> boole
 	return found
 end
 
--- The lines of `text` (the file at `path`) that name one of `surnames`.
+-- The lines of `text` (the file at `path`) that name one of `surnames`,
+-- leaving out the strings ALLOWED in that file.
 function Compliance.names(path: string, text: string, surnames: { string }?): { string }
-	local patterns = {}
+	local lowered = {}
 	for _, surname in (surnames or Compliance.SURNAMES) :: { string } do
-		local escaped = string.gsub(string.lower(surname), "%p", "%%%0")
-		table.insert(patterns, `%f[%a]{escaped}%f[%A]`)
+		table.insert(lowered, string.lower(surname))
 	end
+	local allowed: { string } = Compliance.ALLOWED[path] or {}
 	local function named(line: string): boolean
+		for _, exact in allowed do
+			line = table.concat(string.split(line, exact), "")
+		end
 		local lower = string.lower(line)
-		for _, pattern in patterns do
-			if string.find(lower, pattern) then
+		for _, surname in lowered do
+			if string.find(lower, surname, 1, true) then
 				return true
 			end
 		end

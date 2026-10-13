@@ -179,6 +179,11 @@ return function(t: any)
 			})
 		end)
 
+		it("finds a bare domain and an email address in Luau text", function()
+			local source = 'local a = "visit roblox.com/games/1"\nlocal b = "a@b.com"'
+			expect(#Purity.links("src/client/x.luau", source)).toBe(2)
+		end)
+
 		it("finds a www. address, and covers the server's text too", function()
 			expect(Purity.links("src/server/Persist.luau", 'player:Kick("see www.example.com")')).toEqual({
 				"src/server/Persist.luau:1: a link in text (see www.example.com); the game links to nothing",
