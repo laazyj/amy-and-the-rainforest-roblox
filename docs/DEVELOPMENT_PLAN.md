@@ -522,9 +522,20 @@ Design notes:
 ### Mac runner specifics
 
 - A GitHub Actions self-hosted runner on the MacBook, labelled `studio`,
-  with Roblox Studio installed and logged in, running as a launchd *agent*
-  in a logged-in GUI session (never a daemon), with screen lock and sleep
-  disabled while on power.
+  isolated from the owner's account: inside a macOS virtual machine on
+  the Mac (brief mac-001a; its fallback is a standard macOS account of
+  its own), holding none of the owner's files, keys or logins, the runner
+  a launchd *agent* in the VM's logged-in GUI session (never a daemon).
+  The VM image is also what moves to a dedicated machine later. No host
+  power, screen-saver or lock setting is changed: tier 3 runs when the
+  Mac is awake. Studio there is signed in to a separate Roblox
+  account with no access to Dev or Release and plays local files only.
+- A job on the Mac never runs code from a pull request: it checks out the
+  tools from `main` and acts on the built `place` artifact. Mac workflows
+  start only from `workflow_dispatch`, a push to `main` or the
+  `needs-playtest` label, never from a fork's `pull_request`; they hold no
+  secrets and run with read-only permissions; the repository requires
+  approval for every outside collaborator's workflow run.
 - The bridge of record is **Roblox Studio's built-in MCP server** (which
   exposes run code, run script in play mode, start/stop play, console
   output and Creator Store insertion), wrapped behind
@@ -751,7 +762,8 @@ Outcome: version 1.0 on the Release channel.
   at the current Quest with the world rebuilt from Progress, chapter
   checkpoints, a "continue" title screen, and "start again" behind a
   confirmation. Studio DataStore access enabled on the Dev experience so
-  Mac playtests can exercise it under the test prefix.
+  the owner's own Studio playtests can exercise it under the test prefix
+  (the Mac runner's Roblox account has no access to Dev).
 - Phone and tablet support as separate device classes: touch controls,
   per-class UI layouts, safe areas, first-minute onboarding (where the
   thumbstick is, how to talk), tested under Studio device emulation on the
@@ -872,6 +884,7 @@ Outcome: players return because there is more to discover.
 |---|---|
 | Open Cloud Luau Execution is beta and may change or have outages | Tier 2 is isolated behind one runner script; failures are reported, not hidden; tier 3 and Lune cover most of the same logic |
 | Mac runner is often off | Tier 3 optional on PRs, mandatory for releases; perceptual briefs scheduled when the Mac is on |
+| A self-hosted runner on a public repository | The runner lives in a macOS VM (or, failing that, an unprivileged account) with nothing of the owner's in it; Mac jobs never run pull-request code and hold no secrets; fork workflow runs need approval (mac-001a) |
 | Studio version drift breaks the Mac bridge | Studio version pinned and reported by the job; bridge wrapped behind one module |
 | Agent cannot see or hear the game | Perceptual scope declared per brief; contact sheets and baselines; human review is part of the definition of done for perceptual work |
 | A PR job could publish to the public experience | Separate Dev and Release keys; Release key only in the gated environment; agent never holds a key; no `pull_request_target` |
@@ -906,7 +919,8 @@ Outcome: players return because there is more to discover.
    others) into `assets/images/` or a shared folder.
 6. Add testers as friends of the owning account when Dev is ready.
 7. In Phase 1, install Roblox Studio and the self-hosted runner on the
-   MacBook; the agent provides a setup script and checklist.
+   MacBook, isolated in a virtual machine (brief mac-001a); the agent
+   provides a setup script and checklist.
 
 Phase 0 agent work starts as soon as item 3 is done; items 1–2 can be done
 in parallel with the characterization test and refactor.
