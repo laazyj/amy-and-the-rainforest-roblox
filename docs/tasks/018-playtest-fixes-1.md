@@ -33,19 +33,23 @@ the code on `main` at `eb546cf`.
    the face rule, and the owner uploads them in the Creator Hub. Until
    then the owner may set any placeholder there.
 4. **"The Skip button is inaccessible because the chat window appears
-   above it."** Skip sits top left on PC, under Roblox's chat window. Two
-   fixes, both: **turn the chat off** (`TextChatService`'s chat window
-   disabled and the Chat core GUI off: the game is single player for ages
-   7 to 12 and the compliance questionnaire answers "no chat"), and move
-   Skip out of the core-GUI corner (under the Objective tracker on the
-   right, or bottom centre by the Hint), with the layout tests updated.
-   Coordinator's decision; the owner may overrule the chat part.
+   above it."** Skip sits top left on PC, under Roblox's chat window. The
+   chat stays on: the Dev shortcuts (`/chapter`, `/quest`) are chat
+   commands, so development needs it (whether Release turns it off is a
+   brief 015 Config question). Fix, the owner's: Skip becomes a sibling of
+   the Talk-and-advance button ("Talk" / "Next"), a button row at the
+   bottom right on every class, PC included, so the two are paired: Next
+   during a Dialogue, Skip while a Hint shows in free play, both when both
+   apply. PC therefore gets the clickable Talk-and-advance button too.
+   Layout and overlap tests updated; the row keeps clear of the dialogue
+   box and the Objective tracker.
 5. **"Using Space to continue is weird as the character jumps every time
-   you press Space."** Jumping is still bound on PC (only the touch jump
-   button was hidden). feel.md section 5: no jump requirement anywhere.
-   Fix: disable jumping entirely (`StarterPlayer.CharacterJumpHeight = 0`
-   or the Humanoid's jump height, and sink the jump action), on every
-   class. Space keeps advancing.
+   you press Space."** Jumping stays: the owner wants it for future
+   chapters. Fix: Space no longer advances a Dialogue on PC; click on the
+   box, E, Enter and the Next button do. The first-Line Hint and feel.md
+   section 5 change to match ("Click or press E to continue"). The touch
+   jump button stays hidden for now (the Story has no jump yet) with a
+   note that a future chapter brings it back in its own zone.
 6. **"The tilt shot at the forest wall could be more dramatic, panning
    higher up the wall."** `CameraModel.PATHS.ForestWallReveal` ends its
    look-at at 18 studs up. Fix: start lower (Amy's shoulders) and end at
