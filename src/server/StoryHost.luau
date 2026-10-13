@@ -19,6 +19,10 @@
 	Analytics: each Story event is logged as it is raised, and each
 	player's visit, its length on leave (src/server/Analytics).
 
+	Chat: Roblox's text chat window and input bar show only where
+	Config.chat says, on Dev; the server sets them, so they replicate to
+	every client.
+
 	Saves (Persist): a player's Save is opened when they join and written
 	after every step that raised Story events, on a Resume and on leave.
 	When their client is ready, a player who has not started begins the
@@ -41,6 +45,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextChatService = game:GetService("TextChatService")
 
 local Core = ReplicatedStorage:WaitForChild("core")
 local Events = require(Core:WaitForChild("Events"))
@@ -55,6 +60,7 @@ local Remotes = require(ReplicatedStorage:WaitForChild("shared"):WaitForChild("N
 
 local Analytics = require(script.Parent.Analytics)
 local CharacterHost = require(script.Parent.CharacterHost)
+local Config = require(script.Parent.Config)
 local LightingHost = require(script.Parent.LightingHost)
 local Persist = require(script.Parent.Persist)
 local PickupHost = require(script.Parent.PickupHost)
@@ -341,10 +347,21 @@ function StoryHost.onPlayerRemoving(player: any)
 	PickupHost.clear(player)
 end
 
+-- Roblox's chat window and input bar, shown only where Config.chat says.
+local function applyChat()
+	for _, class in { "ChatWindowConfiguration", "ChatInputBarConfiguration" } do
+		local chat = TextChatService:FindFirstChildOfClass(class)
+		if chat then
+			(chat :: any).Enabled = Config.chat
+		end
+	end
+end
+
 -- Builds what the Story needs in the world and connects the engine's
 -- signals. Once per server.
 function StoryHost.start()
 	assert(not remotes, "StoryHost has already started")
+	applyChat()
 	local made = Remotes.createRemotes()
 	remotes = made
 

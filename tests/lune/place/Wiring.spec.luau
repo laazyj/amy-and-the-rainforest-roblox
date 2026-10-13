@@ -87,6 +87,16 @@ local WIRING: { { file: string, label: string, code: string } } = {
 		code = "warn(Fault.line(name, playerId, why))\n\tAnalytics.fault(name, player)",
 	},
 	{
+		file = "StoryHost.luau",
+		label = "Roblox's text chat shows only where Config.chat says (Dev, not Release)",
+		code = "(chat :: any).Enabled = Config.chat",
+	},
+	{
+		file = "StoryHost.luau",
+		label = "the chat is set when the Story starts",
+		code = 'assert(not remotes, "StoryHost has already started")\n\tapplyChat()',
+	},
+	{
 		file = "Persist.luau",
 		label = "BindToClose releases every Save",
 		code = "pcall(game.BindToClose, game, function()\n\t\tPersist.close(progressOf)\n\tend)",

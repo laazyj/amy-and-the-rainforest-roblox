@@ -93,6 +93,12 @@ in the order to do them in one sitting.
       the Creator Hub, the experience, **Localization**, **Settings**:
       automatic translation (and automatic text capture, which feeds it)
       off. Off on Dev too.
+- [ ] **Check: no text chat on Release**: the server turns Roblox's chat
+      window and input bar off unless the build has the Dev folder, which
+      the release job strips (`Config.chat`;
+      `tests/lune/place/Config.spec.luau`, the Wiring spec,
+      `tests/engine/chat.luau` for Dev). **Human**: after publishing, join
+      Release once and see no chat window.
 - [ ] **Human: voice chat is off.** Where: the Creator Hub, the
       experience, **Communication** (or **Audience**, voice chat).
 - [ ] **Check: no in-game purchases, paid items or Robux prompts**:

@@ -32,8 +32,8 @@ release adds material content, such as a Chapter with new themes (the
 | Gambling, paid random items | **None** | The game sells nothing and has no random rewards | `tools/guard purchases-and-text` (nothing under `src/` reaches MarketplaceService or prompts a purchase) |
 | In-experience purchases | **None** | No passes, no developer products, no Robux prompts | `tools/guard purchases-and-text`; the release checklist |
 | Social hangout, meeting other players | **No** | Single player: one player per server, so a player never meets another | Max Players = 1, the invariant **Single player**: `tests/engine/maxplayers.luau` on Dev; the release checklist on Release |
-| Voice chat | **No** | Not enabled; with one player per server there is no one to hear | The owner leaves voice chat off in the experience's settings (Communication); see Open questions |
-| Text chat | Roblox's own chat window only; no in-game chat | The game adds no chat of its own and takes no typed text; with one player per server there is no one to chat with. Release has no chat commands (the Dev shortcuts are stripped when the release job publishes) | `tools/guard purchases-and-text` (no TextBox under `src/`); the glossary's **Dev shortcut** |
+| Voice chat | **No** | Not enabled; with one player per server there is no one to hear | The owner leaves voice chat off in the experience's settings (the release checklist) |
+| Text chat | **No** | Release has no chat: the server turns Roblox's chat window and input bar off (`Config.chat`), as only Dev keeps them for the Dev shortcuts' chat commands. The game takes no typed text, and with one player per server there is no one to chat with | `tests/lune/place/Config.spec.luau` (chat off in a build without the Dev folder, which the release job strips); the Wiring spec; `tests/engine/chat.luau` (on in Dev); `tools/guard purchases-and-text` (no TextBox) |
 | Free-form user creation (building, drawing, writing others see) | **No** | Players walk, talk and read; they make nothing others can see | `tools/guard purchases-and-text` (no TextBox); there is no building in the Story |
 | Political, religious or real-world sensitive themes | **None** | A child persuades her village to look after a forest. Care for nature is the theme, with no real place, group or event named | Canon; style guide section 4 |
 | Real people's personal information | **None** | The author is credited as "Clara" only; no full name, no web address | `tools/guard names`, `tools/guard links` and `tools/guard store-links` |
@@ -45,16 +45,7 @@ release adds material content, such as a Chapter with new themes (the
 - [ ] The answers above still hold for the build being released: no
       Chapter added since this draft with new themes. If one has, redo
       the topics it touches with the same care.
-- [ ] Voice chat is off (the release checklist's step), and the owner
-      has decided on Roblox's text chat window (see Open questions).
+- [ ] Voice chat is off (the release checklist's step).
 - [ ] The result shown after submitting is the all-ages label; if it is
       not, do not publish to Release until the answer that raised it is
       understood.
-
-## Open questions for the owner
-
-- **Roblox's text chat window.** The game has no chat of its own, but
-  Roblox shows its chat window by default. With one player per server
-  nobody else can read it. Hiding it (TextChatService's chat window off)
-  is one line in a later PR; the Dev shortcuts use chat commands, so it
-  would be hidden on Release only. Say if you want it.
