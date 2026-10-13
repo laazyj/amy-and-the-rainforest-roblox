@@ -15,7 +15,14 @@
 	none of them holds a web address. (Links in Luau text are
 	tools/lib/purity.luau's check.)
 
-	`tools/guard names` and `tools/guard store-links` run them in tier 0.
+	Nothing to buy and nothing to write: no Luau under src/ reaches
+	MarketplaceService or prompts a purchase, and none makes a TextBox, so
+	a player can neither spend nor type anything another could see. The
+	Experience Guidelines answers in docs/store/questionnaire.md rest on
+	these.
+
+	`tools/guard names`, `tools/guard store-links` and `tools/guard
+	purchases-and-text` run them in tier 0.
 ]]
 
 local Compliance = {}
@@ -90,6 +97,25 @@ function Compliance.names(path: string, text: string, surnames: { string }?): { 
 		return false
 	end
 	return scan(path, text, named, `a surname; credits say "Clara" only`)
+end
+
+-- What a purchase or free text needs, in Luau.
+local SHOP_PATTERNS = { "marketplaceservice", "prompt%a*purchase", "%f[%a]textbox%f[%A]" }
+
+local function sellsOrTakesText(line: string): boolean
+	local lower = string.lower(line)
+	for _, pattern in SHOP_PATTERNS do
+		if string.find(lower, pattern) then
+			return true
+		end
+	end
+	return false
+end
+
+-- The lines of `source` (Luau, the file at `path`) that reach a purchase
+-- or make a TextBox; comments count too, which is simpler and stricter.
+function Compliance.purchasesAndText(path: string, source: string): { string }
+	return scan(path, source, sellsOrTakesText, "a purchase or free text; the game sells nothing and takes no writing")
 end
 
 -- The lines of `text` (the file at `path`) that hold a web address.

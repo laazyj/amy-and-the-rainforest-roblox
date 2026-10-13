@@ -18,9 +18,10 @@ will land.
 
 - [ ] **Tier 0 (static) is green** (`tools/check.sh`): format, lint, strict
       types, and the guards of `tools/guard.luau`: core and content purity,
-      the content schema derived from the glossary, no `http` strings in
-      content or UI text, the coverage guards, and the mutation check's
-      canned faults still applying.
+      the content schema derived from the glossary, no web address in any
+      text under `src/` or in the store page kit, no surname, nothing to
+      buy, the coverage guards, and the mutation check's canned faults
+      still applying.
 - [ ] **Tier 1 (unit, Lune) is green** (`tools/test.sh`), including the
       canon test and a walkthrough of every Chapter from a fresh save, from
       every Checkpoint and from a Resume at every Quest.
@@ -68,7 +69,8 @@ Phase 0 PR that adds them; from then on they are required.
       [camera rule](design/feel.md#invariants), and no new art shows her
       face.
 - [ ] No purchases or full names in anything a player can see (tier 0
-      already rejects `http` strings).
+      rejects web addresses, surnames and purchase prompts:
+      `tools/guard links`, `names` and `purchases-and-text`).
 
 ### Process
 

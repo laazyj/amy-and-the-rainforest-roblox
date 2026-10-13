@@ -41,6 +41,18 @@ return function(t: any)
 		end)
 	end)
 
+	describe("the purchases-and-text guard", function()
+		it("finds a purchase prompt, MarketplaceService and a TextBox", function()
+			local source = 'local M = game:GetService("MarketplaceService")\nM:PromptProductPurchase(p, 1)\n'
+				.. 'Instance.new("TextBox")\nlocal ok = 1'
+			expect(#Compliance.purchasesAndText("src/client/x.luau", source)).toBe(3)
+		end)
+
+		it("finds nothing to buy or type under src/", function()
+			expect(Files.each({ "src" }, Compliance.purchasesAndText)).toEqual({})
+		end)
+	end)
+
 	describe("the store page kit's links guard", function()
 		it("finds a scheme or a www. host, in any case", function()
 			expect(Compliance.links("docs/store/x.md", "see HTTPS://example.com\nwww.example.com\nfine")).toEqual({

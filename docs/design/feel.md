@@ -76,6 +76,12 @@ The same rules apply to every class; only the numbers differ.
   touch), so the dialogue box may cover the left zone. It keeps clear of
   the talk-and-advance button: beside it in landscape, above it in
   portrait. The box and the talk-and-advance button both advance.
+- **The pause button** sits at the top left of the safe area on every
+  class, a 48 × 48 touch target; the Objective tracker keeps right of it.
+  It opens the Pause screen, a panel centred in the safe area: Resume,
+  and the Settings page, its rows touch targets, as tall as the safe area
+  at most at every Text scale. While it is open the Story does not
+  advance.
 - **Nothing covers the subject.** No UI element overlaps the projected
   bounding box of the speaker's head during `shot:Dialogue`, the
   Objective target during free play, or a touch control zone's controls
@@ -163,13 +169,22 @@ box, centred. Today's box at 62% of a 1376-unit-wide tablet holds about
   [style guide](../story/style-guide.md#3-reading-level-ages-7-to-12)
   keeps Lines short and untimed so this holds.
 - Contrast between text and its background is at least 4.5:1, and 7:1 in
-  the high-contrast setting. Tier 3 computes it from `TextColor3`,
+  the high-contrast setting, whose dialogue box is opaque. Tier 1 checks
+  the view-model's colours over a white and a black world
+  (`DialogueViewModel.box`); tier 3 computes it from `TextColor3`,
   `BackgroundColor3` and transparency over the backdrop, sampling pixels
   only where the backdrop is the 3D world.
 - Typewriter reveal is allowed, and a tap completes it instantly before
   a second tap advances.
-- A text size setting scales all text up by up to 1.5×; every rule here
-  must still pass at the largest setting.
+- A text size setting scales all text up by up to 1.5× (1, 1.25 or 1.5);
+  every rule here must still pass at the largest setting. A device whose
+  dialogue box cannot fit every Line at the chosen size is capped at the
+  largest size that fits, and the Settings page says so.
+- A dyslexia-friendly font setting sets Comic Neue Angular (Roblox's
+  `Cartoon`) on the Lines, the Objective and the Hints: its b, d, p and q
+  are not mirror images, and its capital I has bars, unlike l. The
+  layout's estimate of half the text size per character covers it; tier
+  3's `TextFits` is the measure.
 
 ### Title screen
 
@@ -241,7 +256,8 @@ receives: a Story that begins with its first Chapter card (a new Save, or
 "Start again") shows the Onboarding; a Resume never does. While a Hint
 shows in free play, a Skip button ends the Onboarding: above the
 talk-and-advance button on touch, at the top left of the safe area on a
-PC. The first Line's Hint has none: tapping is how it is done.
+PC, beside the pause button. The first Line's Hint has none: tapping is
+how it is done.
 
 ## 7. Visual rubric
 

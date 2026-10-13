@@ -15,6 +15,9 @@
 	  lune run tools/guard store-links
 	                                no web address in the store page kit,
 	                                docs/store/
+	  lune run tools/guard purchases-and-text
+	                                nothing under src/ prompts a purchase
+	                                or makes a TextBox
 	  lune run tools/guard coverage a spec per core module, every glossary
 	                                name tests must use in a spec, and a
 	                                Walkthrough spec per Chapter
@@ -63,6 +66,9 @@ local GUARDS: { [string]: (Cli.Context) -> { string } } = {
 	end,
 	["store-links"] = function()
 		return Files.each(Compliance.UNLINKED, Compliance.links, Compliance.isText)
+	end,
+	["purchases-and-text"] = function()
+		return Files.each({ "src" }, Compliance.purchasesAndText)
 	end,
 	coverage = function()
 		local specs = {}
