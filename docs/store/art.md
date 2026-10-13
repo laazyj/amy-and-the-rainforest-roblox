@@ -27,17 +27,17 @@ when the owner sets it. The words are in [description.md](description.md).
 | | |
 |---|---|
 | Size | 512 × 512 PNG; Roblox rounds its corners, so nothing that matters within about 50 pixels of a corner |
-| Status | Placeholder (`assets/images/icon.png`): a plain stand-in, not for Release |
+| Status | Stop-gap crop (`assets/images/icon.png`); the owner sets it in the Creator Hub |
 | Must read at | 150 × 150, the size the Roblox home page shows it |
 
 No square crop of the illustrations we have reads at that size with Amy
 in it (brief 009's assessment, [ASSETS.md](../ASSETS.md)), so the icon is
-the first piece to ask Clara for. Until she draws it, the best stop-gap
-is a square crop of `ui:title_screen` (`assets/images/title.png`, 2000 ×
-1125, `amy: absent`): the wall of trunks with the nests in the canopy,
-x 500 to 1625, y 0 to 1125, scaled to 512 × 512. It has no Amy at all, so
-the face rule holds without a check, but it reads as "trees", not as this
-story; the owner decides whether to ship it or wait.
+the first piece to ask Clara for. Until she draws it, the icon is a
+square crop of `ui:title_screen`: the wall of trunks with the nests in
+the canopy (the exact crop is in the `store:icon` entry of the
+Manifest). It has no Amy at all (`amy: absent`), so the face rule holds
+without a check; it reads as "trees" rather than as this story, which
+Clara's drawing will fix.
 
 ## Thumbnails (`store:thumbnail_1` to `_3`)
 
