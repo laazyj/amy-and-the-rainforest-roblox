@@ -183,10 +183,13 @@ box, centred. Today's box at 62% of a 1376-unit-wide tablet holds about
   dialogue box cannot fit every Line at the chosen size is capped at the
   largest size that fits, and the Settings page says so.
 - A dyslexia-friendly font setting sets Comic Neue Angular (Roblox's
-  `Cartoon`) on the Lines, the Objective and the Hints: its b, d, p and q
-  are not mirror images, and its capital I has bars, unlike l. The
-  layout's estimate of half the text size per character covers it; tier
-  3's `TextFits` is the measure.
+  `Cartoon`) on the Lines, the Objective, the Hints and the Pause
+  screen's labels: a Comic Sans-style face, rounded, with a barred
+  capital I unlike l and a single-storey a and g, the closest of
+  Roblox's built-in fonts to what dyslexia style guides recommend. The
+  owner confirms by eye that it reads more easily. The layout's estimate
+  of half the text size per character covers it; tier 3's `TextFits` is
+  the measure.
 
 ### Title screen
 

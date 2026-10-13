@@ -1023,6 +1023,11 @@ for _, label in { bodyLabel, objectiveText, hintLabel, onboardingHint } do
 end
 local DYSLEXIA_FONT = Enum.Font:FromName(Settings.DYSLEXIA_FACE) or Enum.Font.GothamMedium
 
+-- A body text's font for the Settings: its own, or the dyslexia-friendly one.
+local function fontFor(own: Enum.Font): Enum.Font
+	return if settings.font == "dyslexia" then DYSLEXIA_FONT else own
+end
+
 -- The dialogue box's colours and the body texts' font, for the Settings.
 local function renderBox()
 	local box = DialogueViewModel.box(settings.highContrast)
@@ -1031,7 +1036,7 @@ local function renderBox()
 	dialogueStroke.Color = rgb(box.stroke)
 	hintLabel.TextColor3 = rgb(box.hint)
 	for label, own in OWN_FONTS do
-		label.Font = if settings.font == "dyslexia" then DYSLEXIA_FONT else own
+		label.Font = fontFor(own)
 	end
 end
 renderBox()
@@ -1043,7 +1048,7 @@ local function pauseLabel(parent: Instance, text: string, size: number, width: n
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromOffset(width, height)
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.GothamMedium
+	label.Font = fontFor(Enum.Font.GothamMedium)
 	label.TextColor3 = rgb(pauseColours.text)
 	label.TextSize = size
 	label.TextWrapped = true

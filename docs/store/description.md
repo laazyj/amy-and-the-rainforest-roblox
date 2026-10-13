@@ -30,7 +30,7 @@ One beautiful Sunday, Amy wants to explore. Sam the dog has other ideas! Slip ou
 Meet a maroon squirrel, an orange fox and a golden lion. Follow the glowing flowers. Then hurry home, because the forest needs Amy's help.
 
 - Four short chapters, played on your own
-- Read at your own pace: nothing moves on until you tap
+- Read at your own pace: every line waits for you
 - Bigger text, high contrast and easy-read letters in Settings
 - Nothing to buy
 - Your place in the story is saved
@@ -46,7 +46,7 @@ Each claim and what backs it:
 |---|---|
 | Four chapters | `src/content/Story.luau`; `tests/engine/smoke.luau` counts them |
 | Played on your own | Max Players = 1: `tests/engine/maxplayers.luau` on Dev, the [release checklist](../RELEASE_CHECKLIST.md) on Release |
-| Nothing moves on until you tap | The no-timed-reading test in `tests/lune/core/DialogueViewModel.spec.luau`, and the server waits for every `DialogueFinished` (`tests/lune/place/Wiring.spec.luau`) |
+| Every line waits for you | The no-timed-reading tests: no Dialogue moves on by time (`tests/lune/core/DialogueViewModel.spec.luau`), the binder advances only on input and the server waits for every `DialogueFinished` (`tests/lune/place/Wiring.spec.luau`) |
 | Bigger text, high contrast, easy-read letters | `src/core/Settings.luau` and its spec |
 | Nothing to buy | `tools/guard purchases-and-text` |
 | Your place is saved | `src/server/Persist.luau`, `tests/engine/persist.luau` |

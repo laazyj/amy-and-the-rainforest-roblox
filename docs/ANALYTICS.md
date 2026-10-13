@@ -59,3 +59,13 @@ visits and returning players without any of our events.
 
 Custom events appear in the Creator Hub after a delay of up to a day, and
 only for real players: engine tests log nothing to AnalyticsService.
+
+## Follow-up
+
+Roblox Analytics also has funnel and progression events
+(`AnalyticsService:LogFunnelStepEvent`, `LogProgressionEvent`), which the
+Creator Hub draws as a funnel without building one from custom events.
+Logging each `QuestStarted` as a funnel step of the Story, in story order,
+would show at a glance where players stop. It is a small change in
+`src/server/Analytics.luau` with its own mapping in
+`src/core/AnalyticsEvents.luau`; not done yet.

@@ -370,7 +370,7 @@ row's values (`src/core/Settings.luau`).
 | `volume` | `1`, `0.75`, `0.5`, `0.25`, `0` | The volume of every sound, through the SoundGroup `SoundService.Master` |
 | `textScale` | `1`, `1.25`, `1.5` | The Text scale, capped per device |
 | `highContrast` | `false`, `true` | The dialogue box opaque and darker, every Line, name and hint on it at 7:1 |
-| `font` | `standard`, `dyslexia` | The dyslexia-friendly font (Comic Neue Angular) on the Lines, the Objective and the Hints |
+| `font` | `standard`, `dyslexia` | The dyslexia-friendly font (Comic Neue Angular) on the Lines, the Objective, the Hints and the Pause screen's labels |
 
 ### Faults
 
@@ -449,7 +449,7 @@ one is not a valid change.
 |---|---|---|
 | Single player | Max Players = 1; the Story is never shared between players | Tier 2 |
 | Amy's face is never seen | The Player Character is only ever seen from behind: the camera rule in [`design/feel.md`](design/feel.md#invariants), every Shot, and all art | Tier 3; release checklist for art |
-| No timed reading | Nothing the player must read moves on by itself: a Dialogue advances only on the player's input, and the server waits for every `DialogueFinished` | Tier 1 (`DialogueViewModel.spec`, the Wiring spec) and the mutation check |
+| No timed reading | A Dialogue never moves on by itself: each Line stays until the player advances it, the client binder reaches its advance only from the player's input, and the server waits for every `DialogueFinished`. (A Chapter card, which holds no Line, is timed and can be skipped.) | Tier 1 (`DialogueViewModel.spec`, the Wiring spec) and the mutation check |
 
 ## How to propose a new term
 

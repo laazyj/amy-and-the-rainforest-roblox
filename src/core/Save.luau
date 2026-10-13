@@ -21,7 +21,10 @@
 	  1  { version = 1, progress = Progress }
 	  2  adds `checkpoints`: Chapter id -> the Progress when it started
 	  3  adds `settings`: the player's Settings (src/core/Settings),
-	     the defaults for a Save made before there were any
+	     the defaults for a Save made before there were any. A Setting
+	     read with a value this version does not know becomes its
+	     default, so a new value for an existing Setting needs a new
+	     field, or a schema version the rollback rule accepts
 
 	Rolling back one version (plan section 3). A version only ever adds
 	fields, so code of version N reads a version N + 1 Save as its own:

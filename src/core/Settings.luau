@@ -73,10 +73,9 @@ Settings.DEFAULTS = table.freeze({
 	font = "standard",
 } :: Settings)
 
--- The dyslexia-friendly font's Roblox Enum.Font name, which the client
--- binder sets on the Lines, the Objective and the Hints in place of their
--- own. Cartoon is Comic Neue Angular: its b, d, p and q are not mirror
--- images and its capital I has bars, so it is not confused with l.
+-- The dyslexia-friendly font's Roblox Enum.Font name (Comic Neue Angular),
+-- which the client binder sets on the Lines, the Objective, the Hints and
+-- the Pause screen's labels; docs/design/feel.md section 3 says why.
 Settings.DYSLEXIA_FACE = "Cartoon"
 
 Settings.LABELS = table.freeze({

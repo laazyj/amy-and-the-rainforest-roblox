@@ -7,6 +7,7 @@
 	compared with whitespace collapsed.
 ]]
 
+local Lex = require("../../../tools/lib/lex")
 local Net = require("../../../src/core/Net")
 local bootstrap = require("../bootstrap")
 local fs = require("@lune/fs")
@@ -187,5 +188,43 @@ return function(t: any)
 				end)
 			end
 		end
+	end)
+
+	-- No timed reading, in the binder: the only way a Dialogue moves on is
+	-- advance(), and it is reached only from the player's input. Each
+	-- input below holds one call; a call anywhere else (a task.delay, a
+	-- timer) makes the count differ.
+	describe("client wiring", function()
+		local INPUTS: { { input: string, code: string } } = {
+			{ input = "a click anywhere on a PC", code = "clickCatcher.Activated:Connect(advance)" },
+			{ input = "a tap or click on the dialogue box", code = "dialogueFrame.Activated:Connect(advance)" },
+			{ input = "a tap or click on the Chapter card", code = "titleOverlay.Activated:Connect(advance)" },
+			{
+				input = "E, Space or Enter",
+				code = "or input.KeyCode == Enum.KeyCode.Return then advance() end end)",
+			},
+			{ input = "the Talk-and-advance button", code = 'if action == "advance" then advance()' },
+		}
+
+		for _, each in INPUTS do
+			it(`advances a Dialogue on {each.input}`, function()
+				expect(source(CLIENT)).toContain(each.code)
+			end)
+		end
+
+		it("reaches advance() only from those inputs: no timed reading", function()
+			local uses = 0
+			-- the raw file, not source(): the lexer needs it uncollapsed
+			local tokens = Lex.tokens(bootstrap.readSource(CLIENT))
+			for i, token in tokens do
+				local before = tokens[i - 1]
+				local member = before and before.kind == "symbol" and (before.value == "." or before.value == ":")
+				local defined = before and before.value == "function"
+				if token.kind == "name" and token.value == "advance" and not member and not defined then
+					uses += 1
+				end
+			end
+			expect(uses).toBe(#INPUTS)
+		end)
 	end)
 end
