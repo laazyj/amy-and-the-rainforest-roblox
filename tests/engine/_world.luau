@@ -49,6 +49,7 @@ function World.build(withMap: boolean, saves: string)
 		LightingHost = server("LightingHost"),
 		Persist = server("Persist"),
 		FaultLog = server("FaultLog"),
+		Analytics = server("Analytics"),
 	}
 end
 

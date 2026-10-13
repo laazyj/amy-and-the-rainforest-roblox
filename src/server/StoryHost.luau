@@ -15,6 +15,9 @@
 	message to a client to the Net contract before it is sent; either
 	failing is an error, not a dropped message.
 
+	Analytics: each Story event is logged as it is raised, and each
+	player's visit, its length on leave (src/server/Analytics).
+
 	Saves (Persist): a player's Save is opened when they join and written
 	after every step that raised Story events, on a Resume and on leave.
 	When their client is ready, a player who has not started begins the
@@ -49,6 +52,7 @@ local World = require(Core:WaitForChild("World"))
 local Content = require(ReplicatedStorage:WaitForChild("content"):WaitForChild("Story"))
 local Remotes = require(ReplicatedStorage:WaitForChild("shared"):WaitForChild("Net"))
 
+local Analytics = require(script.Parent.Analytics)
 local CharacterHost = require(script.Parent.CharacterHost)
 local LightingHost = require(script.Parent.LightingHost)
 local Persist = require(script.Parent.Persist)
@@ -103,8 +107,10 @@ local function awaitDialogue(session: Session)
 	end
 end
 
--- After a step that raised Story events, the player's Save gets their Progress.
+-- After a step that raised Story events, they are logged and the player's
+-- Save gets their Progress.
 local function recordAfter(session: Session, events: { Events.StoryEvent })
+	Analytics.storyEvents(session.player, events)
 	if #events > 0 then
 		Persist.record(session.player, session.engine:snapshot())
 	end
@@ -183,6 +189,7 @@ local function initPlayer(player: any)
 	if not sessions[player] then
 		newSession(player, nil)
 		Persist.open(player)
+		Analytics.joined(player)
 	end
 end
 
@@ -307,6 +314,7 @@ end
 -- The player has left: their Save gets their last Progress and is released.
 function StoryHost.onPlayerRemoving(player: any)
 	Persist.release(player, StoryHost.progress(player))
+	Analytics.left(player)
 	local session = sessions[player]
 	if session then
 		session.alive = false

@@ -66,6 +66,26 @@ local WIRING: { { file: string, label: string, code: string } } = {
 		code = "while session.alive and not session.dialogueDone do\n\t\ttask.wait(0.1)\n\tend",
 	},
 	{
+		file = "StoryHost.luau",
+		label = "every Story event a step raises is logged to analytics",
+		code = "local function recordAfter(session: Session, events: { Events.StoryEvent })\n\tAnalytics.storyEvents(session.player, events)",
+	},
+	{
+		file = "StoryHost.luau",
+		label = "a player's visit is logged: joining, and leaving with its length",
+		code = "Persist.open(player)\n\t\tAnalytics.joined(player)",
+	},
+	{
+		file = "StoryHost.luau",
+		label = "a leaving player's SessionEnded is logged",
+		code = "Analytics.left(player)",
+	},
+	{
+		file = "FaultLog.luau",
+		label = "every Fault is logged to analytics",
+		code = "warn(Fault.line(name, playerId, why))\n\tAnalytics.fault(name, player)",
+	},
+	{
 		file = "Persist.luau",
 		label = "BindToClose releases every Save",
 		code = "pcall(game.BindToClose, game, function()\n\t\tPersist.close(progressOf)\n\tend)",
