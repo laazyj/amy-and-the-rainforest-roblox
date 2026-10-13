@@ -179,6 +179,13 @@ return function(t: any)
 			})
 		end)
 
+		it("finds a www. address, and covers the server's text too", function()
+			expect(Purity.links("src/server/Persist.luau", 'player:Kick("see www.example.com")')).toEqual({
+				"src/server/Persist.luau:1: a link in text (see www.example.com); the game links to nothing",
+			})
+			expect(Purity.LINKED).toEqual({ "src" })
+		end)
+
 		it("ignores links in comments, and asset ids", function()
 			expect(Purity.links("src/core/Thing.luau", '-- https://example.com\nlocal a = "rbxassetid://1"')).toEqual({})
 		end)

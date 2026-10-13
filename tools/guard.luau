@@ -6,8 +6,15 @@
 	                                content schema derived from docs/GLOSSARY.md
 	  lune run tools/guard purity   src/core and src/content touch no engine
 	                                global and require only each other
-	  lune run tools/guard links    no http:// or https:// in the text of
-	                                content, the core or the client binder
+	  lune run tools/guard links    no web address in any text under src/:
+	                                content, the core, the client and the
+	                                server
+	  lune run tools/guard names    no surname of the family under src/,
+	                                assets/ or docs/store/ (credits say
+	                                "Clara" only)
+	  lune run tools/guard store-links
+	                                no web address in the store page kit,
+	                                docs/store/
 	  lune run tools/guard coverage a spec per core module, every glossary
 	                                name tests must use in a spec, and a
 	                                Walkthrough spec per Chapter
@@ -23,6 +30,7 @@
 ]]
 
 local Cli = require("./lib/cli")
+local Compliance = require("./lib/compliance")
 local Coverage = require("./lib/coverage")
 local Files = require("./lib/files")
 local Mutate = require("./lib/mutate")
@@ -49,6 +57,12 @@ local GUARDS: { [string]: (Cli.Context) -> { string } } = {
 	end,
 	links = function()
 		return Files.each(Purity.LINKED, Purity.links)
+	end,
+	names = function()
+		return Files.each(Compliance.NAMED, Compliance.names, Compliance.isText)
+	end,
+	["store-links"] = function()
+		return Files.each(Compliance.UNLINKED, Compliance.links, Compliance.isText)
 	end,
 	coverage = function()
 		local specs = {}
