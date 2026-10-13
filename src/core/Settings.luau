@@ -22,7 +22,7 @@
 	                     valid kept, the default for the rest, and the
 	                     fields a newer version added kept as they were
 	  known(settings)    only the known fields: what goes on the wire
-	  isDefault(settings)
+	  same(a, b), isDefault(settings)
 	  change(settings, setting, direction)
 	                     one Setting moved a step up (1) or down (-1); a
 	                     toggle flips either way
@@ -181,13 +181,18 @@ function Settings.known(settings: Settings): Settings
 	return known :: Settings
 end
 
-function Settings.isDefault(settings: Settings): boolean
+-- Whether `a` and `b` agree on every Setting this version knows.
+function Settings.same(a: Settings, b: Settings): boolean
 	for _, setting in Settings.ORDER do
-		if settings[setting] ~= Settings.DEFAULTS[setting] then
+		if a[setting] ~= b[setting] then
 			return false
 		end
 	end
 	return true
+end
+
+function Settings.isDefault(settings: Settings): boolean
+	return Settings.same(settings, Settings.DEFAULTS)
 end
 
 function Settings.change(settings: Settings, setting: Setting, direction: number): Settings

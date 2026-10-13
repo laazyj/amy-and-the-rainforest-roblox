@@ -11,6 +11,8 @@
 	                            this version cannot read)
 	  record(player, progress)  new Progress, written on every Story event
 	  replace(player, save)     a whole new Save (the Title screen's choices)
+	  changeSettings(player, settings)
+	                            the player's new Settings
 	  release(player, progress) on leave: writes the last Progress and ends
 	                            the session, releasing the lock
 	  close()                   on BindToClose: releases every session and
@@ -39,6 +41,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Core = ReplicatedStorage:WaitForChild("core")
 local Save = require(Core:WaitForChild("Save"))
+local Settings = require(Core:WaitForChild("Settings"))
 local Story = require(Core:WaitForChild("Story"))
 local StoryEngine = require(Core:WaitForChild("StoryEngine"))
 local Config = require(script.Parent.Config)
@@ -217,6 +220,13 @@ function Persist.replace(player: any, save: Save.Save)
 	if entry and entry.save and entry.profile then
 		hold(entry, save)
 		write(entry)
+	end
+end
+
+function Persist.changeSettings(player: any, settings: Settings.Settings)
+	local entry = entries[player]
+	if entry and entry.save and not Settings.same(entry.save.settings, settings) then
+		Persist.replace(player, Save.withSettings(entry.save, settings))
 	end
 end
 

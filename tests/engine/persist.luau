@@ -11,6 +11,8 @@
 --   - a returning player is offered the Title screen, and each Title
 --     choice (Continue, Play this chapter again, Start again) leads where
 --     it should;
+--   - Settings changed in play are kept in the Save, and sent back
+--     (ApplySettings) when the player returns, before the Title screen;
 --   - data that is no Save is kept aside, the player starts afresh, and the
 --     Fault save_unreadable is reported;
 --   - BindToClose releases every session lock: a task cannot shut its
@@ -32,9 +34,11 @@ local play = Driver.new(server, world.CharacterHost)
 
 local USER_ID = -7
 
--- What each fake player was sent: the remote names, and the ShowTitle payloads.
+-- What each fake player was sent: the remote names, and the ShowTitle and
+-- ApplySettings payloads.
 local sent: { [any]: { string } } = {}
 local titles: { [any]: { any } } = {}
+local applied: { [any]: { any } } = {}
 server.setSend(function(to, remote: RemoteEvent, ...)
 	sent[to] = sent[to] or {}
 	table.insert(sent[to], remote.Name)
@@ -42,6 +46,8 @@ server.setSend(function(to, remote: RemoteEvent, ...)
 		task.defer(server.onDialogueFinished, to)
 	elseif remote.Name == "ShowTitle" then
 		titles[to] = table.pack(...)
+	elseif remote.Name == "ApplySettings" then
+		applied[to] = table.pack(...)
 	end
 end)
 
@@ -193,6 +199,33 @@ describe("Saves", function()
 		local save = stored(back)
 		expect(save.progress.quest).toBe(first)
 		expect(save.checkpoints[chapter2.id]).toBeNil()
+	end)
+
+	it("keeps changed Settings in the Save and sends them back, before the Title screen", function()
+		local back = join()
+		waitFor("ShowTitle", 30, function()
+			return titles[back] ~= nil
+		end)
+		expect(applied[back]).toBeNil() -- the defaults are never sent
+		local Settings = world.Settings
+		local changed = Settings.change(Settings.change(Settings.DEFAULTS, "highContrast", 1), "volume", -1)
+		server.onChangeSettings(back, changed)
+		leave(back)
+		expect(stored(back).settings).toEqual(changed)
+
+		local again = join()
+		waitFor("ShowTitle", 30, function()
+			return titles[again] ~= nil
+		end)
+		local args = applied[again]
+		expect(args ~= nil).toBe(true)
+		expect(Net.check("ApplySettings", args)).toBe(true)
+		expect(args[1]).toEqual(changed)
+		local at = table.find(sent[again], "ApplySettings") :: number
+		expect(at < (table.find(sent[again], "ShowTitle") :: number)).toBe(true)
+		server.onChangeSettings(again, Settings.DEFAULTS)
+		leave(again)
+		expect(stored(again).settings).toEqual(Settings.DEFAULTS)
 	end)
 
 	it("ignores a Title choice that was not offered", function()

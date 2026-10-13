@@ -124,6 +124,11 @@ return function(t: any)
 			expect(Settings.isDefault(settings)).toBe(false)
 		end)
 
+		it("are the same Settings only when every known Setting agrees", function()
+			expect(Settings.same(Settings.read({ narration = "on" }), Settings.DEFAULTS)).toBe(true)
+			expect(Settings.same(Settings.change(Settings.DEFAULTS, "volume", -1), Settings.DEFAULTS)).toBe(false)
+		end)
+
 		it("keeps a newer version's Setting", function()
 			local settings = Settings.read({ narration = "on" })
 			expect(Settings.change(settings, "volume", -1).narration).toBe("on")

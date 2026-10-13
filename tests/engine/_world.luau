@@ -41,6 +41,7 @@ function World.build(withMap: boolean, saves: string)
 		Story = (require :: any)(ReplicatedStorage:WaitForChild("core"):WaitForChild("Story")),
 		StoryEngine = (require :: any)(ReplicatedStorage:WaitForChild("core"):WaitForChild("StoryEngine")),
 		Save = (require :: any)(ReplicatedStorage:WaitForChild("core"):WaitForChild("Save")),
+		Settings = (require :: any)(ReplicatedStorage:WaitForChild("core"):WaitForChild("Settings")),
 		StoryHost = StoryHost,
 		CharacterHost = server("CharacterHost"),
 		DevShortcuts = (require :: any)(ServerScriptService:WaitForChild("Dev"):WaitForChild("DevShortcuts")),

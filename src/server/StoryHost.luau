@@ -18,7 +18,9 @@
 	When their client is ready, a player who has not started begins the
 	Story at once; a returning player is offered the Title screen
 	(ShowTitle) and their Title choice continues, replays the Chapter from
-	its Checkpoint, or starts again.
+	its Checkpoint, or starts again. Before either, a player whose Settings
+	are not the defaults is sent them (ApplySettings); each change the
+	client sends (ChangeSettings) goes into their Save.
 
 	While a player's commands are being carried out the host is busy for
 	them, and other Player events from them are dropped, as a player cannot
@@ -38,6 +40,7 @@ local Core = ReplicatedStorage:WaitForChild("core")
 local Events = require(Core:WaitForChild("Events"))
 local Net = require(Core:WaitForChild("Net"))
 local Save = require(Core:WaitForChild("Save"))
+local Settings = require(Core:WaitForChild("Settings"))
 local StoryEngine = require(Core:WaitForChild("StoryEngine"))
 local TitleScreen = require(Core:WaitForChild("TitleScreen"))
 local World = require(Core:WaitForChild("World"))
@@ -198,6 +201,9 @@ function StoryHost.onClientReady(player: any)
 	initPlayer(player)
 	task.spawn(function()
 		local save = Persist.await(player)
+		if save and not Settings.isDefault(save.settings) then
+			message(player, "ApplySettings", table.pack(Settings.known(save.settings)))
+		end
 		local offer = save and TitleScreen.offer(story, save)
 		local session = sessions[player]
 		if offer and session and not StoryEngine.started(session.engine.progress) then
@@ -250,6 +256,11 @@ end
 function StoryHost.idle(player: any): boolean
 	local session = sessions[player]
 	return session ~= nil and not session.busy
+end
+
+-- The player changed their Settings (held to the contract by fromClient).
+function StoryHost.onChangeSettings(player: any, settings: Settings.Settings)
+	Persist.changeSettings(player, settings)
 end
 
 -- The client has shown the last Line of the Dialogue it was given.
@@ -330,6 +341,7 @@ function StoryHost.start()
 	end
 	made.ClientReady.OnServerEvent:Connect(fromClient("ClientReady", StoryHost.onClientReady))
 	made.TitleChoice.OnServerEvent:Connect(fromClient("TitleChoice", StoryHost.onTitleChoice))
+	made.ChangeSettings.OnServerEvent:Connect(fromClient("ChangeSettings", StoryHost.onChangeSettings))
 	Players.PlayerRemoving:Connect(StoryHost.onPlayerRemoving)
 
 	print("[StoryServer] Story engine ready: " .. story.title)
