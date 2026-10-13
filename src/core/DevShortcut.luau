@@ -7,6 +7,10 @@
 
 	  /chapter N    the first Quest of Chapter N
 	  /quest <id>   that Quest ("/quest chapter3.meet_fox")
+
+	The chat is off (src/client/ChatOff) but for the input bar these are
+	typed in: DevShortcuts sets the attribute CHAT_ATTRIBUTE on
+	TextChatService, and the client keeps the input bar where it is set.
 ]]
 
 local Story = require("./Story")
@@ -31,6 +35,9 @@ local JUMPS: { [string]: Jump } = {
 }
 
 local DevShortcut = {}
+
+-- The attribute that marks a place with Dev shortcuts, for the client's chat.
+DevShortcut.CHAT_ATTRIBUTE = "DevShortcuts"
 
 -- The chat commands, as TextChatCommand aliases.
 DevShortcut.COMMANDS = {}

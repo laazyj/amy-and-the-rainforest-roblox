@@ -52,7 +52,8 @@
 	so the box may use the left zone, and keeps clear of the right zone's
 	Talk-and-advance button, beside it in landscape and above it in
 	portrait. The Skip button shows only in free play (the Onboarding's
-	Hint on the first Line is skipped by tapping), above the Talk button.
+	Hint on the first Line is skipped by tapping): above the Talk button on
+	touch, and on a PC beside the Hint at the bottom centre.
 ]]
 
 local DeviceClass = require("./DeviceClass")
@@ -345,8 +346,15 @@ function ScreenLayout.new(screen: Screen): Layout
 			box = { left = safe.x + MARGIN, space = space, bottom = bottom - MARGIN }
 		end
 	else
-		skip = rect(safe.x + MARGIN, safe.y + MARGIN, skipWidth, ScreenLayout.TARGET)
 		hint = rect(safe.x + (safe.width - hintWidth) / 2, bottom - BOTTOM_MARGIN - hintHeight, hintWidth, hintHeight)
+		-- beside the Hint, its bottom edge level with the Hint's: clear of
+		-- the top-left corner, where Roblox's own buttons sit
+		skip = rect(
+			hint.x + hint.width + ScreenLayout.TARGET_GAP,
+			hint.y + hint.height - ScreenLayout.TARGET,
+			skipWidth,
+			ScreenLayout.TARGET
+		)
 		box = { left = safe.x + MARGIN, space = safe.width - 2 * MARGIN, bottom = bottom - BOTTOM_MARGIN }
 	end
 

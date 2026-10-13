@@ -145,6 +145,20 @@ return function(t: any)
 			end)
 		end
 
+		it("has the client turn the chat off as it starts", function()
+			expect(source(CLIENT)).toContain('require(script.Parent:WaitForChild("ChatOff")).start()')
+		end)
+
+		it("has the Dev shortcuts mark TextChatService, so Dev keeps the chat input bar", function()
+			expect(source(`{SERVER}/Dev/DevShortcuts.luau`)).toContain(
+				"TextChatService:SetAttribute(DevShortcut.CHAT_ATTRIBUTE, true)"
+			)
+		end)
+
+		it("has Space advance above the jump action, which never sees it", function()
+			expect(source(CLIENT)).toContain("Enum.ContextActionPriority.High.Value, Enum.KeyCode.Space)")
+		end)
+
 		for name, remote in Net.REMOTES do
 			if remote.direction == "toServer" then
 				it(`hands {name} from the client, payload checked, to StoryHost.on{name}`, function()

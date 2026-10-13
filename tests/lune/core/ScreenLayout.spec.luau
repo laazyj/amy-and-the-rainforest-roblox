@@ -359,6 +359,19 @@ return function(t: any)
 		end)
 	end)
 
+	describe("ScreenLayout Skip button", function()
+		each("sits beside the Hint at the bottom on a PC, out of the top-left corner", function(layout)
+			if layout.touch then
+				return
+			end
+			local skip, hint = layout.skip, layout.hint
+			expect(inside(skip, layout.safe)).toBe(true)
+			expect(gap(skip, hint) >= ScreenLayout.TARGET_GAP).toBe(true)
+			expect(skip.y > layout.safe.y + layout.safe.height / 2).toBe(true)
+			expect(skip.y + skip.height).toBe(hint.y + hint.height)
+		end)
+	end)
+
 	describe("ScreenLayout nothing overlaps", function()
 		each("in free play: the Objective tracker, a Hint, the Skip button and the touch controls", function(layout)
 			local shown: { [string]: Rect } = {

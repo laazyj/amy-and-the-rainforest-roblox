@@ -9,7 +9,10 @@
 
 	  jumpTo(player, questId)    the jump-to-Quest entry point
 	  onCommand(player, text)    a chat command, parsed by core/DevShortcut
-	  start()                    makes the chat commands (/chapter, /quest)
+	  start()                    makes the chat commands (/chapter, /quest),
+	                             and marks TextChatService so the client
+	                             keeps the chat input bar to type them in
+	                             (src/client/ChatOff; Release has no chat)
 
 	DevServer.server.luau starts it. Both live in ServerScriptService.Dev,
 	which the publish job strips from the Release place (RELEASE_JOB=1,
@@ -57,6 +60,8 @@ function DevShortcuts.start()
 		end)
 		command.Parent = TextChatService
 	end
+	-- the client's ChatOff keeps the chat input bar for the commands
+	TextChatService:SetAttribute(DevShortcut.CHAT_ATTRIBUTE, true)
 	print("[DevShortcuts] Dev shortcuts ready: " .. table.concat(DevShortcut.COMMANDS, ", "))
 end
 

@@ -16,6 +16,9 @@
 	Every remote it receives is held to the Net contract first (Net.guard);
 	a malformed payload is dropped with a warning.
 
+	The chat is off (ChatOff). Amy never jumps: her jump height is 0
+	(default.project.json) and Space is bound above the jump action.
+
 	Click, tap, or press E, Space or Enter to advance a Dialogue; when the
 	view-model says it is finished, DialogueFinished goes to the server.
 	The Title screen shows while the client loads; a returning player's
@@ -43,6 +46,7 @@ local Workspace = game:GetService("Workspace")
 -- The camera first, before anything here yields: every frame is its own.
 local Camera = require(script.Parent:WaitForChild("Camera"))
 Camera.start()
+require(script.Parent:WaitForChild("ChatOff")).start()
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -607,14 +611,19 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then
 		return
 	end
-	if
-		input.KeyCode == Enum.KeyCode.E
-		or input.KeyCode == Enum.KeyCode.Space
-		or input.KeyCode == Enum.KeyCode.Return
-	then
+	-- Space is bound below, above the jump action
+	if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.Return then
 		advance()
 	end
 end)
+-- Space advances and never jumps: bound above the
+-- default controls' jump action, which then never sees it (feel.md section 5)
+ContextActionService:BindActionAtPriority("AdvanceNotJump", function(_, state: Enum.UserInputState)
+	if state == Enum.UserInputState.Begin then
+		advance()
+	end
+	return Enum.ContextActionResult.Sink
+end, false, Enum.ContextActionPriority.High.Value, Enum.KeyCode.Space)
 
 ShowDialogue.OnClientEvent:Connect(Net.guard("ShowDialogue", function(lines: { Events.ShownLine })
 	DialogueViewModel.enqueue(dialogue, lines)

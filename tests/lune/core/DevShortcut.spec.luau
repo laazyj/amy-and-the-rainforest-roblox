@@ -10,6 +10,12 @@ return function(t: any)
 		return DevShortcut.parse(fixture, text)
 	end
 
+	describe("DevShortcut.CHAT_ATTRIBUTE", function()
+		it("names the attribute that keeps the chat input bar in a Dev build", function()
+			expect(DevShortcut.CHAT_ATTRIBUTE).toBe("DevShortcuts")
+		end)
+	end)
+
 	describe("DevShortcut.parse", function()
 		it("jumps /chapter N to the first Quest of Chapter N", function()
 			for n, chapter in fixture.chapters do
