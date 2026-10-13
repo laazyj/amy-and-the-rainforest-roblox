@@ -12,7 +12,13 @@
 	           in full, a typed Line gives way to the next; after the last
 	           Line the Dialogue is finished, `advance` returns true and the
 	           binder sends DialogueFinished
-	  view     what the dialogue box shows now
+	  view     what the dialogue box shows now, in the high-contrast
+	           styles when that Setting is on
+	  box      the dialogue box's own colours, usual or high-contrast
+
+	No timed reading (docs/story/style-guide.md section 3): only `advance`,
+	the player's input, ever moves a Dialogue on. `tick` types a Line out
+	and nothing more, however much time passes; tier 1 holds it to that.
 
 	Typing counts graphemes, the characters a reader sees, as Roblox's
 	MaxVisibleGraphemes does: "♥️" and "👍🏽" are one each, though they are
@@ -26,6 +32,10 @@ type ShownLine = Events.ShownLine
 
 -- How a Speaker's Lines look: the colours of the name tag and of the text.
 export type Style = { tag: Story.RGB, text: Story.RGB }
+
+-- The dialogue box behind the Lines: its colour and how much of the world
+-- shows through it, its border, and the hint row's text colour.
+export type Box = { background: Story.RGB, transparency: number, stroke: Story.RGB, hint: Story.RGB }
 
 export type View = {
 	-- whether the dialogue box is showing
@@ -83,8 +93,43 @@ local STYLES: { [string]: Style } = table.freeze({
 
 DialogueViewModel.STYLES = STYLES
 
-function DialogueViewModel.style(speaker: string): Style
+-- The high-contrast Setting (feel.md section 3, 7:1): the same Speakers'
+-- colours, darker tags under the same name text.
+local HIGH_CONTRAST_DEFAULT: Style = table.freeze({
+	tag = table.freeze({ r = 40, g = 84, b = 34 }),
+	text = DEFAULT_STYLE.text,
+})
+
+local HIGH_CONTRAST_STYLES: { [string]: Style } = table.freeze({
+	Narrator = table.freeze({ tag = table.freeze({ r = 80, g = 66, b = 120 }), text = STYLES.Narrator.text }),
+	Amy = table.freeze({ tag = table.freeze({ r = 120, g = 50, b = 70 }), text = STYLES.Amy.text }),
+})
+
+function DialogueViewModel.style(speaker: string, highContrast: boolean?): Style
+	if highContrast then
+		return HIGH_CONTRAST_STYLES[speaker] or HIGH_CONTRAST_DEFAULT
+	end
 	return STYLES[speaker] or DEFAULT_STYLE
+end
+
+-- The usual box lets a little of the world through; the high-contrast one
+-- is opaque and darker, so its contrast never depends on what is behind it.
+DialogueViewModel.BOX = table.freeze({
+	background = table.freeze({ r = 24, g = 44, b = 30 }),
+	transparency = 0.12,
+	stroke = table.freeze({ r = 140, g = 200, b = 120 }),
+	hint = table.freeze({ r = 190, g = 215, b = 180 }),
+} :: Box)
+
+DialogueViewModel.HIGH_CONTRAST_BOX = table.freeze({
+	background = table.freeze({ r = 8, g = 16, b = 10 }),
+	transparency = 0,
+	stroke = table.freeze({ r = 255, g = 226, b = 150 }),
+	hint = table.freeze({ r = 255, g = 226, b = 150 }),
+} :: Box)
+
+function DialogueViewModel.box(highContrast: boolean?): Box
+	return if highContrast then DialogueViewModel.HIGH_CONTRAST_BOX else DialogueViewModel.BOX
 end
 
 local function between(code: number, low: number, high: number): boolean
@@ -192,7 +237,7 @@ end
 local CLOSED: View =
 	table.freeze({ open = false, speaker = "", text = "", visibleGraphemes = -1, style = DEFAULT_STYLE })
 
-function DialogueViewModel.view(vm: DialogueViewModel): View
+function DialogueViewModel.view(vm: DialogueViewModel, highContrast: boolean?): View
 	local lines = vm.lines
 	if not lines then
 		return CLOSED
@@ -204,7 +249,7 @@ function DialogueViewModel.view(vm: DialogueViewModel): View
 		speaker = line.speaker,
 		text = line.text,
 		visibleGraphemes = if shown < vm.graphemes then shown else -1,
-		style = DialogueViewModel.style(line.speaker),
+		style = DialogueViewModel.style(line.speaker, highContrast),
 	}
 end
 

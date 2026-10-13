@@ -1,9 +1,10 @@
 -- ScreenLayout: feel.md's layout rules, for every Device class and
--- orientation, at Text scale 1, 1.25 and 1.5, each capped at the largest
+-- orientation, at every Text scale the Settings offer (1, 1.25 and 1.5), each capped at the largest
 -- scale at which every Line of the Story fits the device.
 
 local Content = require("../../../src/content/Story")
 local ScreenLayout = require("../../../src/core/ScreenLayout")
+local Settings = require("../../../src/core/Settings")
 local Story = require("../../../src/core/Story")
 local TitleScreen = require("../../../src/core/TitleScreen")
 local hints = require("../../../src/content/hints")
@@ -178,7 +179,7 @@ return function(t: any)
 	local function each(rule: string, check: (Layout, ScreenLayout.Screen) -> ())
 		for _, device in DEVICES do
 			local scales: { number } = {}
-			for _, wanted in { 1, 1.25, 1.5 } do
+			for _, wanted in Settings.TEXT_SCALES do
 				local scale = math.min(wanted, CAPS[device])
 				if not table.find(scales, scale) then
 					table.insert(scales, scale)

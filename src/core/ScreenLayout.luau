@@ -52,6 +52,7 @@
 
 local DeviceClass = require("./DeviceClass")
 local DialogueViewModel = require("./DialogueViewModel")
+local Settings = require("./Settings")
 local TitleScreen = require("./TitleScreen")
 
 type Class = DeviceClass.DeviceClass
@@ -143,8 +144,9 @@ ScreenLayout.ZONES = table.freeze({
 	Tablet = table.freeze({ width = 0.25, height = 0.35 }),
 } :: { [Class]: { width: number, height: number } })
 
-ScreenLayout.MIN_SCALE = 1
-ScreenLayout.MAX_SCALE = 1.5
+-- The Text scales the Settings offer run from 1 to 1.5 (feel.md section 3).
+ScreenLayout.MIN_SCALE = Settings.TEXT_SCALES[1]
+ScreenLayout.MAX_SCALE = Settings.TEXT_SCALES[#Settings.TEXT_SCALES]
 -- 60 characters of about half the text size each.
 ScreenLayout.COLUMN_EMS = 30
 ScreenLayout.PADDING = 24

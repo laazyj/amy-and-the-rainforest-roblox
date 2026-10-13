@@ -20,6 +20,8 @@
 
 	  1  { version = 1, progress = Progress }
 	  2  adds `checkpoints`: Chapter id -> the Progress when it started
+	  3  adds `settings`: the player's Settings (src/core/Settings),
+	     the defaults for a Save made before there were any
 
 	Rolling back one version (plan section 3). A version only ever adds
 	fields, so code of version N reads a version N + 1 Save as its own:
@@ -32,6 +34,7 @@
 	and the player starts the Story afresh rather than never saving again.
 ]]
 
+local Settings = require("./Settings")
 local Story = require("./Story")
 local StoryEngine = require("./StoryEngine")
 
@@ -42,13 +45,14 @@ export type Save = {
 	progress: Progress,
 	-- Chapter id -> the Progress when the Chapter started
 	checkpoints: { [string]: Progress },
+	settings: Settings.Settings,
 	-- fields of a newer version, kept as they were read
 	[string]: any,
 }
 
 local Save = {}
 
-Save.VERSION = 2
+Save.VERSION = 3
 
 -- The Chapters, in order, that `progress` has reached.
 local function reached(story: Story.Story, progress: Progress): { Story.Chapter }
@@ -82,6 +86,12 @@ Save.MIGRATIONS = {
 		end
 		data.checkpoints = checkpoints
 		data.version = 2
+		return data
+	end,
+	-- 2 -> 3: the default Settings.
+	[2] = function(_story: Story.Story, data: { [string]: any }): { [string]: any }
+		data.settings = table.clone(Settings.DEFAULTS)
+		data.version = 3
 		return data
 	end,
 } :: { [number]: Migration }
@@ -128,9 +138,14 @@ local function progressProblem(value: any): string?
 end
 
 -- A Save with fresh Progress and no Checkpoints: a player who has not
--- started.
-function Save.new(): Save
-	return { version = Save.VERSION, progress = StoryEngine.fresh(), checkpoints = {} }
+-- started, with the default Settings or, for Start again, theirs.
+function Save.new(settings: Settings.Settings?): Save
+	return {
+		version = Save.VERSION,
+		progress = StoryEngine.fresh(),
+		checkpoints = {},
+		settings = table.clone(settings or Settings.DEFAULTS),
+	}
 end
 
 -- Stored data as a Save of this version, migrated as needed. An empty table,
@@ -165,6 +180,8 @@ function Save.read(story: Story.Story, stored: any): (Save?, string?)
 			return nil, `checkpoint {tostring(chapter)}: {wrong}`
 		end
 	end
+	-- Settings are only preferences: one that is not valid is the default
+	data.settings = Settings.read(data.settings)
 	return data :: Save, nil
 end
 
@@ -192,6 +209,17 @@ end
 -- The data to store for `save`: plain tables only, nothing shared with it.
 function Save.write(save: Save): { [string]: any }
 	return copy(save)
+end
+
+-- `save` with `settings`, keeping any Setting a newer version added.
+function Save.withSettings(save: Save, settings: Settings.Settings): Save
+	local result = table.clone(save)
+	local merged = table.clone(save.settings)
+	for _, setting in Settings.ORDER do
+		merged[setting] = settings[setting]
+	end
+	result.settings = merged
+	return result
 end
 
 -- Whether the player has started the Story.

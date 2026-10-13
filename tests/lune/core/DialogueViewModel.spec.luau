@@ -6,6 +6,7 @@
 
 local Contrast = require("../../../src/core/Contrast")
 local DialogueViewModel = require("../../../src/core/DialogueViewModel")
+local Story = require("../../../src/core/Story")
 
 local STEP = DialogueViewModel.SECONDS_PER_GRAPHEME
 
@@ -186,15 +187,58 @@ return function(t: any)
 			expect(DialogueViewModel.style("Amy").tag).toEqual({ r = 167, g = 94, b = 109 })
 		end)
 
-		it("puts the name on every name tag at a contrast of at least 4.5:1 (feel.md section 3)", function()
-			local styles = table.clone(DialogueViewModel.STYLES)
-			styles.default = DialogueViewModel.DEFAULT_STYLE
-			for speaker, style in styles do
-				local ratio = Contrast.ratio(DialogueViewModel.NAME_TEXT, style.tag)
-				if ratio < Contrast.MINIMUM then
-					error(`{speaker}'s name tag is {ratio}:1`)
+		-- Every Speaker's style, with the contrast it must reach, for each
+		-- value of the high-contrast Setting.
+		local function eachStyle(check: (
+			speaker: string,
+			style: DialogueViewModel.Style,
+			minimum: number,
+			highContrast: boolean
+		) -> ())
+			for _, highContrast in { false, true } do
+				local minimum = if highContrast then Contrast.HIGH else Contrast.MINIMUM
+				for _, speaker in { "Narrator", "Amy", "Dad" } do
+					check(speaker, DialogueViewModel.style(speaker, highContrast), minimum, highContrast)
 				end
 			end
+		end
+
+		it("puts the name on every name tag at 4.5:1, and 7:1 in high contrast (feel.md section 3)", function()
+			eachStyle(function(speaker, style, minimum)
+				local ratio = Contrast.ratio(DialogueViewModel.NAME_TEXT, style.tag)
+				if ratio < minimum then
+					error(`{speaker}'s name tag is {ratio}:1, under {minimum}:1`)
+				end
+			end)
+		end)
+
+		it("puts every Line and the hint row on the box at 4.5:1, and 7:1 in high contrast, over any world", function()
+			local white, black = { r = 255, g = 255, b = 255 }, { r = 0, g = 0, b = 0 }
+			eachStyle(function(speaker, style, minimum, highContrast)
+				local box = DialogueViewModel.box(highContrast)
+				for _, backdrop in { white, black } do
+					local behind = Contrast.over(box.background, box.transparency, backdrop)
+					local colours: { [string]: Story.RGB } = { Line = style.text, hint = box.hint }
+					for what, colour in colours do
+						local ratio = Contrast.ratio(colour, behind)
+						if ratio < minimum then
+							error(`{speaker}'s {what} is {ratio}:1, under {minimum}:1`)
+						end
+					end
+				end
+			end)
+		end)
+
+		it("makes the high-contrast box opaque, so nothing behind it can lower its contrast", function()
+			expect(DialogueViewModel.box(true).transparency).toBe(0)
+			expect(DialogueViewModel.box(false)).toBe(DialogueViewModel.BOX)
+		end)
+
+		it("styles the view in high contrast when that Setting is on", function()
+			local vm = DialogueViewModel.new()
+			DialogueViewModel.enqueue(vm, { { speaker = "Narrator", text = "Hello." } })
+			expect(DialogueViewModel.view(vm, true).style).toBe(DialogueViewModel.style("Narrator", true))
+			expect(DialogueViewModel.view(vm, true).style).never.toBe(DialogueViewModel.view(vm).style)
 		end)
 
 		it("gives every other Speaker the Character style", function()
