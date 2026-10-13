@@ -1,0 +1,75 @@
+# Tier 3 proof that the Mac runner works (brief mac-001a): on the self-hosted
+# runner inside the Mac's virtual machine, download the place file CI last
+# built from main, play it in Roblox Studio through Studio's MCP server
+# (tools/studio-playtest), and upload the screenshot and a JSON report (Studio
+# version, duration, pass or fail). See docs/MAC_RUNNER.md.
+#
+# The rules for every job on the Mac (brief mac-001a, Must 7), which
+# tools/mac/check-repo.sh checks where a script can: manual start only here;
+# the tools come from main and the place from CI's artifact, so no pull
+# request's code runs on the Mac; read-only permissions, no secrets, a
+# timeout, and one Studio at a time. There is no continue-on-error: a red run
+# means the runner or the bridge is broken.
+name: Studio smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One Studio, one screen.
+concurrency:
+  group: studio
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Play the place in Studio on the Mac
+    runs-on: [self-hosted, studio]
+    permissions:
+      contents: read
+      actions: read # to download the place artifact of CI's run on main
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main # the tools from main, whatever ref the run was started on
+          persist-credentials: false
+
+      - name: Install the pinned toolchain
+        uses: ./.github/actions/setup-tools
+
+      - name: Download the latest place artifact from main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --event push \
+            --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
+            echo "::error::no successful CI run on main to take the place artifact from"
+            exit 1
+          fi
+          rm -rf build/place build/studio-smoke
+          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name place --dir build/place
+          echo "Place file from CI run $run_id on main" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Play it in Studio
+        run: lune run tools/studio-playtest/run --file build/place/AmyAndTheRainforest.rbxl --out build/studio-smoke
+
+      - name: Add the report to the summary
+        if: always()
+        run: |
+          if [ -f build/studio-smoke/report.json ]; then
+            { echo '```json'; cat build/studio-smoke/report.json; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No report: the run failed before Studio was played." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload the screenshot and the report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: studio-smoke
+          path: build/studio-smoke
+          if-no-files-found: error

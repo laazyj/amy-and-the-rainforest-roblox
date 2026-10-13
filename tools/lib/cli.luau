@@ -33,7 +33,7 @@ local COMMON_OPTIONS = "--universe <id> --place <id> [--key-env NAME] [--dry-run
 
 -- Parses `--name value` options (those in `valued`) and the --dry-run flag.
 -- Anything else is an error; no arguments at all raises the usage text.
-local function parseArgs(argv: { string }, usage: string, valued: { string }): ({ [string]: string }, boolean)
+function Cli.options(argv: { string }, usage: string, valued: { string }): ({ [string]: string }, boolean)
 	if #argv == 0 then
 		error(usage, 0)
 	end
@@ -120,7 +120,7 @@ end
 function Cli.target(ctx: Context, usage: string, ownOptions: { string }): Target
 	local valued = { "universe", "place", "key-env" }
 	table.move(ownOptions, 1, #ownOptions, #valued + 1, valued)
-	local values, dryRun = parseArgs(ctx.args, `{usage}\n         {COMMON_OPTIONS}`, valued)
+	local values, dryRun = Cli.options(ctx.args, `{usage}\n         {COMMON_OPTIONS}`, valued)
 	local universeId = Cli.numericId(values, "universe")
 	local placeId = Cli.numericId(values, "place")
 
