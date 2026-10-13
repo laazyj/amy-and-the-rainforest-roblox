@@ -61,6 +61,11 @@ local WIRING: { { file: string, label: string, code: string } } = {
 		code = "if #events > 0 then\n\t\tPersist.record(session.player, session.engine:snapshot())",
 	},
 	{
+		file = "StoryHost.luau",
+		label = "the host waits for DialogueFinished with no time limit: no timed reading",
+		code = "while session.alive and not session.dialogueDone do\n\t\ttask.wait(0.1)\n\tend",
+	},
+	{
 		file = "Persist.luau",
 		label = "BindToClose releases every Save",
 		code = "pcall(game.BindToClose, game, function()\n\t\tPersist.close(progressOf)\n\tend)",

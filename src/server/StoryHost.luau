@@ -7,7 +7,9 @@
 	  - a Wait pauses for its seconds (the Chapter card, Sam's catch);
 	  - a ShowDialogue is sent; once the step's commands are carried out,
 	    if the engine is showing a Dialogue, the host waits until the client
-	    says DialogueFinished (or 300 s pass) and feeds that to the engine.
+	    says DialogueFinished, however long that takes, and feeds that to
+	    the engine. There is no timed reading: a player who reads slowly,
+	    or leaves the Pause screen open, holds the Story where it is.
 
 	Every World command is held to its schema (World.execute) and every
 	message to a client to the Net contract before it is sent; either
@@ -56,9 +58,6 @@ local PropHost = require(script.Parent.PropHost)
 local SceneBuilder = require(script.Parent.SceneBuilder)
 local WorldImpl = require(script.Parent.WorldImpl)
 
--- How long the host waits for DialogueFinished before going on without it.
-local DIALOGUE_TIMEOUT = 300
-
 type Session = {
 	player: any,
 	-- a returning player's Save while they are offered the Title screen
@@ -99,9 +98,8 @@ local function toClient(player: any, command: Events.WorldCommand)
 end
 
 local function awaitDialogue(session: Session)
-	local waited = 0
-	while session.alive and not session.dialogueDone and waited < DIALOGUE_TIMEOUT do
-		waited = waited + task.wait(0.1)
+	while session.alive and not session.dialogueDone do
+		task.wait(0.1)
 	end
 end
 

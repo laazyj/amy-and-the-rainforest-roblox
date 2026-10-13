@@ -7,6 +7,7 @@
 local Contrast = require("../../../src/core/Contrast")
 local DialogueViewModel = require("../../../src/core/DialogueViewModel")
 local Story = require("../../../src/core/Story")
+local Content = require("../../../src/content/Story")
 
 local STEP = DialogueViewModel.SECONDS_PER_GRAPHEME
 
@@ -145,6 +146,49 @@ return function(t: any)
 			DialogueViewModel.tick(vm, 10)
 			DialogueViewModel.enqueue(vm, lines("Hello"))
 			expect(DialogueViewModel.view(vm).visibleGraphemes).toBe(1)
+		end)
+	end)
+
+	describe("no timed reading (style guide section 3)", function()
+		-- Every Dialogue of the Story, as the client is sent it.
+		local dialogues: { { any } } = {}
+		for _, placed in Story.quests(Content.story) do
+			for _, said in { placed.quest.intro, placed.quest.dialogue, placed.quest.outro } do
+				if said then
+					table.insert(dialogues, Story.shownLines(Content.story, said))
+				end
+			end
+		end
+		table.insert(dialogues, Story.shownLines(Content.story, Content.story.ending.lines))
+
+		it("never moves any Dialogue of the Story on by time: only the player's advance does", function()
+			for _, shown in dialogues do
+				local vm = DialogueViewModel.new()
+				DialogueViewModel.enqueue(vm, shown)
+				-- a second of frames, then ten minutes, an hour and forever
+				for _ = 1, 60 do
+					DialogueViewModel.tick(vm, 1 / 60)
+				end
+				for _, seconds in { 600, 3600, math.huge } do
+					DialogueViewModel.tick(vm, seconds)
+				end
+				local view = DialogueViewModel.view(vm)
+				expect(view.open).toBe(true)
+				expect(vm.index).toBe(1)
+				expect(view.text).toBe(shown[1].text)
+				expect(view.visibleGraphemes).toBe(-1) -- typed out in full, and waiting
+				-- and the player's advances finish it
+				expect(finish(vm) >= #shown).toBe(true)
+			end
+		end)
+
+		it("keeps a queued Dialogue waiting behind one the player has not finished", function()
+			local vm = DialogueViewModel.new()
+			DialogueViewModel.enqueue(vm, lines("First."))
+			DialogueViewModel.enqueue(vm, lines("Second."))
+			DialogueViewModel.tick(vm, 3600)
+			expect(DialogueViewModel.view(vm).text).toBe("First.")
+			expect(#vm.queue).toBe(1)
 		end)
 	end)
 
