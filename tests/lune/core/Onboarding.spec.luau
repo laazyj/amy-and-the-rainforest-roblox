@@ -79,7 +79,7 @@ return function(t: any)
 				ring = false,
 				pulse = false,
 				marker = "Dad",
-				row = "Click or press Space to continue",
+				row = "Click or press E to continue",
 				large = true,
 				glow = false,
 				skip = false, -- the first Line's Hint is skipped by tapping
@@ -99,7 +99,7 @@ return function(t: any)
 			local vm = fresh()
 			Onboarding.cardGone(vm)
 			Onboarding.tick(vm, 60)
-			expect(view(vm).row).toBe("Click or press Space to continue")
+			expect(view(vm).row).toBe("Click or press E to continue")
 		end)
 
 		it("gives the box its standing hint back once the step is done", function()

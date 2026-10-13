@@ -145,18 +145,15 @@ return function(t: any)
 			end)
 		end
 
-		it("has the client turn the chat off as it starts", function()
-			expect(source(CLIENT)).toContain('require(script.Parent:WaitForChild("ChatOff")).start()')
+		it("leaves Space to the jump: the client never advances on it", function()
+			expect(source(CLIENT)).never.toContain("KeyCode.Space")
 		end)
 
-		it("has the Dev shortcuts mark TextChatService, so Dev keeps the chat input bar", function()
-			expect(source(`{SERVER}/Dev/DevShortcuts.luau`)).toContain(
-				"TextChatService:SetAttribute(DevShortcut.CHAT_ATTRIBUTE, true)"
+		it("has the Talk-and-advance button press as TalkAndAdvance says, on every class", function()
+			expect(source(CLIENT)).toContain(
+				"talkButton.Activated:Connect(function() local action = TalkAndAdvance.press(dialogue.lines ~= nil, promptDistances())"
 			)
-		end)
-
-		it("has Space advance above the jump action, which never sees it", function()
-			expect(source(CLIENT)).toContain("Enum.ContextActionPriority.High.Value, Enum.KeyCode.Space)")
+			expect(source(CLIENT)).toContain("talkButton.Visible = TalkAndAdvance.shown(open, prompts)")
 		end)
 
 		for name, remote in Net.REMOTES do

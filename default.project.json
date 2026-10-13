@@ -31,10 +31,6 @@
     },
     "StarterPlayer": {
       "$className": "StarterPlayer",
-      "$properties": {
-        "CharacterJumpHeight": 0,
-        "CharacterJumpPower": 0
-      },
       "StarterPlayerScripts": {
         "$className": "StarterPlayerScripts",
         "$path": "src/client"

@@ -264,7 +264,7 @@ return function(t: any)
 				{ x = 1376 * 0.75, y = 1032 * 0.65, width = 1376 * 0.25, height = 1032 * 0.35 }
 			)
 			expect(at(DEVICES[12], 1).zones).toEqual({})
-			expect(at(DEVICES[12], 1).talk).toBeNil()
+			expect(at(DEVICES[12], 1).ring).toBeNil()
 		end)
 
 		it("follow a rotation: a phone turned to portrait has its zones and box laid out again", function()
@@ -279,7 +279,7 @@ return function(t: any)
 			if layout.class == "PC" then
 				return
 			end
-			local talk, ring = layout.talk :: Rect, layout.ring :: Rect
+			local talk, ring = layout.talk, layout.ring :: Rect
 			for _, button in { talk, layout.skip } do
 				expect(inside(button, layout.zones[2])).toBe(true)
 				expect(inside(button, layout.safe)).toBe(true)
@@ -325,12 +325,37 @@ return function(t: any)
 		end)
 	end)
 
+	describe("ScreenLayout button row", function()
+		each("pairs the Talk-and-advance and Skip buttons at the bottom right, clear of each other", function(layout)
+			local talk, skip, safe = layout.talk, layout.skip, layout.safe
+			expect(inside(talk, safe) and inside(skip, safe)).toBe(true)
+			-- the Talk-and-advance button in the bottom-right corner
+			expect(talk.x + talk.width > safe.x + safe.width * 0.75).toBe(true)
+			expect(talk.y > safe.y + safe.height / 2).toBe(true)
+			expect(gap(talk, skip) >= ScreenLayout.TARGET_GAP).toBe(true)
+			if skip.y + skip.height == talk.y + talk.height then
+				expect(skip.x + skip.width <= talk.x).toBe(true) -- a row: Skip to its left
+			else
+				-- stacked only where a row would leave the right zone
+				expect(layout.touch).toBe(true)
+				expect(talk.x - ScreenLayout.TARGET_GAP - skip.width < layout.zones[2].x).toBe(true)
+				expect(skip.y + skip.height <= talk.y).toBe(true)
+			end
+			-- out of the top-left corner, where Roblox's own buttons sit
+			expect(skip.y > safe.y + safe.height / 2).toBe(true)
+		end)
+
+		it("is a row beside each other on a PC and a phone in landscape", function()
+			for _, device in { DEVICES[1], DEVICES[12], DEVICES[14] } do
+				local layout = at(device, 1)
+				expect(layout.skip.y + layout.skip.height).toBe(layout.talk.y + layout.talk.height)
+			end
+		end)
+	end)
+
 	describe("ScreenLayout touch targets", function()
 		each("are at least 48 x 48 and 8 apart", function(layout)
-			local targets: { Rect } = { layout.skip }
-			if layout.talk then
-				table.insert(targets, layout.talk)
-			end
+			local targets: { Rect } = { layout.skip, layout.talk }
 			for i, target in targets do
 				expect(target.width >= ScreenLayout.TARGET and target.height >= ScreenLayout.TARGET).toBe(true)
 				for j = i + 1, #targets do
@@ -359,29 +384,14 @@ return function(t: any)
 		end)
 	end)
 
-	describe("ScreenLayout Skip button", function()
-		each("sits beside the Hint at the bottom on a PC, out of the top-left corner", function(layout)
-			if layout.touch then
-				return
-			end
-			local skip, hint = layout.skip, layout.hint
-			expect(inside(skip, layout.safe)).toBe(true)
-			expect(gap(skip, hint) >= ScreenLayout.TARGET_GAP).toBe(true)
-			expect(skip.y > layout.safe.y + layout.safe.height / 2).toBe(true)
-			expect(skip.y + skip.height).toBe(hint.y + hint.height)
-		end)
-	end)
-
 	describe("ScreenLayout nothing overlaps", function()
 		each("in free play: the Objective tracker, a Hint, the Skip button and the touch controls", function(layout)
 			local shown: { [string]: Rect } = {
 				objective = tracker(layout, longestObjective),
 				hint = layout.hint,
 				skip = layout.skip,
+				talk = layout.talk,
 			}
-			if layout.talk then
-				shown.talk = layout.talk :: Rect
-			end
 			for name, a in shown do
 				expect(inside(a, layout.safe)).toBe(true)
 				for other, b in shown do
@@ -405,16 +415,10 @@ return function(t: any)
 				then layout.objective.icon
 				else tracker(layout, longestObjective)
 			-- the Skip button shows only in free play
-			local buttons: { Rect } = {}
-			if layout.talk then
-				table.insert(buttons, layout.talk)
-			end
 			for _, text in LINES do
 				local shown = box(layout, text)
 				expect(gap(shown, objective) >= 0).toBe(true)
-				for _, button in buttons do
-					expect(gap(shown, button) >= ScreenLayout.TARGET_GAP).toBe(true)
-				end
+				expect(gap(shown, layout.talk) >= ScreenLayout.TARGET_GAP).toBe(true)
 			end
 		end)
 	end)
@@ -435,6 +439,9 @@ return function(t: any)
 			expect(ScreenLayout.lines(continue, layout.text.hint, layout.dialogue.column)).toBe(1)
 			local skip = utf8.len(hints.skip) or 0
 			expect(skip <= ScreenLayout.SKIP_CHARACTERS).toBe(true)
+			for _, label: string in { hints.button.talk, hints.button.next } do
+				expect((utf8.len(label) or 0) <= ScreenLayout.TALK_CHARACTERS).toBe(true)
+			end
 		end)
 	end)
 

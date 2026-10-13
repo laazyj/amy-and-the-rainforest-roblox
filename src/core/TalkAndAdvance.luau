@@ -1,8 +1,8 @@
 --!strict
 --[[
 	TalkAndAdvance: what the Talk-and-advance button does, as plain data
-	(docs/design/feel.md sections 1 and 4). The client binder shows it on a
-	Phone or a Tablet, in the right touch control zone, when `shown` says,
+	(docs/design/feel.md sections 1 and 4). The client binder shows it on
+	every class, in the button row at the bottom right, when `shown` says,
 	and calls `press` when it is pressed.
 
 	  shown(open, prompts)  whether the button shows: while a Dialogue

@@ -65,19 +65,23 @@ The same rules apply to every class; only the numbers differ.
 - **Touch control zones** are the bottom-left and bottom-right corners:
   35% of the width by 40% of the height on phone, 25% by 35% on tablet.
   The Roblox thumbstick sits in the left zone, where Roblox's player
-  module puts it (the game never moves it); a talk-and-advance button
-  sits in the right zone, reachable by the right thumb, with the
-  Onboarding's Skip button above it while a Hint shows in free play.
-  The talk-and-advance button shows only while a Dialogue shows or a
-  prompt is within reach. Thumbs reach from
+  module puts it (the game never moves it); the button row sits in the
+  right zone, reachable by the right thumb. Thumbs reach from
   the edges, so no control sits anywhere else. Roblox's jump button is
-  hidden on touch: Amy never jumps ([§5](#5-input)), and the right zone is
-  the talk button's.
+  hidden on touch for now: the Story has no jump yet, and the right zone
+  is the button row's; a future chapter that needs a jump brings it back
+  in its own zone.
+- **The button row** sits at the bottom right on every class, PC
+  included: the talk-and-advance button ("Talk", or "Next" while a
+  Dialogue shows) in the corner, and the Onboarding's Skip button beside
+  it while a Hint shows in free play (above it where a row would leave
+  the right zone, in portrait). The talk-and-advance button shows only
+  while a Dialogue shows or a prompt is within reach.
 - **While a Dialogue shows on touch**, Amy listens: the player's controls
   are disabled (as the old full-screen click catcher already took every
-  touch), so the dialogue box may cover the left zone. It keeps clear of
-  the talk-and-advance button: beside it in landscape, above it in
-  portrait. The box and the talk-and-advance button both advance. Every
+  touch), so the dialogue box may cover the left zone. On every class it
+  keeps clear of the talk-and-advance button: beside it in landscape and
+  on a PC, above it in portrait. The box and the talk-and-advance button both advance. Every
   way a Dialogue ends gives the controls back.
 - **Nothing covers the subject.** No UI element overlaps the projected
   bounding box of the speaker's head during `shot:Dialogue`, the
@@ -206,23 +210,17 @@ The words are game-rendered text, never part of the image.
 ## 5. Input
 
 - One action per verb: move, talk (use a prompt), advance dialogue. No
-  jump requirement anywhere in the Story, and no jump at all: Amy's jump
-  height is 0 on every class (`default.project.json`), and Space advances
-  without reaching Roblox's jump action.
+  jump requirement anywhere in the Story yet; jumping stays for future
+  chapters, so Space is the jump's and never advances a Dialogue.
 - PC: W/S or Up/Down to walk forward and back; A/D or Left/Right to turn
   Amy and the view together (she never strafes or backs towards the
   camera); a right-mouse drag turns too. The pointer is never locked, so
   it stays free for the Title screen, the dialogue box and prompts. E to
-  talk, click, E or Space to advance. The key mapping lives in one place,
+  talk; click the box or the Next button, or press E or Enter, to
+  advance. The key mapping lives in one place,
   `CameraModel.TURN_KEYS` (confirmed by the owner with the merge of #36).
   Touch: the controls in [§1](#layout-rules), and a drag outside the
   control zones turns the view.
-- **Chat off.** There is no chat: the game is single player for ages 7
-  to 12, so there is no one to chat with. The client turns the chat
-  window off (`TextChatService.ChatWindowConfiguration`) on every class,
-  and in a Release build Roblox's Chat core GUI too
-  (`src/client/ChatOff.luau`), so it has no chat at all. A Dev build
-  keeps the input bar, never the window, for the Dev shortcuts' commands. The compliance answers cite this.
 - Every input gets feedback within 100 ms: the client logs a Cue played
   or a named UI tween started, with a timestamp, and tier 3 asserts the
   gap from input to that event.
@@ -238,7 +236,7 @@ block play.
 | Step | What the player sees | Hint (PC / touch) | Done when |
 |---|---|---|---|
 | 1 | The `chapter1` card, about 3 s, tap or click to skip | none | Card fades |
-| 2 | The first Narrator Line ([canon Line 1](../story/canon.md#canon-lines)) | "Click or press Space to continue" / "Tap to continue", shown large on this first Line only | `DialogueFinished` |
+| 2 | The first Narrator Line ([canon Line 1](../story/canon.md#canon-lines)) | "Click or press E to continue" / "Tap to continue", shown large on this first Line only | `DialogueFinished` |
 | 3 | Objective "Ask Dad if you can go outside" appears with a marker over Dad | none; the panel briefly glows | Objective shown |
 | 4 | Amy in the garden, Dad nearby | "Walk with W and S, turn with A and D, or use the arrow keys" / a glowing ring on the thumbstick and "Drag here to walk" | Amy has moved 4 studs |
 | 5 | Dad's talk prompt | "Press E to talk" / the prompt button pulses | `TalkedTo(Dad)` |
@@ -254,9 +252,9 @@ pulsing "prompt button" is the talk-and-advance button, which uses the
 nearest prompt. "Shown once per save" is read from what the client
 receives: a Story that begins with its first Chapter card (a new Save, or
 "Start again") shows the Onboarding; a Resume never does. While a Hint
-shows in free play, a Skip button ends the Onboarding: above the
-talk-and-advance button on touch, beside the Hint at the bottom centre
-on a PC (clear of the top-left corner, where Roblox's own buttons sit).
+shows in free play, a Skip button ends the Onboarding, in the button
+row beside the talk-and-advance button on every class (clear of the
+top-left corner, where Roblox's own buttons and chat sit).
 The first Line's Hint has none: tapping is how it is done. On touch, the
 walk step's ring is drawn round Roblox's thumbstick where it really is on
 screen (`ScreenLayout.ringAround`), or in the left zone's bottom-left

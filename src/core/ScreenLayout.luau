@@ -43,17 +43,20 @@
 	  zones           viewport: 35% x 40% on a Phone, 25% x 35% on a
 	                  Tablet; none on a PC. Roblox's thumbstick has the
 	                  left one, where the player module puts it (the binder
-	                  never moves it); the Talk-and-advance button (and
-	                  the Skip button while a Hint shows) sit in the right one
+	                  never moves it); the button row sits in the right one
+	  button row      at the bottom right on every class: the
+	                  Talk-and-advance button ("Talk", "Next") in the
+	                  corner, the Skip button (while a Hint shows in free
+	                  play) beside it, or above it where a row would leave
+	                  the right zone (portrait)
 	  touch targets   at least 48 x 48, 8 apart
 
 	While a Dialogue shows on touch, Amy listens: the player's controls are
 	disabled (the old full-screen click catcher already took every touch),
-	so the box may use the left zone, and keeps clear of the right zone's
-	Talk-and-advance button, beside it in landscape and above it in
-	portrait. The Skip button shows only in free play (the Onboarding's
-	Hint on the first Line is skipped by tapping): above the Talk button on
-	touch, and on a PC beside the Hint at the bottom centre.
+	so the box may use the left zone. On every class it keeps clear of the
+	Talk-and-advance button, beside it in landscape (and on a PC) and above
+	it in portrait. The Skip button shows only in free play (the
+	Onboarding's Hint on the first Line is skipped by tapping).
 ]]
 
 local DeviceClass = require("./DeviceClass")
@@ -104,16 +107,17 @@ export type Layout = {
 	objective: { x: number, y: number, width: number, collapses: boolean, icon: Rect },
 	-- the touch control zones, left then right; none on a PC
 	zones: { Rect },
-	-- touch only: the Talk-and-advance button, the ring the Onboarding
-	-- draws round where the thumb goes while the thumbstick is not found
-	-- (ringAround has it where the thumbstick is), and the one it pulses
-	-- round the button
-	talk: Rect?,
+	-- the button row at the bottom right, on every class: the
+	-- Talk-and-advance button, and the Onboarding's Skip button beside it
+	talk: Rect,
+	skip: Rect,
+	-- touch only: the ring the Onboarding draws round where the thumb goes
+	-- while the thumbstick is not found (ringAround has it where the
+	-- thumbstick is), and the one it pulses round the button
 	ring: Rect?,
 	pulse: Rect?,
-	-- the onboarding: where a Hint shows in free play, and its Skip button
+	-- where a Hint shows in free play
 	hint: Rect,
-	skip: Rect,
 	-- the title's bottom edge is at `centre`, the subtitle's top `gap` below
 	card: { x: number, width: number, centre: number, gap: number, title: number, subtitle: number },
 	title: {
@@ -172,6 +176,8 @@ ScreenLayout.TARGET_GAP = 8
 -- The longest Skip label the Skip button is sized for, in characters: it
 -- fits beside the phone's portrait zone at Text scale 1.5.
 ScreenLayout.SKIP_CHARACTERS = 6
+-- The longest Talk-and-advance label ("Talk", "Next"), in characters.
+ScreenLayout.TALK_CHARACTERS = 4
 
 -- For the estimates: a character is a little over half the text size wide
 -- (feel.md says about half; this leaves room), and a line of text is 1.1
@@ -206,7 +212,8 @@ local TRACKER_EMS = 18
 -- top edge the Speaker's name tag ends (it rises above the box), and the
 -- tag's padding round its name, above and below.
 ScreenLayout.BOX = table.freeze({ top = 18, bottom = 10, between = 6, tag = 6, tagPadding = 12 })
-local TALK: { [Class]: number } = { Phone = 64, Tablet = 72 }
+-- The Talk-and-advance button's least side; it widens for its label.
+local TALK: { [Class]: number } = { Phone = 64, Tablet = 72, PC = 64 }
 local RING: { [Class]: number } = { Phone = 96, Tablet = 112 }
 
 -- The longest Title screen label, in graphemes.
@@ -317,7 +324,6 @@ function ScreenLayout.new(screen: Screen): Layout
 	local hintHeight = 2 * text.hint * ScreenLayout.LINE + MARGIN
 	local hintWidth = math.min(safe.width - 2 * MARGIN, ScreenLayout.COLUMN_EMS * text.hint)
 	local zones: { Rect } = {}
-	local talk, ring, pulse, skip, hint, box
 	if touch then
 		local share = ScreenLayout.ZONES[class]
 		local zoneWidth, zoneHeight = width * share.width, height * share.height
@@ -325,18 +331,38 @@ function ScreenLayout.new(screen: Screen): Layout
 			rect(0, height - zoneHeight, zoneWidth, zoneHeight),
 			rect(width - zoneWidth, height - zoneHeight, zoneWidth, zoneHeight),
 		}
+	end
 
-		-- the right zone's buttons, in a column at the bottom-right corner
-		local size = TALK[class]
-		talk = rect(right - MARGIN - size, bottom - MARGIN - size, size, size)
+	-- The button row at the bottom right, on every class: the
+	-- Talk-and-advance button in the corner, the Skip button beside it, or
+	-- above it where the row would leave the right touch control zone
+	-- (portrait, at the larger Text scales).
+	local side = TALK[class]
+	local talkWidth =
+		math.max(side, math.ceil(ScreenLayout.TALK_CHARACTERS * ScreenLayout.CHARACTER * text.speaker) + 2 * MARGIN)
+	local talk = rect(right - MARGIN - talkWidth, bottom - MARGIN - side, talkWidth, side)
+	local skip = rect(
+		talk.x - ScreenLayout.TARGET_GAP - skipWidth,
+		talk.y + talk.height - ScreenLayout.TARGET,
+		skipWidth,
+		ScreenLayout.TARGET
+	)
+	if touch and skip.x < zones[2].x then
 		skip = rect(
 			right - MARGIN - skipWidth,
 			talk.y - ScreenLayout.TARGET_GAP - ScreenLayout.TARGET,
 			skipWidth,
 			ScreenLayout.TARGET
 		)
+	end
+
+	-- the dialogue box's space beside the Talk-and-advance button
+	local besideTalk = talk.x - ScreenLayout.TARGET_GAP - (safe.x + MARGIN)
+
+	local ring, pulse, hint, box
+	if touch then
 		local around = 6
-		pulse = rect(talk.x - around, talk.y - around, size + 2 * around, size + 2 * around)
+		pulse = rect(talk.x - around, talk.y - around, talk.width + 2 * around, talk.height + 2 * around)
 
 		-- the left zone's bottom-left corner, inside the safe area, where
 		-- Roblox puts its thumbstick
@@ -358,20 +384,12 @@ function ScreenLayout.new(screen: Screen): Layout
 		if portrait then
 			box = { left = safe.x, space = safe.width, bottom = talk.y - ScreenLayout.TARGET_GAP }
 		else
-			local space = talk.x - ScreenLayout.TARGET_GAP - (safe.x + MARGIN)
-			box = { left = safe.x + MARGIN, space = space, bottom = bottom - MARGIN }
+			box = { left = safe.x + MARGIN, space = besideTalk, bottom = bottom - MARGIN }
 		end
 	else
 		hint = rect(safe.x + (safe.width - hintWidth) / 2, bottom - BOTTOM_MARGIN - hintHeight, hintWidth, hintHeight)
-		-- beside the Hint, its bottom edge level with the Hint's: clear of
-		-- the top-left corner, where Roblox's own buttons sit
-		skip = rect(
-			hint.x + hint.width + ScreenLayout.TARGET_GAP,
-			hint.y + hint.height - ScreenLayout.TARGET,
-			skipWidth,
-			ScreenLayout.TARGET
-		)
-		box = { left = safe.x + MARGIN, space = safe.width - 2 * MARGIN, bottom = bottom - BOTTOM_MARGIN }
+		-- clear of the Talk-and-advance button, which shows with it
+		box = { left = safe.x + MARGIN, space = besideTalk, bottom = bottom - BOTTOM_MARGIN }
 	end
 
 	local speaker = text.speaker + ScreenLayout.BOX.tagPadding

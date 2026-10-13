@@ -16,10 +16,8 @@
 	Every remote it receives is held to the Net contract first (Net.guard);
 	a malformed payload is dropped with a warning.
 
-	The chat is off (ChatOff). Amy never jumps: her jump height is 0
-	(default.project.json) and Space is bound above the jump action.
-
-	Click, tap, or press E, Space or Enter to advance a Dialogue; when the
+	Click or tap the box or the Next button, or press E or Enter, to
+	advance a Dialogue (Space is the jump's, so it never advances); when the
 	view-model says it is finished, DialogueFinished goes to the server.
 	The Title screen shows while the client loads; a returning player's
 	Title choice goes to the server as TitleChoice.
@@ -38,7 +36,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local ContextActionService = game:GetService("ContextActionService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
@@ -46,7 +43,6 @@ local Workspace = game:GetService("Workspace")
 -- The camera first, before anything here yields: every frame is its own.
 local Camera = require(script.Parent:WaitForChild("Camera"))
 Camera.start()
-require(script.Parent:WaitForChild("ChatOff")).start()
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -346,6 +342,18 @@ onboardingHint.Visible = false
 onboardingHint.Parent = screenGui
 addCorner(onboardingHint, 12)
 
+-- The button row at the bottom right, on every class: the Talk-and-advance
+-- button ("Talk", "Next"), and the Skip button beside it while a Hint shows.
+local talkButton = Instance.new("TextButton")
+talkButton.Name = "TalkAndAdvance"
+talkButton.BackgroundColor3 = rgb(palette.gold)
+talkButton.Font = Enum.Font.FredokaOne
+talkButton.TextColor3 = rgb(palette.deep)
+talkButton.Visible = false
+talkButton.ZIndex = 6 -- over the PC's click catcher
+talkButton.Parent = screenGui
+addCorner(talkButton, 16)
+
 local skipButton = Instance.new("TextButton")
 skipButton.Name = "Skip"
 skipButton.BackgroundColor3 = rgb(palette.cream)
@@ -610,19 +618,10 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then
 		return
 	end
-	-- Space is bound below, above the jump action
 	if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.Return then
 		advance()
 	end
 end)
--- Space advances and never jumps: bound above the
--- default controls' jump action, which then never sees it (feel.md section 5)
-ContextActionService:BindActionAtPriority("AdvanceNotJump", function(_, state: Enum.UserInputState)
-	if state == Enum.UserInputState.Begin then
-		advance()
-	end
-	return Enum.ContextActionResult.Sink
-end, false, Enum.ContextActionPriority.High.Value, Enum.KeyCode.Space)
 
 ShowDialogue.OnClientEvent:Connect(Net.guard("ShowDialogue", function(lines: { Events.ShownLine })
 	DialogueViewModel.enqueue(dialogue, lines)
@@ -631,21 +630,18 @@ ShowDialogue.OnClientEvent:Connect(Net.guard("ShowDialogue", function(lines: { E
 end, warn))
 
 ----------------------------------------------------------------
--- Touch controls (feel.md sections 1 and 4)
+-- Touch controls and the button row (feel.md sections 1 and 4)
 ----------------------------------------------------------------
--- The Talk-and-advance button, a ContextActionService touch button in the
--- right zone, bound only while TalkAndAdvance.shown says (a Dialogue
--- shows or a prompt is within reach): it advances a Dialogue, or else uses
--- the nearest prompt shown, which stays the universal talk affordance.
--- Roblox's thumbstick has the left zone, where the player module puts it;
--- while a Dialogue shows the player's controls are disabled (Amy listens;
--- the box may cover the zone). The jump button goes: the Story never asks
--- for a jump, and the right zone is the talk button's.
-local TALK_ACTION = "TalkAndAdvance"
+-- The Talk-and-advance button, on every class, shows only while
+-- TalkAndAdvance.shown says (a Dialogue shows or a prompt is within
+-- reach): it advances a Dialogue, or else uses the nearest prompt shown,
+-- which stays the universal talk affordance. Roblox's thumbstick has the
+-- left zone, where the player module puts it; while a Dialogue shows the
+-- player's controls are disabled (Amy listens; the box may cover the
+-- zone). Roblox's touch jump button is hidden: the Story has no jump yet,
+-- and the right zone is the button row's; a future chapter that needs a
+-- jump brings it back in its own zone.
 local TALK_LABELS: TalkAndAdvance.Labels = hints.button
--- whether it is bound, and whether its button has been placed (Roblox
--- builds the button a little after the action is bound)
-local talkBound, talkPlaced = false, false
 local prompts: { [ProximityPrompt]: true } = {}
 
 -- Each prompt shown, by its distance from Amy.
@@ -669,33 +665,19 @@ local function promptDistances(): { [ProximityPrompt]: number }
 	return distances
 end
 
-local function talkOrAdvance(_: string, state: Enum.UserInputState): Enum.ContextActionResult
-	if state == Enum.UserInputState.Begin then
-		local action = TalkAndAdvance.press(dialogue.lines ~= nil, promptDistances())
-		if action == "advance" then
-			advance()
-		elseif action then
-			local prompt = action :: ProximityPrompt
-			prompt:InputHoldBegin()
-			prompt:InputHoldEnd()
-		end
+talkButton.Activated:Connect(function()
+	local action = TalkAndAdvance.press(dialogue.lines ~= nil, promptDistances())
+	if action == "advance" then
+		advance()
+	elseif action then
+		local prompt = action :: ProximityPrompt
+		prompt:InputHoldBegin()
+		prompt:InputHoldEnd()
 	end
-	return Enum.ContextActionResult.Sink
-end
+end)
 
 local function offsets(rect: ScreenLayout.Rect): (UDim2, UDim2)
 	return UDim2.fromOffset(rect.x, rect.y), UDim2.fromOffset(rect.width, rect.height)
-end
-
--- Puts `gui` at `rect`, in the layout's units, whatever its parent.
-local function place(gui: GuiObject, rect: ScreenLayout.Rect)
-	local parent = gui.Parent
-	local origin = if parent and parent:IsA("GuiObject")
-		then parent.AbsolutePosition - root.AbsolutePosition
-		else Vector2.zero
-	gui.AnchorPoint = Vector2.zero
-	gui.Position = UDim2.fromOffset(rect.x - origin.X, rect.y - origin.Y)
-	gui.Size = UDim2.fromOffset(rect.width, rect.height)
 end
 
 -- Roblox's touch controls (PlayerGui.TouchGui), once the player module
@@ -758,23 +740,8 @@ end
 renderTouch = function()
 	local open = dialogue.lines ~= nil
 	local wanted = listening()
-	local shown = layout.touch and TalkAndAdvance.shown(open, prompts)
-	if shown ~= talkBound then
-		if shown then
-			ContextActionService:BindAction(TALK_ACTION, talkOrAdvance, true)
-		else
-			ContextActionService:UnbindAction(TALK_ACTION)
-		end
-		talkBound = shown
-	end
-	if talkBound then
-		ContextActionService:SetTitle(TALK_ACTION, TalkAndAdvance.title(open, TALK_LABELS))
-		local button = ContextActionService:GetButton(TALK_ACTION)
-		if button and layout.talk then
-			place(button, layout.talk)
-		end
-		talkPlaced = button ~= nil
-	end
+	talkButton.Visible = TalkAndAdvance.shown(open, prompts)
+	talkButton.Text = TalkAndAdvance.title(open, TALK_LABELS)
 	-- Every path that ends a Dialogue (the last Line advanced, by a tap,
 	-- the box or a key) comes back here, and so does every frame until the
 	-- player module is found and has been told: the controls come back.
@@ -789,9 +756,8 @@ renderTouch = function()
 	end
 end
 
--- Hides Roblox's jump button, finds the thumbstick, and lays the
--- Talk-and-advance button out. The thumbstick stays where the player
--- module puts it.
+-- Hides Roblox's jump button and finds the thumbstick, which stays where
+-- the player module puts it.
 local function placeTouchControls()
 	eachControl(function(control, kind)
 		if kind == "thumbstick" then
@@ -1032,6 +998,8 @@ local function applyLayout()
 	placeTouchControls()
 	onboardingHint.Position, onboardingHint.Size = offsets(layout.hint)
 	onboardingHint.TextSize = text.hint
+	talkButton.Position, talkButton.Size = offsets(layout.talk)
+	talkButton.TextSize = text.speaker
 	skipButton.Position, skipButton.Size = offsets(layout.skip)
 	skipButton.TextSize = text.hint
 	if layout.pulse then
@@ -1143,8 +1111,8 @@ RunService.RenderStepped:Connect(function(seconds)
 		DialogueViewModel.tick(dialogue, seconds)
 		renderDialogue()
 	end
-	if listening() ~= controlsDisabled or (talkBound and not talkPlaced) then
-		renderTouch() -- the player module or the button was not ready yet
+	if listening() ~= controlsDisabled then
+		renderTouch() -- the player module was not ready yet: again until it is
 	end
 	if card then
 		renderCard()

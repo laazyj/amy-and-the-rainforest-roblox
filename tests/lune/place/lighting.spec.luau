@@ -16,11 +16,5 @@ return function(t: any)
 			local lighting = Built.place():GetService("Lighting")
 			expect(lighting.Technology).toBe(roblox.Enum.Technology.ShadowMap)
 		end)
-
-		it("gives Amy no jump on any class (feel.md section 5): jump height and power 0", function()
-			local starter = Built.place():GetService("StarterPlayer")
-			expect(starter.CharacterJumpHeight).toBe(0)
-			expect(starter.CharacterJumpPower).toBe(0)
-		end)
 	end)
 end
