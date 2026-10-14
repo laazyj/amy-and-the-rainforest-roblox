@@ -145,6 +145,17 @@ return function(t: any)
 			end)
 		end
 
+		it("leaves Space to the jump: the client never advances on it", function()
+			expect(source(CLIENT)).never.toContain("KeyCode.Space")
+		end)
+
+		it("has the Talk-and-advance button press as TalkAndAdvance says, on every class", function()
+			expect(source(CLIENT)).toContain(
+				"talkButton.Activated:Connect(function() local action = TalkAndAdvance.press(dialogue.lines ~= nil, promptDistances())"
+			)
+			expect(source(CLIENT)).toContain("talkButton.Visible = TalkAndAdvance.shown(open, prompts)")
+		end)
+
 		for name, remote in Net.REMOTES do
 			if remote.direction == "toServer" then
 				it(`hands {name} from the client, payload checked, to StoryHost.on{name}`, function()

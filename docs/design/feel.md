@@ -64,18 +64,25 @@ The same rules apply to every class; only the numbers differ.
   while a Dialogue is shown.
 - **Touch control zones** are the bottom-left and bottom-right corners:
   35% of the width by 40% of the height on phone, 25% by 35% on tablet.
-  The Roblox thumbstick sits in the left zone; a talk-and-advance button
-  sits in the right zone, reachable by the right thumb, with the
-  Onboarding's Skip button above it while a Hint shows in free play.
-  Thumbs reach from
+  The Roblox thumbstick sits in the left zone, where Roblox's player
+  module puts it (the game never moves it); the button row sits in the
+  right zone, reachable by the right thumb. Thumbs reach from
   the edges, so no control sits anywhere else. Roblox's jump button is
-  hidden on touch: the Story never asks for a jump, and the right zone is
-  the talk button's.
+  hidden on touch for now: the Story has no jump yet, and the right zone
+  is the button row's; a future chapter that needs a jump brings it back
+  in its own zone.
+- **The button row** sits at the bottom right on every class, PC
+  included: the talk-and-advance button ("Talk", or "Next" while a
+  Dialogue shows) in the corner, and the Onboarding's Skip button beside
+  it while a Hint shows in free play (above it where a row would leave
+  the right zone, in portrait). The talk-and-advance button shows only
+  while a Dialogue shows or a prompt is within reach.
 - **While a Dialogue shows on touch**, Amy listens: the player's controls
   are disabled (as the old full-screen click catcher already took every
-  touch), so the dialogue box may cover the left zone. It keeps clear of
-  the talk-and-advance button: beside it in landscape, above it in
-  portrait. The box and the talk-and-advance button both advance.
+  touch), so the dialogue box may cover the left zone. On every class it
+  keeps clear of the talk-and-advance button: beside it in landscape and
+  on a PC, above it in portrait. The box and the talk-and-advance button both advance. Every
+  way a Dialogue ends gives the controls back.
 - **Nothing covers the subject.** No UI element overlaps the projected
   bounding box of the speaker's head during `shot:Dialogue`, the
   Objective target during free play, or a touch control zone's controls
@@ -100,7 +107,7 @@ in the [glossary](../GLOSSARY.md#shots).
 | Shot | Used by | Subject and framing | Moves |
 |---|---|---|---|
 | `shot:Dialogue` | Every Dialogue whose Speaker is a Character in the world; the core frames it before the Dialogue (`src/core/Shot.luau`), of its first such Speaker | Two-shot over Amy's shoulder, camera at the speaker's eye height, the projected head point inside x 0.33–0.67 and y 0.15–0.5 of the viewport. Narrator-only Dialogue keeps the current camera. | Eases in over 0.5 s, then still |
-| `shot:ForestWallReveal` | `chapter2.walk_to_forest.onComplete`, after canon Line 6 (the Quest's outro), as the next Objective appears | Low behind Amy, looking up: the wall of trunks fills the width, the gap is centred, the cream sky and canopies above. Ends with the gap clearly visible, so the next Objective is obvious. | Slow tilt up from Amy to the canopy over about 3 s |
+| `shot:ForestWallReveal` | `chapter2.walk_to_forest.onComplete`, after canon Line 6 (the Quest's outro), as the next Objective appears | Low behind Amy, looking up: the wall of trunks fills the width, the gap is centred, the cream sky and canopies above. Ends looking up at the canopies over the wall, the gap still the slit between the trunks below, so the next Objective is obvious. | Slow tilt up from Amy's shoulders up the trunks' full height to the canopies (48 studs up) over about 3 s; the camera stays where it is |
 | `shot:MeetCharacter` | The first `TalkedTo` of each animal in `chapter3` (its Quest's `onTalkedTo` Hook), before its `shot:Dialogue` | The animal in full, facing Amy, as the table below sets | As the table below sets |
 | `shot:MachineFinale` | `chapter4.explain.onComplete` (`beat:machine_stops`) and the Ending, whose Dialogue it accompanies, so it holds until `DialogueFinished` | Wide, from behind Amy and the crowd, looking toward the machine and the trees: Amy small between the stopped blade and the giant trees | Holds while the machine reverses, then tilts up to the treetops for the Ending's Lines |
 
@@ -178,8 +185,12 @@ The title screen emulates the story website's title overlay (reference:
 a phone screenshot of the website). Over the `ui:title_screen` image, Clara's
 scene of the forest wall:
 
-- a rounded pill label, "a little tale of the wild";
-- then "Amy", and below it "& the Rain Forest", in a hand-written script;
+- a rounded pill label, "a little tale of the wild", as wide as its
+  words, left of centre just above "Amy" and tilted about 4° with its
+  left end lower;
+- then "Amy", and below it "& the Rain Forest", in a hand-written script
+  (the family is one constant in `src/content/title.luau`; Kalam until
+  the owner picks another by eye);
 - the words are white, except "Rain Forest", which is gold; each has a soft
   dark shadow, so it reads over the canopy.
 
@@ -199,12 +210,14 @@ The words are game-rendered text, never part of the image.
 ## 5. Input
 
 - One action per verb: move, talk (use a prompt), advance dialogue. No
-  jump requirement anywhere in the Story.
+  jump requirement anywhere in the Story yet; jumping stays for future
+  chapters, so Space is the jump's and never advances a Dialogue.
 - PC: W/S or Up/Down to walk forward and back; A/D or Left/Right to turn
   Amy and the view together (she never strafes or backs towards the
   camera); a right-mouse drag turns too. The pointer is never locked, so
   it stays free for the Title screen, the dialogue box and prompts. E to
-  talk, click, E or Space to advance. The key mapping lives in one place,
+  talk; click the box or the Next button, or press E or Enter, to
+  advance. The key mapping lives in one place,
   `CameraModel.TURN_KEYS` (confirmed by the owner with the merge of #36).
   Touch: the controls in [§1](#layout-rules), and a drag outside the
   control zones turns the view.
@@ -223,7 +236,7 @@ block play.
 | Step | What the player sees | Hint (PC / touch) | Done when |
 |---|---|---|---|
 | 1 | The `chapter1` card, about 3 s, tap or click to skip | none | Card fades |
-| 2 | The first Narrator Line ([canon Line 1](../story/canon.md#canon-lines)) | "Click or press Space to continue" / "Tap to continue", shown large on this first Line only | `DialogueFinished` |
+| 2 | The first Narrator Line ([canon Line 1](../story/canon.md#canon-lines)) | "Click or press E to continue" / "Tap to continue", shown large on this first Line only | `DialogueFinished` |
 | 3 | Objective "Ask Dad if you can go outside" appears with a marker over Dad | none; the panel briefly glows | Objective shown |
 | 4 | Amy in the garden, Dad nearby | "Walk with W and S, turn with A and D, or use the arrow keys" / a glowing ring on the thumbstick and "Drag here to walk" | Amy has moved 4 studs |
 | 5 | Dad's talk prompt | "Press E to talk" / the prompt button pulses | `TalkedTo(Dad)` |
@@ -239,9 +252,13 @@ pulsing "prompt button" is the talk-and-advance button, which uses the
 nearest prompt. "Shown once per save" is read from what the client
 receives: a Story that begins with its first Chapter card (a new Save, or
 "Start again") shows the Onboarding; a Resume never does. While a Hint
-shows in free play, a Skip button ends the Onboarding: above the
-talk-and-advance button on touch, at the top left of the safe area on a
-PC. The first Line's Hint has none: tapping is how it is done.
+shows in free play, a Skip button ends the Onboarding, in the button
+row beside the talk-and-advance button on every class (clear of the
+top-left corner, where Roblox's own buttons and chat sit).
+The first Line's Hint has none: tapping is how it is done. On touch, the
+walk step's ring is drawn round Roblox's thumbstick where it really is on
+screen (`ScreenLayout.ringAround`), or in the left zone's bottom-left
+corner until the thumbstick has been built.
 
 ## 7. Visual rubric
 

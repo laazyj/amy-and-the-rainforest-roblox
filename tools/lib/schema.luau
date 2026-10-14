@@ -430,6 +430,12 @@ local function hints(schema: Schema): Check
 	})
 end
 
+-- The Title screen's lettering: a font family and weight for each part.
+local function title(): Check
+	local lettering = record({ family = text, weight = text })
+	return record({ heading = lettering, pill = lettering })
+end
+
 local function helpers(): Check
 	return ignore
 end
@@ -446,6 +452,7 @@ local ROLES: { [string]: Role } = {
 	["presets.luau"] = { shape = presets, plain = true },
 	["ending.luau"] = { shape = ending, plain = true },
 	["hints.luau"] = { shape = hints, plain = true },
+	["title.luau"] = { shape = title, plain = true },
 	-- what content writes positions, colours, Spots and Zones with
 	["layout.luau"] = { shape = helpers, plain = true },
 	["palette.luau"] = { shape = helpers, plain = true },
