@@ -38,7 +38,7 @@ local function uploadFor(entry: Manifest.Entry, contents: string, creatorUserId:
 		displayName = `Amy and the Rain Forest {entry.name}`,
 		description = `{entry.name}, for the game Amy and the Rain Forest.`,
 		creatorUserId = creatorUserId,
-		fileName = string.match(entry.path, "[^/]+$") :: string,
+		fileName = string.match(entry.path :: string, "[^/]+$") :: string,
 		file = contents,
 	}
 end
@@ -80,7 +80,7 @@ function UploadAssets.main(ctx: Cli.Context)
 		if not entry.upload then
 			continue
 		end
-		local contents = readAsset(entry.path) :: string
+		local contents = readAsset(entry.path :: string) :: string
 		local sha256 = Manifest.hash(contents)
 		if Manifest.isPending(entry, sha256) then
 			local request = OpenCloud.createAssetRequest(target.apiKey, uploadFor(entry, contents, creatorUserId))

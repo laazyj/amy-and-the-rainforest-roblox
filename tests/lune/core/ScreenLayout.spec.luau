@@ -504,8 +504,8 @@ return function(t: any)
 			local words = TitleScreen.WORDS.pill
 			expect(ScreenLayout.lines(words, pill.text, pill.width - 2 * ScreenLayout.PILL.side)).toBe(1)
 			expect(pill.text >= layout.text.hint).toBe(true)
-			-- tilted about 4 degrees, its left end lower
-			expect(pill.rotation).toBe(-4)
+			-- tilted 2 degrees, as the website has it, its left end lower
+			expect(pill.rotation).toBe(-2)
 			-- its tilted outline stays inside the safe area
 			local angle = math.rad(math.abs(pill.rotation))
 			local wide = pill.width * math.cos(angle) + pill.height * math.sin(angle)

@@ -16,7 +16,7 @@ the rest.
 |---|---|
 | `assets/manifest.json` | Every asset the game references: name, kind, file, Roblox asset id, the SHA-256 of the file uploaded, moderation status, creator, licence and origin. |
 | `assets/images/`, `assets/audio/`, `assets/meshes/` | The files. Clara's illustrations, placeholders, sounds, models. |
-| `src/shared/AssetIds.luau` | Generated from the manifest: asset name → `rbxassetid://` content id, for every uploaded asset the game shows. Never edited by hand. |
+| `src/shared/AssetIds.luau` | Generated from the manifest: asset name → `rbxassetid://` content id, for every entry with an id that the game shows: uploaded, or a [font](#fonts). Never edited by hand. |
 | `tools/check-assets.luau` | Tier 0 (run by `tools/check.sh`): the manifest is valid, every asset id the scan finds is in it (see [What the tier 0 scan catches](#what-the-tier-0-scan-catches)), and `AssetIds.luau` matches it. |
 | `tools/upload-assets.luau` | The uploader. Run only by CI; `--dry-run` anywhere. |
 | `.github/workflows/upload-assets.yml` | Runs the uploader on demand and opens the "Asset ids" PR. |
@@ -42,12 +42,12 @@ the rest.
 | Field | Meaning |
 |---|---|
 | `name` | The Asset name the game uses; see [Asset names](#asset-names). Unique. |
-| `kind` | `image`, `audio` or `model`. The file's extension must be one the Assets API takes for that kind (`tools/opencloud.luau`, `ASSET_CONTENT_TYPES`). |
-| `path` | The file, under `assets/`. Two entries may share a file (a thumbnail that is a Chapter card). |
-| `assetId` | The Roblox asset id as a string of digits, or `null` until uploaded. Written by the uploader only. |
-| `sha256` | The SHA-256 of the file that was uploaded. Written by the uploader only. |
+| `kind` | `image`, `audio` or `model`. The file's extension must be one the Assets API takes for that kind (`tools/opencloud.luau`, `ASSET_CONTENT_TYPES`). Or `font`, a Creator Store family with no file; see [Fonts](#fonts). |
+| `path` | The file, under `assets/`. Two entries may share a file (a thumbnail that is a Chapter card). None for a font. |
+| `assetId` | The Roblox asset id as a string of digits, or `null` until uploaded. Written by the uploader only, except a font's, which is its Creator Store id and is required. |
+| `sha256` | The SHA-256 of the file that was uploaded. Written by the uploader only. None for a font. |
 | `moderation` | The Moderation status; see [Moderation](#moderation). |
-| `upload` | `false` for files the game never shows: store art (set on the Creator Dashboard by the owner) and Character references. |
+| `upload` | `false` for files the game never shows: store art (set on the Creator Dashboard by the owner) and Character references; and `false` for a font, which is referenced, never uploaded. |
 | `placeholder` | `true` for a stand-in until the real piece is drawn. |
 | `amy` | Images only. `absent` or `from-behind`. There is no third value, because **no image shows Amy's face**. Whoever adds an image states which it is; the reviewer checks it. |
 | `creator` | Who made it. |
@@ -61,7 +61,7 @@ An Asset name is a prefix saying what the Asset is for, then a name, in
 the forms of the [glossary's Ids](GLOSSARY.md#6-ids): `card:` (Chapter
 cards and the end card), `ui:` (frames, motifs, screens), `store:`
 (store page art), `ref:` (references, never shown), `cue:` and `music:`
-(Cues), `prop:` (Prop models). The game looks an Asset up by its name in
+(Cues), `prop:` (Prop models), `font:` (Creator Store font families). The game looks an Asset up by its name in
 `AssetIds.luau`; a name with no id yet is absent, and the game is to fall
 back to plain UI (or silence, for a Cue). Nothing in `src/` reads
 `AssetIds.luau` yet; the briefs that show the cards and play the Cues
@@ -100,6 +100,21 @@ longer matches the one recorded, so the next upload run sends it again.
 Roblox cannot update an image or a sound in place, so it becomes a new
 asset with a new id; the "Asset ids" PR shows the old id being replaced.
 
+### Fonts
+
+A font is a Creator Store font family the game references by its id, such
+as `font:dancing_script` for the Title screen's lettering. To find one: in
+Studio, **Toolbox → Creator Store → Fonts**. Only families Roblox has
+published exist there, and Studio's Properties picker for `FontFace` shows
+the built-in families only, so a Creator Store family is chosen by its id.
+Its entry has kind `font`, no `path` and no `sha256`, `upload` false,
+its Creator Store `assetId`, `moderation` `approved` (Roblox published
+it), no `amy`, and licence `creator-store-free`; `creator` names the
+designer and the publisher, and `origin` the listing and the font's
+licence. Tier 0 holds all of that. `tools/upload-assets` skips it, and
+`AssetIds.luau` lists it, so code names the Asset (`font:dancing_script`)
+and looks its id up there, as for any other Asset.
+
 ### What the tier 0 scan catches
 
 `tools/check-assets` reads every file under `src/`, whatever its
@@ -131,7 +146,7 @@ in the "Asset ids" PR the workflow opens.
 | `licence` | Use for | Rules |
 |---|---|---|
 | `owner` | Clara's illustrations (the owner's family's work, used with the owner's permission), and placeholders generated in this repository | Record in `origin` which original it came from. |
-| `creator-store-free` | Free models and sounds from the Creator Store | Fetched as the plan's section 5.5 says. Record the Creator Store asset id and creator in `origin`. Only items marked free. |
+| `creator-store-free` | Free models, sounds and fonts from the Creator Store | Fetched as the plan's section 5.5 says. Record the Creator Store asset id and creator in `origin`. Only items marked free. |
 | `cc0` | Public-domain sounds or images | Record the source URL in `origin`. |
 | `cc-by` | Free-licence sounds or images that need credit | `attribution` is required and goes in the credits. |
 | `synthesised` | Audio generated for this game | Record the tool and settings in `origin`. |

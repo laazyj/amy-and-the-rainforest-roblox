@@ -310,6 +310,17 @@
       "creator": "This repository",
       "licence": "owner",
       "origin": "Placeholder for brief 009: a plain cream #f0edd9 card (512x512) with no text, until Clara's drawing replaces it (issue #21)."
+    },
+    {
+      "name": "font:dancing_script",
+      "kind": "font",
+      "assetId": "8764312106",
+      "moderation": "approved",
+      "upload": false,
+      "placeholder": false,
+      "creator": "Impallari Type; published on the Creator Store by Roblox",
+      "licence": "creator-store-free",
+      "origin": "Creator Store, Fonts: Dancing Script (Regular, Medium, SemiBold, Bold), published by Roblox under the SIL Open Font License 1.1; chosen by the owner on Dev for the Title screen (brief 019)."
     }
   ]
 }
