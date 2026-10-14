@@ -211,13 +211,14 @@ scene of the forest wall:
 - then "Amy", and below it "& the Rain Forest", in Dancing Script Bold
   (`src/content/title.luau` names the Asset `font:dancing_script`);
 - the words are white, except "Rain Forest", which is gold; each line has
-  the website's two shadows, so it reads over the canopy.
+  the website's hard deep-green shadow, so it reads over the canopy.
 
 What shipped (brief 019): the family is the manifest's `font:dancing_script`,
-the heading lines Bold and the pill SemiBold, the pill tilted −2°. Roblox
-has no text blur, so the two shadows are offset copies of the line: a hard
-one at (0, 3) in deep green, opaque, over a soft black one at (4, 8), 60%
-transparent, standing in for the blur.
+the heading lines Bold and the pill SemiBold, the pill tilted −2°, and one
+shadow per line: an opaque deep-green copy at (0, 3), the website's hard
+edge. The website's soft blurred shadow is left out: Roblox cannot blur
+text, and an offset copy standing in for it read as a misprint on a phone
+(the owner's Dev screenshots of 2026-10-14).
 
 The words are game-rendered text, never part of the image.
 

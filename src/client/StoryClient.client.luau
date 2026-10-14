@@ -451,16 +451,10 @@ local function fontFace(font: typeof(lettering.pill)): Font
 	return Font.new(AssetIds[font.family] or font.family, (Enum.FontWeight :: any)[font.weight])
 end
 
--- The website's two title shadows, bottom first: a soft dark one further
--- off (Roblox has no blur; the offset stands in for it), under a hard one in
--- deep green just below the words.
-local TITLE_SHADOWS = {
-	{ name = "SoftShadow", x = 4, y = 8, colour = Color3.new(0, 0, 0), transparency = 0.6, z = 30 },
-	{ name = "HardShadow", x = 0, y = 3, colour = rgb(palette.deep), transparency = 0, z = 31 },
-}
-
--- A line of title text, white, over TITLE_SHADOWS; `rich` is the line with
--- its RichText colours, when it has any.
+-- A line of title text, white, over its shadow: the website's hard deep-green
+-- edge just below the words. (Its soft blurred shadow is left out: Roblox
+-- cannot blur text, and an offset copy read as a misprint on a phone.)
+-- `rich` is the line with its RichText colours, when it has any.
 local function titleText(
 	name: string,
 	line: { y: number, height: number },
@@ -475,15 +469,12 @@ local function titleText(
 	label.FontFace = font
 	label.TextScaled = true
 	label.Text = text
-	for _, shadow in TITLE_SHADOWS do
-		local layer = label:Clone()
-		layer.Name = name .. shadow.name
-		layer.Position = UDim2.new(0.5, shadow.x, line.y, shadow.y)
-		layer.TextColor3 = shadow.colour
-		layer.TextTransparency = shadow.transparency
-		layer.ZIndex = shadow.z
-		layer.Parent = titleWords
-	end
+	local shadow = label:Clone()
+	shadow.Name = name .. "Shadow"
+	shadow.Position = UDim2.new(0.5, 0, line.y, 3)
+	shadow.TextColor3 = rgb(palette.deep)
+	shadow.ZIndex = 31
+	shadow.Parent = titleWords
 	label.Name = name
 	label.Position = UDim2.new(0.5, 0, line.y, 0)
 	label.TextColor3 = Color3.new(1, 1, 1)
