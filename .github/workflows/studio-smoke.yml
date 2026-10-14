@@ -14,10 +14,6 @@ name: Studio smoke
 
 on:
   workflow_dispatch:
-  # TEMPORARY (brief mac-001a, Must 6): proves the job from the cloud before
-  # the workflow is on main. Removed before review.
-  push:
-    branches: [mac-001a-isolated-runner]
 
 permissions:
   contents: read
@@ -38,7 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: mac-001a-isolated-runner # TEMPORARY: the tools are not on main yet
+          ref: main # the tools from main, whatever ref the run was started on
           persist-credentials: false
 
       - name: Install the pinned toolchain

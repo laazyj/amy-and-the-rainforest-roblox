@@ -129,12 +129,24 @@ Done once, on 2026-10-13. The host is an Apple silicon MacBook on macOS
    command line, and is valid for an hour. The runner (2.338.0 at install;
    it updates itself) registers with the labels `self-hosted`, `macOS`,
    `ARM64`, `studio` and runs as a launchd agent of the guest's logged-in
-   user, so it starts whenever the VM boots.
-9. **Seal:** `tools/mac/vm.sh stop`, `tools/mac/vm.sh seal` keeps the VM
+   user, so it starts whenever the VM boots. Two changes to the agent that
+   the runner's own `svc.sh` writes: it stays in the desktop session
+   (`SessionCreate` off; with it on, the job's session has no window server
+   and the wrapper fails with "there is no desktop session here"), and
+   launchd restarts it if it exits (`KeepAlive`). The script also installs
+   the guest's clock job (see "The host sleeps" below), the one step that
+   uses the guest's `sudo`.
+9. **Screen Recording, by a person:** the first job's capture fails with
+   "could not create image from window" and the guest shows "“node” would
+   like to record this computer's screen". In the VM's window: System
+   Settings → Privacy & Security → Screen & System Audio Recording → turn
+   on **node** (the runner's own Node.js,
+   `~/actions-runner-studio/externals/node24/bin/node`, which macOS holds
+   responsible for every process of a job). A capture through `vm.sh exec`
+   needs no approval; only the runner's does. Closing the VM's window
+   stops the VM: `tools/mac/vm.sh start` afterwards.
+10. **Seal:** `tools/mac/vm.sh stop`, `tools/mac/vm.sh seal` keeps the VM
    as it is then as the base that `reset` restores.
-
-No Screen Recording prompt appeared in the guest, for a capture run
-through `vm.sh exec` or by the runner.
 
 ## Day to day (the owner)
 
@@ -239,9 +251,12 @@ built from this branch.
 | Guest, headless, again | pass | 14.2 s | 16.7 ms | 0.448 |
 | Host, in the owner's session | pass | 13.4 s | 16.7 ms | 0.396 |
 | Guest, headless, the owner's screen locked for the whole run | pass | 17.8 s | 16.7 ms | 0.449 |
-| From the cloud, `studio-smoke.yml` on the runner | CLOUD_ROW |
+| From the cloud, `studio-smoke.yml` on the runner ([run](https://github.com/laazyj/amy-and-the-rainforest-roblox/actions/runs/38579335725)), place from CI on `main` | pass | 16.0 s | 16.7 ms | 0.386 |
+| The same, after `vm.sh seal` and `vm.sh reset` | pass | 18.2 s | 16.7 ms | 0.387 |
 
-Every screenshot shows the game in Play: the Scene, the Characters, the
+`seal` and `reset` each take under a second (APFS clones), and the reset
+guest kept the runner's registration, Studio's sign-in and the Screen
+Recording approval. Every screenshot shows the game in Play: the Scene, the Characters, the
 Objective and the first Line. Frame time is 16.7 ms in the guest and on
 the host, which is the 60 frames a second both displays refresh at, so it
 shows that the guest keeps up with this place and not how much headroom
@@ -257,7 +272,8 @@ What was not known going in, and what was found:
   seconds (shaders compile once); later ones 3 to 4.
 - **Does `screencapture` work in a headless guest?** Yes. With
   `--no-graphics` the guest still has a display and a logged-in desktop
-  session; only the host shows no window. No Screen Recording prompt.
+  session; only the host shows no window. The runner needs Screen Recording
+  approved once (step 9).
 - **Does the guest keep rendering while the owner's screen is locked?**
   Yes: same frame time and the same picture as with it unlocked.
 - **Does the guest run while the host sleeps?** No. The VM freezes with
@@ -267,6 +283,36 @@ What was not known going in, and what was found:
 So the VM is the route, and neither fallback of the brief (an unprivileged
 account; the runner in the owner's account) was built.
 
+## The host sleeps
+
+The VM freezes while the Mac sleeps and its clock stops with it, so on
+wake the guest's clock is behind by the length of the sleep. On 2026-10-13
+that was an hour, and GitHub refused the runner's signed token as expired
+("The token expired on … Current server time is …"); the runner reported
+this as "The runner registration has been deleted from the server" and
+stopped for good. The registration had not been deleted.
+
+Two guards, both in the guest, installed by `setup.sh runner`:
+
+- a launchd daemon, `local.amy-studio.clock`, sets the guest's clock from
+  `time.apple.com` every minute (nothing in the guest can tell it was frozen, so it is a plain interval);
+- launchd restarts the runner whenever it exits.
+
+They have not yet been through a real overnight sleep; if the runner is
+offline after one, look for "token expired" in the newest
+`~/actions-runner-studio/_diag/Runner_*.log` in the guest, and restart the
+runner with `tools/mac/vm.sh stop && tools/mac/vm.sh start` rather than
+registering it again.
+
+GitHub removes a self-hosted runner that has not connected for 14 days.
+Start the VM at least once a fortnight, or register it again (above) after
+a longer gap. A job started while the runner is offline waits in the queue
+for up to 24 hours, then fails.
+
+Do not use `tart suspend`: resuming a suspended VM with Softnet failed
+("The virtual machine failed to restore with error “invalid argument”"),
+and the snapshot had to be discarded and the VM booted cold.
+
 ## Failure modes
 
 | What happens | What you see | What to do |
@@ -275,6 +321,8 @@ account; the runner in the owner's account) was built.
 | The host is asleep, or the VM is not running after a restart | The job stays queued | Wake the Mac; `tools/mac/vm.sh start`. |
 | Studio's sign-in has expired | "Studio did not open the place: no new Studio connected to the MCP server; is Studio signed in?" after 90 seconds | `vm.sh stop`, `vm.sh start window`, sign in again, `stop`, `seal`. |
 | Studio's MCP server is switched off | "Studio's MCP server is not enabled" at once | Step 7 above. |
+| The runner is offline although the VM runs | `vm.sh status` says running; GitHub shows the runner offline | `tools/mac/vm.sh stop && tools/mac/vm.sh start`. Seen once, after the VM was frozen and resumed: the guest had an address but no route out. |
+| Studio cannot capture | "could not create image from window" | Step 9: Screen Recording for `node`. A runner update that replaces its Node.js may ask again. |
 | A job left the guest in a bad state | Anything | `tools/mac/vm.sh reset`. |
 | Tart is updated by Homebrew | `vm.sh` warns that the version differs | If the VM still starts and the smoke job passes, bump `TART_VERSION` in `vm.sh`. |
 | Softnet is updated by Homebrew | `vm.sh start` fails with "root privileges are required" | Step 2 above, with the new path. |

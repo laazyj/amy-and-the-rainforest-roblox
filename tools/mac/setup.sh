@@ -2,7 +2,8 @@
 # Sets up the Mac runner's virtual machine from the inside (brief mac-001a):
 # Roblox Studio and the GitHub Actions self-hosted runner labelled `studio`.
 # Run it in the guest, as the guest's one user, never on the owner's Mac
-# itself and never with sudo. See docs/MAC_RUNNER.md.
+# itself, and not with sudo: the script asks for the guest's sudo itself for
+# the one step that needs it. See docs/MAC_RUNNER.md.
 #
 #   tools/mac/setup.sh studio                         install Roblox Studio
 #   RUNNER_TOKEN=<token> tools/mac/setup.sh runner    install and register the runner
@@ -13,8 +14,10 @@
 # `runner` downloads the pinned runner, verifies its SHA-256, registers it
 # with the labels self-hosted, macOS, studio, and installs it as a launchd
 # agent of the logged-in GUI session (not a daemon: Studio needs a window
-# server), started at login. A runner that is already registered is left
-# registered, and RUNNER_TOKEN is then not needed.
+# server), started at login and restarted whenever it exits. A runner that
+# is already registered is left registered, and RUNNER_TOKEN is then not
+# needed. It also installs the guest's clock job (below), the one step that
+# uses the guest's sudo.
 #
 # Environment:
 #   RUNNER_TOKEN  registration token, made on the host by the owner:
@@ -99,6 +102,33 @@ install_studio() {
 	echo "  - Approve the Screen Recording prompt the first time the wrapper captures the window."
 }
 
+# The guest's clock stops while the host sleeps and is behind when it wakes;
+# GitHub then refuses the runner's signed token as expired and the runner
+# stops. macOS's own network time (timed) corrects the clock only every few
+# hours, too late, so a launchd daemon of the guest sets it every minute.
+# Nothing in the guest can tell that it was frozen (its clock stopped too), so
+# it is a plain interval; launchd restarts the runner meanwhile.
+install_clock() {
+	echo "== Guest clock"
+	local label="local.amy-studio.clock"
+	local plist="/Library/LaunchDaemons/$label.plist"
+	sudo tee "$plist" >/dev/null <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key><string>$label</string>
+	<key>ProgramArguments</key>
+	<array><string>/usr/bin/sntp</string><string>-sS</string><string>time.apple.com</string></array>
+	<key>StartInterval</key><integer>60</integer>
+</dict>
+</plist>
+PLIST
+	sudo launchctl bootout "system/$label" 2>/dev/null || true
+	sudo launchctl bootstrap system "$plist"
+	echo "the guest's clock is set every minute"
+}
+
 install_runner() {
 	[ -d "$STUDIO_APP" ] || fail "install Studio first: tools/mac/setup.sh studio"
 
@@ -127,16 +157,20 @@ install_runner() {
 	echo "== launchd agent"
 	# svc.sh writes ~/Library/LaunchAgents/actions.runner.*.plist and loads it
 	# into this user's GUI session; it captures the current PATH for the jobs.
-	if ./svc.sh status 2>/dev/null | grep -q "Started:"; then
-		echo "already running"
-	else
-		[ -f .service ] || ./svc.sh install
-		# svc.sh asks launchd for a session of the runner's own, which has no
-		# window server: Studio would render nothing. Stay in the desktop session.
-		plutil -replace SessionCreate -bool false "$(cat .service)"
-		./svc.sh start
-	fi
-	echo "Runner '$RUNNER_NAME' is set up."
+	# Running this again restarts the runner, ending any job it is running.
+	[ -f .service ] || ./svc.sh install
+	local agent
+	agent="$(cat .service)"
+	# svc.sh asks launchd for a session of the runner's own, which has no
+	# window server: Studio would render nothing. Stay in the desktop session.
+	plutil -replace SessionCreate -bool false "$agent"
+	# The runner exits for good on some errors (an expired token after the
+	# host slept); launchd starts it again.
+	plutil -replace KeepAlive -bool true "$agent"
+	./svc.sh stop >/dev/null 2>&1 || true
+	./svc.sh start
+	install_clock
+	echo "The runner is set up."
 }
 
 case "${1:-}" in
