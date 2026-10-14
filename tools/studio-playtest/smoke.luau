@@ -83,8 +83,9 @@ local frames, seconds = 60, 0
 for _ = 1, frames do
 	seconds += renderStepped:Wait()
 end
+-- ViewportSize is fractional on a scaled display.
 local size = workspace.CurrentCamera.ViewportSize
-return `{size.X}x{size.Y} {seconds / frames * 1000}`
+return `{math.round(size.X)}x{math.round(size.Y)} {seconds / frames * 1000}`
 ]]
 
 local function round(seconds: number): number
@@ -175,12 +176,13 @@ function Smoke.run(bridge: Bridge, options: Options): Report
 			name = "Capture the viewport",
 			run = function()
 				local ready = bridge.run("Client", Smoke.CLIENT_READY_SCRIPT)
-				local viewport, frame = string.match(ready, "^(%d+x%d+) ([%d.]+)$")
-				if not viewport then
+				local viewport, frame = string.match(ready, "^(%d+x%d+) (%S+)$")
+				local milliseconds = tonumber(frame)
+				if not viewport or not milliseconds then
 					error(`the client returned '{ready}'`, 0)
 				end
 				report.viewport = viewport
-				report.frameMilliseconds = round(tonumber(frame) :: number)
+				report.frameMilliseconds = round(milliseconds)
 				local luminance = bridge.capture(options.screenshotPath)
 				report.screenshot = options.screenshotPath
 				report.screenshotLuminance = math.round(luminance * 1000) / 1000

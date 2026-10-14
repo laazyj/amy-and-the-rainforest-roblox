@@ -81,7 +81,9 @@ function Mcp.connect(program: string, clientName: string): Client
 			lines, pending = Mcp.lines(pending .. chunk)
 			for _, line in lines do
 				local ok, message = pcall(serde.decode, "json" :: "json", line)
-				if ok and type(message) == "table" and type(message.id) == "number" then
+				-- Only responses: a request from the server (roots/list, say) has
+				-- a method, and its id is the server's, not one of ours.
+				if ok and type(message) == "table" and type(message.id) == "number" and message.method == nil then
 					responses[message.id] = message
 				end
 			end

@@ -6,9 +6,13 @@ local function check(yaml: string): { string }
 	return MacWorkflows.check("w.yml", serde.decode("yaml", MacWorkflows.explicit(yaml)))
 end
 
-local function workflow(on: string, runsOn: string): string
-	return `on:\n{on}\njobs:\n  play:\n    runs-on: {runsOn}\n    steps: []\n`
+-- One job; `environment` defaults to studio, and false leaves it out.
+local function workflow(on: string, runsOn: string, environment: (string | false)?): string
+	local env = if environment == false then "" else `    environment: {environment or "studio"}\n`
+	return `on:\n{on}\njobs:\n  play:\n    runs-on: {runsOn}\n{env}    steps: []\n`
 end
+
+local JOB = "jobs:\n  play:\n    runs-on: self-hosted\n    environment: studio\n"
 
 return function(t: any)
 	t.describe("mac-workflows", function()
@@ -17,7 +21,7 @@ return function(t: any)
 			t.expect(check(workflow("  pull_request:", "[macos-15]"))).toEqual({})
 		end)
 
-		t.it("accepts a Mac job started by hand, on a schedule or by a push to named branches", function()
+		t.it("accepts a Mac job started by hand, on a schedule or by a push to main", function()
 			t.expect(check(workflow("  workflow_dispatch:", "[self-hosted, studio]"))).toEqual({})
 			t.expect(check(workflow("  schedule:\n    - cron: '0 3 * * *'", "[self-hosted, studio]"))).toEqual({})
 			t.expect(check(workflow("  push:\n    branches: [main]", "[self-hosted, studio]"))).toEqual({})
@@ -28,11 +32,8 @@ return function(t: any)
 				"w.yml: runs on the Mac and starts on 'pull_request'; only workflow_dispatch, schedule, push may start a Mac job"
 			t.expect(check(workflow("  pull_request:\n    types: [labeled]", "[self-hosted, studio]")))
 				.toEqual({ problem })
-			t.expect(check("on: pull_request\njobs:\n  play:\n    runs-on: self-hosted\n")).toEqual({ problem })
-			t.expect(check("on: [workflow_dispatch, pull_request]\njobs:\n  play:\n    runs-on: self-hosted\n"))
-				.toEqual({
-					problem,
-				})
+			t.expect(check("on: pull_request\n" .. JOB)).toEqual({ problem })
+			t.expect(check("on: [workflow_dispatch, pull_request]\n" .. JOB)).toEqual({ problem })
 		end)
 
 		t.it("refuses pull_request_target, workflow_run and workflow_call on the Mac", function()
@@ -41,10 +42,19 @@ return function(t: any)
 			end
 		end)
 
-		t.it("refuses a push with no branches named", function()
-			t.expect(check(workflow("  push:", "[self-hosted, studio]"))).toEqual({
-				"w.yml: runs on the Mac and starts on every push; name the branches",
-			})
+		t.it("refuses a push to anything but main", function()
+			local problem = "w.yml: runs on the Mac and starts on a push; only 'branches: [main]' may"
+			for _, branches in { "", "\n    branches: [my-branch]", "\n    branches: [main, my-branch]" } do
+				t.expect(check(workflow(`  push:{branches}`, "[self-hosted, studio]"))).toEqual({ problem })
+			end
+		end)
+
+		t.it("requires every Mac job to use the studio environment", function()
+			local problem = "w.yml: job 'play' runs on the Mac without 'environment: studio'"
+			t.expect(check(workflow("  workflow_dispatch:", "[self-hosted, studio]", false))).toEqual({ problem })
+			t.expect(check(workflow("  workflow_dispatch:", "[self-hosted, studio]", "dev"))).toEqual({ problem })
+			t.expect(check(workflow("  workflow_dispatch:", "[self-hosted, studio]", "{ name: studio }"))).toEqual({})
+			t.expect(check(workflow("  workflow_dispatch:", "ubuntu-latest", false))).toEqual({})
 		end)
 
 		t.it("counts a label of our own, a runner group and an expression as the Mac", function()
@@ -57,7 +67,7 @@ return function(t: any)
 
 		t.it("finds the Mac job among others", function()
 			local yaml =
-				"on:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n  b:\n    runs-on: [self-hosted]\n"
+				"on:\n  pull_request:\njobs:\n  a:\n    runs-on: ubuntu-latest\n  b:\n    runs-on: [self-hosted]\n    environment: studio\n"
 			t.expect(#check(yaml)).toBe(1)
 		end)
 

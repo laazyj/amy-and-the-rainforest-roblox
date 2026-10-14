@@ -2,7 +2,9 @@
 --[[
 	The rule that keeps pull request code off the Mac runner (brief mac-001a,
 	Must 3 and 7; docs/MAC_RUNNER.md): a workflow with a job on a self-hosted
-	runner starts only from the triggers in ALLOWED. The repository is
+	runner starts only from the triggers in ALLOWED, and every such job uses
+	the `studio` environment, which only `main` may deploy to, so a branch
+	cannot run its own copy of a Mac workflow. The repository is
 	public, so this fails closed: a `runs-on` this file cannot prove is a
 	GitHub-hosted runner counts as the Mac, and a trigger that is not listed
 	is refused, `pull_request`, `pull_request_target` and `workflow_call`
@@ -11,9 +13,9 @@
 
 local MacWorkflows = {}
 
--- `push` must also name its branches; only people with write access push
--- branches to this repository.
+-- `push` only to main.
 MacWorkflows.ALLOWED = { "workflow_dispatch", "schedule", "push" }
+MacWorkflows.ENVIRONMENT = "studio"
 
 local HOSTED = { "^ubuntu%-", "^macos%-", "^windows%-" }
 
@@ -91,12 +93,23 @@ function MacWorkflows.check(path: string, workflow: any): { string }
 	if type(workflow) ~= "table" or type(workflow.jobs) ~= "table" then
 		return { `{path}: is not a workflow (no jobs)` }
 	end
+	local problems = {}
 	local onMac = false
-	for _, job in workflow.jobs do
+	for name, job in workflow.jobs do
 		-- A job that calls a reusable workflow has no runs-on; the workflow it
 		-- calls is checked as its own file.
 		if type(job) == "table" and job.uses == nil and selfHosted(job["runs-on"]) then
 			onMac = true
+			local environment = job.environment
+			if type(environment) == "table" then
+				environment = environment.name
+			end
+			if environment ~= MacWorkflows.ENVIRONMENT then
+				table.insert(
+					problems,
+					`{path}: job '{name}' runs on the Mac without 'environment: {MacWorkflows.ENVIRONMENT}'`
+				)
+			end
 		end
 	end
 	if not onMac then
@@ -105,7 +118,6 @@ function MacWorkflows.check(path: string, workflow: any): { string }
 
 	-- YAML 1.1 parsers read the key `on` as the boolean true.
 	local found = triggers(workflow.on or workflow[true])
-	local problems = {}
 	if next(found) == nil then
 		table.insert(problems, `{path}: runs on the Mac and its triggers cannot be read`)
 	end
@@ -115,8 +127,11 @@ function MacWorkflows.check(path: string, workflow: any): { string }
 				problems,
 				`{path}: runs on the Mac and starts on '{name}'; only {table.concat(MacWorkflows.ALLOWED, ", ")} may start a Mac job`
 			)
-		elseif name == "push" and (type(filters.branches) ~= "table" or #filters.branches == 0) then
-			table.insert(problems, `{path}: runs on the Mac and starts on every push; name the branches`)
+		elseif
+			name == "push"
+			and not (type(filters.branches) == "table" and #filters.branches == 1 and filters.branches[1] == "main")
+		then
+			table.insert(problems, `{path}: runs on the Mac and starts on a push; only 'branches: [main]' may`)
 		end
 	end
 	table.sort(problems)

@@ -27,6 +27,9 @@ jobs:
   smoke:
     name: Play the place in Studio on the Mac
     runs-on: [self-hosted, studio]
+    # Only main may deploy to this environment, so a branch cannot run its own
+    # copy of this workflow on the Mac (docs/MAC_RUNNER.md).
+    environment: studio
     permissions:
       contents: read
       actions: read # to download the place artifact of CI's run on main

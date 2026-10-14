@@ -20,7 +20,7 @@ Cli.main(function(ctx)
 	end
 	local out = Cli.required(values, "out")
 	fs.writeDir(out)
-	local report = Smoke.run(Studio.bridge(ctx.log), {
+	local report = Smoke.run(Studio.bridge({ ctx = ctx }), {
 		placeFile = Cli.required(values, "file"),
 		screenshotPath = `{out}/viewport.png`,
 		pinnedStudioVersion = (string.gsub(Files.read("tools/studio-playtest/studio-version.txt"), "%s+", "")),

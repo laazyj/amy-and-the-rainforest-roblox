@@ -122,6 +122,18 @@ return function(t: any)
 			t.expect(calls[#calls]).toBe("close")
 		end)
 
+		t.it("fails with what the client returned when it is not a viewport and a frame time", function()
+			local report = run((fakeStudio({
+				run = function(dataModel, code)
+					return if dataModel == "Edit"
+						then "Place.rbxl"
+						elseif code == Smoke.PLAY_SCRIPT then PRINTED
+						else "1029x719 soon"
+				end,
+			})))
+			t.expect(report.failure).toBe("Capture the viewport: the client returned '1029x719 soon'")
+		end)
+
 		t.it("fails when the screenshot is black where the viewport should be", function()
 			local bridge = fakeStudio({
 				capture = function()

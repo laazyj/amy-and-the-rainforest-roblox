@@ -206,12 +206,24 @@ says so plainly.
    under the test prefix). The plan's "Studio DataStore access on Dev" is
    for the owner's own playtests in the owner's account and now says so.
    mac-002's Creator Store insertion uses the runner's account too.
-3. **No per-run approval gate.** Isolation comes from structure, not a
-   click: Must 7. Every way a Mac job can start is already the owner's or
-   the coordinator's doing, fork workflow runs need approval for all
-   outside collaborators, and a job never runs pull-request code. If a
-   second gate is ever wanted, a `studio` environment with the owner as
-   required reviewer can be added without changing the jobs.
+3. **No per-run approval gate, but a `studio` environment limited to
+   `main`** (amended in the review of PR #47). Isolation comes from
+   structure, not a click: Must 7. Fork workflow runs need approval for
+   all outside collaborators, and a job never runs pull-request code. The
+   amendment: `workflow_dispatch` runs the workflow file of the branch it
+   is dispatched on, and a `push` runs the pushed commit's file, so any
+   session with write access could run a changed copy of a Mac workflow
+   from its own branch; `ref: main` on the checkout does not help, since
+   the steps come from the branch. So every Mac job uses
+   `environment: studio`, and the owner creates that environment with
+   deployment branches limited to `main` (no secrets in it; a required
+   reviewer stays optional). GitHub then refuses a job from any other
+   branch before a step runs. Tier 0 requires the environment on every
+   self-hosted job and `check-repo.sh` checks the environment's policy.
+   Because the environment gates only jobs that declare it, the runner
+   also refuses, in a job-started hook, any job whose workflow file is not
+   on `main` or whose event is not `workflow_dispatch`, `push` or
+   `schedule`.
 4. **This brief replaces mac-001.** mac-001 stays in the repository marked
    superseded; its row is gone from the table; mac-002 follows mac-001a.
    The working code on the local branch `mac-001-runner-bootstrap` (the

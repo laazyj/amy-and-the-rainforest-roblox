@@ -19,8 +19,8 @@ screen saver and lock settings are never touched, by script or by hand.
 |---|---|---|
 | `tools/mac/vm.sh` | on the host, as the owner | Creates the VM from the pinned image; `start`, `stop`, `status`, `exec`, `push`, `seal`, `reset`. Never mounts a host directory into the guest. |
 | `tools/mac/setup.sh` | in the guest | `studio` installs Roblox Studio; `runner` installs the pinned runner (SHA-256 checked), registers it and installs its launchd agent. Refuses to run as root, and refuses to run outside a virtual machine. |
-| `tools/mac/check-repo.sh` | on the host, as the owner | Fails unless fork pull requests need approval for all external contributors and no workflow with a job on a self-hosted runner starts from a pull request. |
-| `tools/lib/mac-workflows.luau` | in tier 0 (`tools/check.sh`), on every PR | The second half of that check: a workflow with a job on anything but a GitHub-hosted runner may start only from `workflow_dispatch`, `schedule` or a `push` to named branches. |
+| `tools/mac/check-repo.sh` | on the host, as the owner | Fails unless fork pull requests need approval for all external contributors, the `studio` environment allows `main` only, and no workflow with a job on a self-hosted runner starts from a pull request. |
+| `tools/lib/mac-workflows.luau` | in tier 0 (`tools/check.sh`), on every PR | The workflow half of that check: a job on anything but a GitHub-hosted runner must use `environment: studio`, and its workflow may start only from `workflow_dispatch`, `schedule` or a `push` to `main`. |
 | `tools/studio-playtest/` | in the guest, by the job | The wrapper: opens a place file in Studio, starts Play, runs a script, captures the Studio window, stops Play, quits Studio, writes `viewport.png` and `report.json`. |
 | `.github/workflows/studio-smoke.yml` | started by hand | The proof that all of the above works from the cloud. |
 
@@ -32,8 +32,27 @@ The repository is public, so these hold for every workflow that targets
 - It starts only from `workflow_dispatch`, a push to `main`, or the owner's
   `needs-playtest` label. Never from a plain pull request event.
   Tier 0 and `tools/mac/check-repo.sh` fail on any other trigger,
-  `pull_request`, `pull_request_target` and `workflow_call` among them;
-  the label trigger will need the rule widened, deliberately, in mac-002.
+  `pull_request`, `pull_request_target` and `workflow_call` among them,
+  and on a `push` to any branch but `main`; the label trigger will need
+  the rule widened, deliberately, in mac-002.
+- Every Mac job has `environment: studio`, and the `studio` environment
+  allows deployments from `main` only (Settings → Environments → studio →
+  Deployment branches and tags → Selected branches and tags → `main`; no
+  secrets in it). A manual run, or a push, runs the workflow file of its
+  own branch, so without this any session with write access could run a
+  changed copy of a Mac workflow from its branch; with it, GitHub refuses
+  the job before a step runs ("Branch … is not allowed to deploy to
+  studio"). Tier 0 requires the environment on every self-hosted job;
+  `check-repo.sh` checks the environment's policy.
+- The environment only gates jobs that declare it, and tier 0 runs after
+  the fact, so the runner enforces the rule itself: its job-started hook
+  (`~/actions-runner-studio/job-started.sh` in the guest, installed by
+  `setup.sh runner`) fails any job whose workflow file is not on `main`
+  (`GITHUB_WORKFLOW_REF` ending in `@refs/heads/main`) or whose event is
+  not `workflow_dispatch`, `push` or `schedule`, before any step runs.
+  Tested live with a throwaway branch whose workflow targeted the runner
+  without the environment: "this runner runs only workflow files from
+  main". mac-002's label trigger needs this hook widened too.
 - It checks out the tools from `main` (`ref: main`) and acts on the built
   `place` artifact. It never checks out or runs a pull request's source.
 - `permissions: contents: read, actions: read`, no secrets, a
@@ -102,7 +121,9 @@ Done once, on 2026-10-13. The host is an Apple silicon MacBook on macOS
    build 25G83), and gives it 4 cores, 8 GB of memory and a 60 GB disk.
    The first pull downloads about 25 GB. The image logs its user in
    automatically, never sleeps, and carries the Tart guest agent that
-   `vm.sh exec` talks to.
+   `vm.sh exec` talks to, Homebrew, and the GitHub CLI (`gh`) the smoke
+   job downloads the place artifact with; it is never logged in, the job
+   passes its own token. `setup.sh studio` fails if `gh` is missing.
 4. **The repository into the guest:** `tools/mac/vm.sh start`, then
    `git ls-files -z | xargs -0 tools/mac/vm.sh push` copies the tools into
    the guest's `~/incoming`.
@@ -133,7 +154,12 @@ Done once, on 2026-10-13. The host is an Apple silicon MacBook on macOS
    the runner's own `svc.sh` writes: it stays in the desktop session
    (`SessionCreate` off; with it on, the job's session has no window server
    and the wrapper fails with "there is no desktop session here"), and
-   launchd restarts it if it exits (`KeepAlive`). The script also installs
+   launchd restarts it if it exits (`KeepAlive`). It installs the runner's
+   job hooks (`job-started.sh`, `job-completed.sh`, named in the runner's
+   `.env`): only workflow files from `main` run, and any leftover Studio is
+   ended before and after each job. The guest is also told
+   not to reopen apps at login, so a Studio left open in the VM's window
+   does not come back and idle beside every job's. The script also installs
    the guest's clock job (see "The host sleeps" below), the one step that
    uses the guest's `sudo`.
 9. **Screen Recording, by a person:** the first job's capture fails with
@@ -216,7 +242,11 @@ screenshot's brightness.
 Studio version and whether it differs from `studio-version.txt`, the
 viewport size, the mean frame time over 60 frames of Play, and the mean
 luminance of the middle of the screenshot. A run fails when that luminance
-is under 0.03: Studio ran and rendered nothing.
+is under 0.03: Studio ran and rendered nothing. Only a black viewport is
+caught: a light panel over the viewport (Studio's start page, an update
+dialog) passes the floor, so read the screenshot when a run looks wrong.
+mac-002 adds a second check. Every command the bridge runs (`plutil`,
+`osascript`, `screencapture`, `sips`) is killed after 30 seconds.
 
 It fails within seconds, with the reason, when:
 
@@ -224,6 +254,10 @@ It fails within seconds, with the reason, when:
   would render nothing);
 - Studio's MCP server is not enabled;
 - Studio exits while starting, which is what an update does.
+
+A job that times out or is cancelled kills the wrapper but not Studio,
+which launchd keeps. The runner's job hooks (below) end any Studio before
+and after every job.
 
 Two things about Studio that the wrapper works around:
 
@@ -324,6 +358,7 @@ and the snapshot had to be discarded and the VM booted cold.
 | The guest has no way out | `vm.sh start` warns "cannot reach GitHub; restarting it" | Nothing: `start` boots the VM a second time, which has always cured it. About one boot in four under Softnet came up with an address and gateway but no traffic getting through (cause not found). If both boots fail, `start` says so; try again, or `STUDIO_VM_NET=nat` to tell Softnet apart from the network. |
 | The runner is offline although the VM runs | `vm.sh status` says running; GitHub shows the runner offline | `tools/mac/vm.sh stop && tools/mac/vm.sh start`. |
 | Studio cannot capture | "could not create image from window" | Step 9: Screen Recording for `node`. A runner update that replaces its Node.js may ask again. |
+| A job is refused at "Set up job" | "this runner runs only workflow files from main" or "does not run jobs started by …" | Intended: the workflow ran from a branch or an event the Mac does not take. Run it from `main`. |
 | A job left the guest in a bad state | Anything | `tools/mac/vm.sh reset`. |
 | Tart is updated by Homebrew | `vm.sh` warns that the version differs | If the VM still starts and the smoke job passes, bump `TART_VERSION` in `vm.sh`. |
 | Softnet is updated by Homebrew | `vm.sh start` fails with "root privileges are required" | Step 2 above, with the new path. |

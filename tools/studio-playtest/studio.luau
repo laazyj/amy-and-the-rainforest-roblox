@@ -4,16 +4,31 @@
 -- MCP tools are called and how its window is captured is in this file, so a
 -- Studio update that breaks the bridge is fixed here (docs/MAC_RUNNER.md).
 
-local fs = require("@lune/fs")
-local process = require("@lune/process")
 local serde = require("@lune/serde")
-local task = require("@lune/task")
 
+local Cli = require("../lib/cli")
 local Bmp = require("./bmp")
 local Mcp = require("./mcp")
 local Smoke = require("./smoke")
 
 local Studio = {}
+
+export type ExecResult = { ok: boolean, code: number, stdout: string, stderr: string }
+
+-- What the bridge needs of the machine beyond the tools' shared context
+-- (Cli.Context: files, clock, sleep, env, log), so the spec can replace it.
+export type System = {
+	exec: (program: string, params: { string }) -> ExecResult,
+	isFile: (path: string) -> boolean,
+	removeFile: (path: string) -> (),
+	cwd: string,
+	connect: (program: string, clientName: string) -> Mcp.Client,
+}
+
+export type Options = {
+	ctx: Cli.Context,
+	system: System?,
+}
 
 local APP = "/Applications/RobloxStudio.app"
 -- The app's own launcher only forwards roblox-studio: links, and a place file
@@ -25,6 +40,9 @@ local MCP_PROXY = `{APP}/Contents/MacOS/StudioMCP`
 
 local OPEN_TIMEOUT = 90
 local PLAY_TIMEOUT = 60
+-- For each command the bridge runs: a TCC prompt or a wedged window server
+-- would otherwise hold the step until the job's own timeout.
+local COMMAND_TIMEOUT = 30
 -- The square in the middle of the screenshot whose brightness is measured, in
 -- pixels: inside the viewport in Studio's default layout.
 local LUMINANCE_SQUARE = "400"
@@ -52,59 +70,93 @@ function run(argv) {
 }
 ]]
 
-local function exec(program: string, params: { string }): string
-	local result = process.exec(program, params)
-	if not result.ok then
-		local detail = string.gsub(result.stderr .. result.stdout, "%s+$", "")
-		error(`{program} failed ({result.code}): {detail}`, 0)
-	end
-	return (string.gsub(result.stdout, "%s+$", ""))
+-- Runs argv[2..] and kills it after argv[1] seconds, exiting 124 (macOS has
+-- no timeout command). A signal becomes a failing exit code: Lune reports a
+-- process killed by a signal as having succeeded.
+local TIMEOUT_SCRIPT = [[
+my $t = shift; my $pid = fork // die "fork: $!";
+if (!$pid) { exec @ARGV or die "$ARGV[0]: $!\n" }
+$SIG{ALRM} = sub { kill 9, $pid; print STDERR "timed out after $t seconds\n"; exit 124 };
+alarm $t; waitpid $pid, 0;
+exit($? & 127 ? 128 + ($? & 127) : $? >> 8)
+]]
+
+-- The real machine. Every command but kill is ended after COMMAND_TIMEOUT.
+function Studio.liveSystem(): System
+	local fs = require("@lune/fs")
+	local process = require("@lune/process")
+	return {
+		exec = function(program, params)
+			-- kill cannot hang, and is polled every second while Studio opens.
+			return if program == "kill"
+				then process.exec(program, params)
+				else process.exec("/usr/bin/perl", {
+					"-e",
+					TIMEOUT_SCRIPT,
+					tostring(COMMAND_TIMEOUT),
+					program,
+					table.unpack(params),
+				})
+		end,
+		isFile = fs.isFile,
+		removeFile = fs.removeFile,
+		cwd = process.cwd,
+		connect = Mcp.connect,
+	}
 end
 
-local function absolute(path: string): string
-	return if string.sub(path, 1, 1) == "/" then path else process.cwd .. path
-end
+function Studio.bridge(options: Options): Smoke.Bridge
+	local system = options.system or Studio.liveSystem()
+	local ctx = options.ctx
 
-local function alive(pid: string): boolean
-	return process.exec("kill", { "-0", pid }).ok
-end
-
--- Polls `ready` every `interval` seconds; raises what `what` returns after `timeout`.
-local function waitFor(what: () -> string, timeout: number, interval: number, ready: () -> boolean)
-	local deadline = os.clock() + timeout
-	while not ready() do
-		if os.clock() > deadline then
-			error(`{what()} (waited {timeout} seconds)`, 0)
+	local function exec(program: string, params: { string }): string
+		local result = system.exec(program, params)
+		if not result.ok then
+			local detail = string.gsub(result.stderr .. result.stdout, "%s+$", "")
+			error(`{program} failed ({result.code}): {detail}`, 0)
 		end
-		task.wait(interval)
+		return (string.gsub(result.stdout, "%s+$", ""))
 	end
-end
 
--- Studio keeps the switch in its Assistant settings, one file per Roblox user.
-local function mcpEnabled(): boolean
-	local dir = `{process.env.HOME}/Library/Roblox/AssistantSettings`
-	local names: { string } = if fs.isDir(dir) then fs.readDir(dir) else {}
-	for _, name in names do
-		local ok, settings = pcall(serde.decode, "json" :: "json", fs.readFile(`{dir}/{name}`))
-		local server = if ok and type(settings) == "table" then settings["mcp-server"] else nil
-		if type(server) == "table" and server.enabled == true then
-			return true
+	local function absolute(path: string): string
+		return if string.sub(path, 1, 1) == "/" then path else system.cwd .. path
+	end
+
+	local function alive(pid: string): boolean
+		return system.exec("kill", { "-0", pid }).ok
+	end
+
+	-- Polls `ready` every `interval` seconds; raises what `what` returns after `timeout`.
+	local function waitFor(what: () -> string, timeout: number, interval: number, ready: () -> boolean)
+		local deadline = ctx.clock() + timeout
+		while not ready() do
+			if ctx.clock() > deadline then
+				error(`{what()} (waited {timeout} seconds)`, 0)
+			end
+			ctx.sleep(interval)
 		end
 	end
-	return false
-end
 
-local function version(): string
-	return exec("plutil", { "-extract", "CFBundleShortVersionString", "raw", `{APP}/Contents/Info.plist` })
-end
+	-- Studio keeps the switch in its Assistant settings, one file per Roblox user.
+	local function mcpEnabled(): boolean
+		local dir = `{ctx.env.HOME}/Library/Roblox/AssistantSettings`
+		local names: { string } = ctx.listDir(dir) or {}
+		for _, name in names do
+			local ok, settings = pcall(serde.decode, "json" :: "json", ctx.readFile(`{dir}/{name}`) or "")
+			local server = if ok and type(settings) == "table" then settings["mcp-server"] else nil
+			if type(server) == "table" and server.enabled == true then
+				return true
+			end
+		end
+		return false
+	end
 
-function Studio.bridge(log: (string) -> ()): Smoke.Bridge
 	local client: Mcp.Client? = nil
 	local studioId: string? = nil
 	local pid: string? = nil
 
 	local function mcp(): Mcp.Client
-		local connected = client or Mcp.connect(MCP_PROXY, "studio-playtest")
+		local connected = client or system.connect(MCP_PROXY, "studio-playtest")
 		client = connected
 		return connected
 	end
@@ -147,11 +199,13 @@ function Studio.bridge(log: (string) -> ()): Smoke.Bridge
 	end
 
 	local bridge: Smoke.Bridge = {
-		studioVersion = version,
+		studioVersion = function()
+			return exec("plutil", { "-extract", "CFBundleShortVersionString", "raw", `{APP}/Contents/Info.plist` })
+		end,
 
 		open = function(placeFile)
 			local path = absolute(placeFile)
-			if not fs.isFile(path) then
+			if not system.isFile(path) then
 				error(`place file not found: {path}`, 0)
 			end
 			local cannotRender = serde.decode("json", exec("osascript", { "-l", "JavaScript", "-e", SESSION_SCRIPT }))
@@ -178,7 +232,7 @@ function Studio.bridge(log: (string) -> ()): Smoke.Bridge
 				path,
 			})
 			pid = launched
-			log(`launched Studio (pid {launched}) on {path}`)
+			ctx.log(`launched Studio (pid {launched}) on {path}`)
 
 			-- What the last probe of a new Studio answered, for the failure.
 			local answer = "no new Studio connected to the MCP server; is Studio signed in?"
@@ -228,13 +282,13 @@ function Studio.bridge(log: (string) -> ()): Smoke.Bridge
 			end
 			-- -l: only Studio's window, whatever else is on screen; -o: no shadow.
 			exec("screencapture", { "-x", "-o", "-l", tostring(windowId), path })
-			if not fs.isFile(path) then
+			if not system.isFile(path) then
 				error("screencapture wrote no image; does the runner have Screen Recording permission?", 0)
 			end
 			local middle = `{path}.middle.bmp`
 			exec("sips", { "-c", LUMINANCE_SQUARE, LUMINANCE_SQUARE, "-s", "format", "bmp", path, "--out", middle })
-			local luminance = Bmp.luminance(fs.readFile(middle))
-			fs.removeFile(middle)
+			local luminance = Bmp.luminance(ctx.readFile(middle) or error("sips wrote no image", 0))
+			system.removeFile(middle)
 			return luminance
 		end,
 
@@ -248,7 +302,7 @@ function Studio.bridge(log: (string) -> ()): Smoke.Bridge
 				pid = nil
 				-- Studio answers a polite quit with a "Save changes?" dialog that
 				-- nothing here can dismiss, and the place is a throwaway build.
-				process.exec("kill", { "-9", studioPid })
+				system.exec("kill", { "-9", studioPid })
 			end
 		end,
 	}

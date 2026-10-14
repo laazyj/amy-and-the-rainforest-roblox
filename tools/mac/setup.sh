@@ -94,6 +94,8 @@ install_studio() {
 		echo "installed Roblox Studio $(studio_version)"
 	fi
 	[ -x "$STUDIO_APP/Contents/MacOS/StudioMCP" ] || fail "this Studio has no built-in MCP server (Contents/MacOS/StudioMCP)"
+	# The smoke job downloads the place with it; the Tart image has it.
+	command -v gh >/dev/null || fail "the GitHub CLI is missing: brew install gh"
 
 	echo
 	echo "Left for a person, in the VM's window (tools/mac/vm.sh start window):"
@@ -129,6 +131,49 @@ PLIST
 	echo "the guest's clock is set every minute"
 }
 
+# Runner hooks: the runner runs these before and after every job, whatever
+# the workflow says. A job starts only from a workflow file on main (the
+# `studio` environment gates only jobs that declare it, and a branch can run
+# its own copy of a workflow) and from an allowed event; and any Studio left
+# by a job that timed out or was cancelled is ended.
+install_hooks() {
+	echo "== Job hooks"
+	cat >job-completed.sh <<'HOOK'
+#!/bin/bash
+# Installed by tools/mac/setup.sh (docs/MAC_RUNNER.md): after every job.
+if pkill -9 -x RobloxStudio; then echo "ended a Studio the job left running"; fi
+exit 0
+HOOK
+	cat >job-started.sh <<'HOOK'
+#!/bin/bash
+# Installed by tools/mac/setup.sh (docs/MAC_RUNNER.md): before every job.
+if pkill -9 -x RobloxStudio; then echo "ended a Studio an earlier job left running"; fi
+case "${GITHUB_WORKFLOW_REF:-}" in
+"$GITHUB_REPOSITORY"/.github/workflows/*@refs/heads/main) ;;
+*)
+	echo "::error::this runner runs only workflow files from main, not '${GITHUB_WORKFLOW_REF:-unknown}'"
+	exit 1
+	;;
+esac
+case "${GITHUB_EVENT_NAME:-}" in
+workflow_dispatch | push | schedule) ;;
+*)
+	echo "::error::this runner does not run jobs started by '${GITHUB_EVENT_NAME:-unknown}'"
+	exit 1
+	;;
+esac
+HOOK
+	chmod +x job-started.sh job-completed.sh
+	# .env is read by the runner at start; keep any other lines in it.
+	touch .env
+	grep -v '^ACTIONS_RUNNER_HOOK_JOB_' .env >.env.new || true
+	{
+		echo "ACTIONS_RUNNER_HOOK_JOB_STARTED=$RUNNER_DIR/job-started.sh"
+		echo "ACTIONS_RUNNER_HOOK_JOB_COMPLETED=$RUNNER_DIR/job-completed.sh"
+	} >>.env.new
+	mv .env.new .env
+}
+
 install_runner() {
 	[ -d "$STUDIO_APP" ] || fail "install Studio first: tools/mac/setup.sh studio"
 
@@ -154,6 +199,8 @@ install_runner() {
 			--url "https://github.com/$REPO" --name "$RUNNER_NAME" --labels studio --work _work --replace
 	fi
 
+	install_hooks
+
 	echo "== launchd agent"
 	# svc.sh writes ~/Library/LaunchAgents/actions.runner.*.plist and loads it
 	# into this user's GUI session; it captures the current PATH for the jobs.
@@ -169,6 +216,10 @@ install_runner() {
 	plutil -replace KeepAlive -bool true "$agent"
 	./svc.sh stop >/dev/null 2>&1 || true
 	./svc.sh start
+	# A Studio left open in the VM's window would reopen at the next login
+	# and idle beside every job's own; the guest reopens nothing.
+	defaults write com.apple.loginwindow TALLogoutSavesState -bool false
+	defaults write com.apple.loginwindow LoginwindowLaunchesRelaunchApps -bool false
 	install_clock
 	echo "The runner is set up."
 }

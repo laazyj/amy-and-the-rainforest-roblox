@@ -9,6 +9,9 @@
 # It fails unless:
 #   - fork pull requests need approval for all external contributors, so no
 #     outside workflow run reaches the runner without the owner's click;
+#   - the `studio` environment, which every Mac job uses, may be deployed
+#     to from `main` only, so a branch cannot run its own copy of a Mac
+#     workflow (workflow_dispatch and push run the branch's file);
 #   - no workflow with a job on a self-hosted runner has a pull_request or
 #     pull_request_target trigger, so a Mac job never starts from a pull
 #     request (tools/lib/mac-workflows.luau, which tools/check.sh runs too).
@@ -34,6 +37,18 @@ else
 	echo "error: $REPO must require approval for all external contributors (it is '${policy:-unreadable: is gh logged in as an admin?}')." >&2
 	echo "  Settings -> Actions -> General -> 'Require approval for all external contributors', or:" >&2
 	echo "  gh api -X PUT repos/$REPO/actions/permissions/fork-pr-contributor-approval -f approval_policy=all_external_contributors" >&2
+fi
+
+echo "== The studio environment"
+env_policy="$(gh api "repos/$REPO/environments/studio" --jq '.deployment_branch_policy | "\(.custom_branch_policies) \(.protected_branches)"' 2>/dev/null)" || env_policy=""
+branches="$(gh api "repos/$REPO/environments/studio/deployment-branch-policies" --jq '[.branch_policies[] | "\(.type):\(.name)"] | join(",")' 2>/dev/null)" || branches=""
+if [ "$env_policy" = "true false" ] && [ "$branches" = "branch:main" ]; then
+	echo "ok: only main may deploy to studio"
+else
+	failed=1
+	echo "error: the 'studio' environment must allow deployments from the branch main only (policy '${env_policy:-none}', branches '${branches:-none}')." >&2
+	echo "  Settings -> Environments -> New environment 'studio' -> Deployment branches and tags ->" >&2
+	echo "  Selected branches and tags -> add the branch rule 'main'. No secrets in it." >&2
 fi
 
 echo "== Workflows that run on the Mac (also a tier 0 check, tools/check.sh)"
