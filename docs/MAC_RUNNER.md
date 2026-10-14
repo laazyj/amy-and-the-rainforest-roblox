@@ -358,6 +358,7 @@ and the snapshot had to be discarded and the VM booted cold.
 | The guest has no way out | `vm.sh start` warns "cannot reach GitHub; restarting it" | Nothing: `start` boots the VM a second time, which has always cured it. About one boot in four under Softnet came up with an address and gateway but no traffic getting through (cause not found). If both boots fail, `start` says so; try again, or `STUDIO_VM_NET=nat` to tell Softnet apart from the network. |
 | The runner is offline although the VM runs | `vm.sh status` says running; GitHub shows the runner offline | `tools/mac/vm.sh stop && tools/mac/vm.sh start`. |
 | Studio cannot capture | "could not create image from window" | Step 9: Screen Recording for `node`. A runner update that replaces its Node.js may ask again. |
+| A future macOS drops `/usr/bin/perl` (Apple has called it deprecated since 10.15) | Every bridge command fails at once with "/usr/bin/perl" in the error | The wrapper's 30-second command timeout is a few lines of Perl (`TIMEOUT_SCRIPT` in `studio.luau`); install Perl in the guest or rewrite that wrapper. |
 | A job is refused at "Set up job" | "this runner runs only workflow files from main" or "does not run jobs started by …" | Intended: the workflow ran from a branch or an event the Mac does not take. Run it from `main`. |
 | A job left the guest in a bad state | Anything | `tools/mac/vm.sh reset`. |
 | Tart is updated by Homebrew | `vm.sh` warns that the version differs | If the VM still starts and the smoke job passes, bump `TART_VERSION` in `vm.sh`. |

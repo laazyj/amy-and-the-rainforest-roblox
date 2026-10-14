@@ -70,14 +70,14 @@ function run(argv) {
 }
 ]]
 
--- Runs argv[2..] and kills it after argv[1] seconds, exiting 124 (macOS has
--- no timeout command). A signal becomes a failing exit code: Lune reports a
+-- Runs argv[2..] in its own process group and kills the group after argv[1]
+-- seconds, exiting 124 (macOS has no timeout command). A signal becomes a failing exit code: Lune reports a
 -- process killed by a signal as having succeeded.
 local TIMEOUT_SCRIPT = [[
 my $t = shift; my $pid = fork // die "fork: $!";
-if (!$pid) { exec @ARGV or die "$ARGV[0]: $!\n" }
-$SIG{ALRM} = sub { kill 9, $pid; print STDERR "timed out after $t seconds\n"; exit 124 };
-alarm $t; waitpid $pid, 0;
+if (!$pid) { setpgrp; exec @ARGV or die "$ARGV[0]: $!\n" }
+$SIG{ALRM} = sub { kill 9, -$pid; print STDERR "timed out after $t seconds\n"; exit 124 };
+alarm $t; waitpid $pid, 0; alarm 0;
 exit($? & 127 ? 128 + ($? & 127) : $? >> 8)
 ]]
 
