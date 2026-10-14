@@ -245,7 +245,7 @@ return function(t: any)
 		it("are 35% x 40% on a Phone and 25% x 35% on a Tablet, in the bottom corners; a PC has none", function()
 			local function near(zone: Rect, expected: { [string]: number })
 				for field, value in expected do
-					expect(math.abs((zone :: any)[field] - value) < 1e-9).toBe(true)
+					expect((zone :: any)[field]).toBeCloseTo(value)
 				end
 			end
 			local phone = at(DEVICES[1], 1).zones
