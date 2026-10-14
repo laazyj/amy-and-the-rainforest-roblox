@@ -227,11 +227,12 @@ the nearest built-in:
 | UI text elsewhere on the site | Fredoka (the game's FredokaOne is its bold) | | |
 | Hand-written notes on the site | Caveat, weight 500 | | |
 
-Dancing Script is not among Roblox's built-in families. If Roblox's font
-library (the Creator Store's Fonts, chosen in Studio's `FontFace` picker and
-referenced by asset id) carries it, the title uses it through an entry of
-kind `font` in the asset manifest; until then the built-in `Kalam` stands
-in. The owner chooses by eye on Dev.
+Dancing Script is not among Roblox's built-in families (the ones Studio's
+`FontFace` picker lists), but the Creator Store carries it, published by
+Roblox (asset id 8764312106; Regular, Medium, SemiBold and Bold; Open Font
+Licence). The owner confirmed it by eye on Dev on 2026-10-14: the heading
+lines in Bold, the pill in SemiBold. Brief 019 brings it in through an
+entry of kind `font` in the asset manifest; `Kalam` stands in until then.
 
 ## 4. Touch targets
 
