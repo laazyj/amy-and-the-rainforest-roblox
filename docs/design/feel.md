@@ -216,6 +216,24 @@ scene of the forest wall:
 
 The words are game-rendered text, never part of the image.
 
+The website's own recipe, read from its stylesheet on 2026-10-14, is the
+specification to transcribe; a family the client cannot load falls back to
+the nearest built-in:
+
+| Element | Family and weight | Colour | Other |
+|---|---|---|---|
+| "Amy" / "& the Rain Forest" | **Dancing Script**, weight 700 (Google Fonts, Open Font Licence) | white; "Rain Forest" gold `#e7b53a` | shadow in two layers: a hard `0 3px` in deep green `#23401d`, then a soft `4px 8px` blur at 40% black; line height 1.02 |
+| "a little tale of the wild" pill | Dancing Script, weight 600 | text deep green `#23401d` on white at 73% opacity | padding 2 × 18, fully rounded corners, rotated **−2°** |
+| UI text elsewhere on the site | Fredoka (the game's FredokaOne is its bold) | | |
+| Hand-written notes on the site | Caveat, weight 500 | | |
+
+Dancing Script is not among Roblox's built-in families (the ones Studio's
+`FontFace` picker lists), but the Creator Store carries it, published by
+Roblox (asset id 8764312106; Regular, Medium, SemiBold and Bold; Open Font
+Licence). The owner confirmed it by eye on Dev on 2026-10-14: the heading
+lines in Bold, the pill in SemiBold. Brief 019 brings it in through an
+entry of kind `font` in the asset manifest; `Kalam` stands in until then.
+
 ## 4. Touch targets
 
 - Every touch target is at least **48 × 48 units**, with 8 units between
