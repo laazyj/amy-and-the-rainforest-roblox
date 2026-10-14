@@ -11,7 +11,14 @@ return function(t: any)
 				visible = true,
 				text = "Ask Dad if you can go outside",
 			})
-			expect(ObjectiveText.HEADER).toBe("✦ Objective")
+			expect(ObjectiveText.HEADER).toBe("Objective")
+		end)
+
+		it("uses only plain ASCII for the header and the icon's mark, which every font has", function()
+			for _, text in { ObjectiveText.HEADER, ObjectiveText.ICON_MARK } do
+				expect(string.find(text, "[\128-\255]")).toBeNil()
+				expect(text ~= "").toBe(true)
+			end
 		end)
 
 		it("trims the space around an Objective", function()

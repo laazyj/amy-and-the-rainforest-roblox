@@ -181,6 +181,17 @@ return function(t: any)
 			end)
 		end
 
+		it("leaves Space to the jump: the client never advances on it", function()
+			expect(source(CLIENT)).never.toContain("KeyCode.Space")
+		end)
+
+		it("has the Talk-and-advance button press as TalkAndAdvance says, on every class", function()
+			expect(source(CLIENT)).toContain(
+				"talkButton.Activated:Connect(function() if PauseScreen.paused(pause) then return end local action = TalkAndAdvance.press(dialogue.lines ~= nil, promptDistances())"
+			)
+			expect(source(CLIENT)).toContain("talkButton.Visible = TalkAndAdvance.shown(open, prompts)")
+		end)
+
 		for name, remote in Net.REMOTES do
 			if remote.direction == "toServer" then
 				it(`hands {name} from the client, payload checked, to StoryHost.on{name}`, function()
@@ -210,10 +221,13 @@ return function(t: any)
 			{ input = "a tap or click on the dialogue box", code = "dialogueFrame.Activated:Connect(advance)" },
 			{ input = "a tap or click on the Chapter card", code = "titleOverlay.Activated:Connect(advance)" },
 			{
-				input = "E, Space or Enter",
+				input = "E or Enter",
 				code = "or input.KeyCode == Enum.KeyCode.Return then advance() end end)",
 			},
-			{ input = "the Talk-and-advance button", code = 'if action == "advance" then advance()' },
+			{
+				input = "the Talk-and-advance button (Next on every class, a PC included)",
+				code = 'if action == "advance" then advance()',
+			},
 		}
 
 		for _, each in INPUTS do

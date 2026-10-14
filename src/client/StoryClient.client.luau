@@ -24,7 +24,8 @@
 	Every remote it receives is held to the Net contract first (Net.guard);
 	a malformed payload is dropped with a warning.
 
-	Click, tap, or press E, Space or Enter to advance a Dialogue; when the
+	Click or tap the box or the Next button, or press E or Enter, to
+	advance a Dialogue (Space is the jump's, so it never advances); when the
 	view-model says it is finished, DialogueFinished goes to the server.
 	The Title screen shows while the client loads; a returning player's
 	Title choice goes to the server as TitleChoice.
@@ -43,7 +44,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local ContextActionService = game:GetService("ContextActionService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
@@ -73,6 +73,7 @@ local TitleScreen = require(Core:WaitForChild("TitleScreen"))
 local ContentFolder = ReplicatedStorage:WaitForChild("content")
 local palette = require(ContentFolder:WaitForChild("palette")).colours
 local hints = require(ContentFolder:WaitForChild("hints"))
+local lettering = require(ContentFolder:WaitForChild("title"))
 local Content = require(ContentFolder:WaitForChild("Story"))
 local Shared = ReplicatedStorage:WaitForChild("shared")
 local AssetIds = require(Shared:WaitForChild("AssetIds"))
@@ -288,17 +289,22 @@ objectiveText.TextYAlignment = Enum.TextYAlignment.Top
 objectiveText.Text = ""
 objectiveText.Parent = objectiveFrame
 
+-- the collapsed tracker: a drawn marker, a gold disc with a mark on it
 local objectiveIcon = Instance.new("TextLabel")
 objectiveIcon.Name = "ObjectiveIcon"
-objectiveIcon.BackgroundColor3 = Color3.fromRGB(24, 44, 30)
-objectiveIcon.BackgroundTransparency = ObjectiveText.RESTING_TRANSPARENCY
+objectiveIcon.BackgroundColor3 = rgb(palette.gold)
 objectiveIcon.BorderSizePixel = 0
 objectiveIcon.Font = Enum.Font.FredokaOne
-objectiveIcon.TextColor3 = Color3.fromRGB(255, 214, 120)
-objectiveIcon.Text = "✦"
+objectiveIcon.TextColor3 = rgb(palette.deep)
+objectiveIcon.Text = ObjectiveText.ICON_MARK
 objectiveIcon.Visible = false
 objectiveIcon.Parent = screenGui
-addCorner(objectiveIcon, 12)
+addCorner(objectiveIcon, 999)
+local objectiveIconStroke = Instance.new("UIStroke")
+objectiveIconStroke.Color = rgb(palette.deep)
+objectiveIconStroke.Thickness = 2
+objectiveIconStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+objectiveIconStroke.Parent = objectiveIcon
 
 -- Title / chapter card -----------------------------------------
 -- a button: a tap or a click skips a Chapter card
@@ -351,6 +357,18 @@ onboardingHint.TextWrapped = true
 onboardingHint.Visible = false
 onboardingHint.Parent = screenGui
 addCorner(onboardingHint, 12)
+
+-- The button row at the bottom right, on every class: the Talk-and-advance
+-- button ("Talk", "Next"), and the Skip button beside it while a Hint shows.
+local talkButton = Instance.new("TextButton")
+talkButton.Name = "TalkAndAdvance"
+talkButton.BackgroundColor3 = rgb(palette.gold)
+talkButton.Font = Enum.Font.FredokaOne
+talkButton.TextColor3 = rgb(palette.deep)
+talkButton.Visible = false
+talkButton.ZIndex = 6 -- over the PC's click catcher
+talkButton.Parent = screenGui
+addCorner(talkButton, 16)
 
 local skipButton = Instance.new("TextButton")
 skipButton.Name = "Skip"
@@ -427,23 +445,27 @@ titleWords.Name = "Words"
 titleWords.BackgroundTransparency = 1
 titleWords.Parent = titleScreen
 
+-- The content's lettering (src/content/title) as a FontFace.
+local function fontFace(font: typeof(lettering.pill)): Font
+	return Font.new(font.family, (Enum.FontWeight :: any)[font.weight])
+end
+
 -- A line of title text, white, with a soft dark shadow behind it; `rich`
 -- is the line with its RichText colours, when it has any.
 local function titleText(
 	name: string,
-	y: number,
-	height: number,
-	font: Enum.Font,
+	line: { y: number, height: number },
+	font: Font,
 	text: string,
 	rich: string?
 ): TextLabel
 	local shadow = Instance.new("TextLabel")
 	shadow.Name = name .. "Shadow"
 	shadow.AnchorPoint = Vector2.new(0.5, 0.5)
-	shadow.Position = UDim2.new(0.5, 3, y, 4)
-	shadow.Size = UDim2.new(0.92, 0, height, 0)
+	shadow.Position = UDim2.new(0.5, 3, line.y, 4)
+	shadow.Size = UDim2.new(0.92, 0, line.height, 0)
 	shadow.BackgroundTransparency = 1
-	shadow.Font = font
+	shadow.FontFace = font
 	shadow.TextScaled = true
 	shadow.TextColor3 = rgb(palette.deep)
 	shadow.TextTransparency = 0.45
@@ -452,7 +474,7 @@ local function titleText(
 	shadow.Parent = titleWords
 	local label = shadow:Clone()
 	label.Name = name
-	label.Position = UDim2.new(0.5, 0, y, 0)
+	label.Position = UDim2.new(0.5, 0, line.y, 0)
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.TextTransparency = 0
 	label.RichText = rich ~= nil
@@ -462,35 +484,29 @@ local function titleText(
 	return label
 end
 
+-- The pill: as wide as its words and padding, tilted (ScreenLayout places it).
 local words = TitleScreen.WORDS
 local pill = Instance.new("TextLabel")
 pill.Name = "Pill"
 pill.AnchorPoint = Vector2.new(0.5, 0.5)
-pill.Position = UDim2.new(0.5, 0, 0.16, 0)
-pill.Size = UDim2.new(0.5, 0, 0.07, 0)
+pill.AutomaticSize = Enum.AutomaticSize.X
 pill.BackgroundColor3 = rgb(palette.cream)
 pill.BackgroundTransparency = 0.25
-pill.Font = Enum.Font.Kalam
-pill.TextScaled = true
+pill.FontFace = fontFace(lettering.pill)
 pill.TextColor3 = rgb(palette.deep)
 pill.Text = words.pill
 pill.ZIndex = 32
 pill.Parent = titleWords
 addCorner(pill, 999)
-local pillPadding = Instance.new("UIPadding")
-pillPadding.PaddingLeft = UDim.new(0.06, 0)
-pillPadding.PaddingRight = UDim.new(0.06, 0)
-pillPadding.PaddingTop = UDim.new(0.12, 0)
-pillPadding.PaddingBottom = UDim.new(0.12, 0)
-pillPadding.Parent = pill
+addPadding(pill, 0, 0, ScreenLayout.PILL.side)
 
-titleText("Amy", 0.29, 0.15, Enum.Font.Fondamento, words.name)
+local scriptFace = fontFace(lettering.heading)
+titleText("Amy", ScreenLayout.TITLE.name, scriptFace, words.name)
 local gold = palette.gold
 titleText(
 	"RainForest",
-	0.43,
-	0.13,
-	Enum.Font.Fondamento,
+	ScreenLayout.TITLE.rest,
+	scriptFace,
 	words.the .. words.gold,
 	string.format('%s<font color="#%02x%02x%02x">%s</font>', words.the, gold.r, gold.g, gold.b, words.gold)
 )
@@ -667,11 +683,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then
 		return
 	end
-	if
-		input.KeyCode == Enum.KeyCode.E
-		or input.KeyCode == Enum.KeyCode.Space
-		or input.KeyCode == Enum.KeyCode.Return
-	then
+	if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.Return then
 		advance()
 	end
 end)
@@ -683,18 +695,18 @@ ShowDialogue.OnClientEvent:Connect(Net.guard("ShowDialogue", function(lines: { E
 end, warn))
 
 ----------------------------------------------------------------
--- Touch controls (feel.md sections 1 and 4)
+-- Touch controls and the button row (feel.md sections 1 and 4)
 ----------------------------------------------------------------
--- The Talk-and-advance button, a ContextActionService touch button in the
--- right zone: it advances a Dialogue, or else uses the nearest prompt
--- shown, which stays the universal talk affordance. Roblox's thumbstick
--- has the left zone; while a Dialogue shows the player's controls are
--- disabled (Amy listens; the box may cover the zone). The jump button
--- goes: the Story never asks for a jump, and the right zone is the talk
--- button's.
-local TALK_ACTION = "TalkAndAdvance"
+-- The Talk-and-advance button, on every class, shows only while
+-- TalkAndAdvance.shown says (a Dialogue shows or a prompt is within
+-- reach): it advances a Dialogue, or else uses the nearest prompt shown,
+-- which stays the universal talk affordance. Roblox's thumbstick has the
+-- left zone, where the player module puts it; while a Dialogue shows the
+-- player's controls are disabled (Amy listens; the box may cover the
+-- zone). Roblox's touch jump button is hidden: the Story has no jump yet,
+-- and the right zone is the button row's; a future chapter that needs a
+-- jump brings it back in its own zone.
 local TALK_LABELS: TalkAndAdvance.Labels = hints.button
-local talkBound = false
 local prompts: { [ProximityPrompt]: true } = {}
 
 -- Each prompt shown, by its distance from Amy.
@@ -718,29 +730,22 @@ local function promptDistances(): { [ProximityPrompt]: number }
 	return distances
 end
 
-local function talkOrAdvance(_: string, state: Enum.UserInputState): Enum.ContextActionResult
-	if state == Enum.UserInputState.Begin and not PauseScreen.paused(pause) then
-		local action = TalkAndAdvance.press(dialogue.lines ~= nil, promptDistances())
-		if action == "advance" then
-			advance()
-		elseif action then
-			local prompt = action :: ProximityPrompt
-			prompt:InputHoldBegin()
-			prompt:InputHoldEnd()
-		end
+talkButton.Activated:Connect(function()
+	if PauseScreen.paused(pause) then
+		return -- the Story does not advance while the Pause screen is open
 	end
-	return Enum.ContextActionResult.Sink
-end
+	local action = TalkAndAdvance.press(dialogue.lines ~= nil, promptDistances())
+	if action == "advance" then
+		advance()
+	elseif action then
+		local prompt = action :: ProximityPrompt
+		prompt:InputHoldBegin()
+		prompt:InputHoldEnd()
+	end
+end)
 
--- Puts `gui` at `rect`, in the layout's units, whatever its parent.
-local function place(gui: GuiObject, rect: ScreenLayout.Rect)
-	local parent = gui.Parent
-	local origin = if parent and parent:IsA("GuiObject")
-		then parent.AbsolutePosition - root.AbsolutePosition
-		else Vector2.zero
-	gui.AnchorPoint = Vector2.zero
-	gui.Position = UDim2.fromOffset(rect.x - origin.X, rect.y - origin.Y)
-	gui.Size = UDim2.fromOffset(rect.width, rect.height)
+local function offsets(rect: ScreenLayout.Rect): (UDim2, UDim2)
+	return UDim2.fromOffset(rect.x, rect.y), UDim2.fromOffset(rect.width, rect.height)
 end
 
 -- Roblox's touch controls (PlayerGui.TouchGui), once the player module
@@ -760,8 +765,25 @@ local function eachControl(each: (control: GuiObject, kind: string) -> ())
 	end
 end
 
+-- Roblox's thumbstick's frame, as placeTouchControls last found it.
+local thumbstickFrame: GuiObject? = nil
+
+-- That frame as it is on screen, in layout units, or nil while the player
+-- module has not built it (or it is hidden); and whether it is the dynamic
+-- thumbstick's touch area rather than the classic stick.
+local function thumbstick(): (ScreenLayout.Rect?, boolean)
+	local frame = thumbstickFrame
+	if not (frame and frame.Parent and frame.Visible) then
+		return nil, false
+	end
+	local at, size = frame.AbsolutePosition - root.AbsolutePosition, frame.AbsoluteSize
+	return { x = at.X, y = at.Y, width = size.X, height = size.Y }, frame.Name == "DynamicThumbstickFrame"
+end
+
 -- The player module's controls (PlayerModule:GetControls), found once.
 local controls: any = nil
+-- whether the controls were last disabled for a Dialogue; renderTouch
+-- runs every frame until the module has done what it was asked
 local controlsDisabled = false
 local function playerControls(): any
 	if controls then
@@ -778,42 +800,37 @@ local function playerControls(): any
 	return controls
 end
 
+-- On touch Amy listens while a Dialogue shows, and on every class she
+-- waits while the Pause screen is open: the controls are disabled.
+local function listening(): boolean
+	return (dialogue.lines ~= nil and layout.touch) or PauseScreen.paused(pause)
+end
+
 renderTouch = function()
 	local open = dialogue.lines ~= nil
-	if talkBound then
-		ContextActionService:SetTitle(TALK_ACTION, TalkAndAdvance.title(open, TALK_LABELS))
-	end
-	-- on touch Amy listens while a Dialogue shows, and on every class she
-	-- waits while the Pause screen is open: the controls are disabled
-	local listening = (open and layout.touch) or PauseScreen.paused(pause)
-	local found = if listening ~= controlsDisabled then playerControls() else nil
+	local wanted = listening()
+	talkButton.Visible = TalkAndAdvance.shown(open, prompts)
+	talkButton.Text = TalkAndAdvance.title(open, TALK_LABELS)
+	-- Every path that ends a Dialogue (the last Line advanced, by a tap,
+	-- the box or a key) comes back here, and so does every frame until the
+	-- player module is found and has been told: the controls come back.
+	local found = if wanted ~= controlsDisabled then playerControls() else nil
 	if found then
-		if listening then
+		if wanted then
 			found:Disable()
 		else
-			found:Enable()
+			found:Enable(true)
 		end
-		controlsDisabled = listening
+		controlsDisabled = wanted
 	end
 end
 
--- Lays the touch controls out in the Screen layout's zones.
+-- Hides Roblox's jump button and finds the thumbstick, which stays where
+-- the player module puts it.
 local function placeTouchControls()
-	if layout.touch ~= talkBound then
-		if layout.touch then
-			ContextActionService:BindAction(TALK_ACTION, talkOrAdvance, true)
-		else
-			ContextActionService:UnbindAction(TALK_ACTION)
-		end
-		talkBound = layout.touch
-	end
-	local button = if talkBound then ContextActionService:GetButton(TALK_ACTION) else nil
-	if button and layout.talk then
-		place(button, layout.talk)
-	end
 	eachControl(function(control, kind)
-		if kind == "thumbstick" and layout.touch then
-			place(control, layout.zones[1])
+		if kind == "thumbstick" then
+			thumbstickFrame = control
 		elseif kind == "jump" and not hiddenJumps[control] then
 			-- the player module shows it again on its own; it stays hidden
 			hiddenJumps[control] = true
@@ -829,10 +846,12 @@ end
 ProximityPromptService.PromptShown:Connect(function(prompt: ProximityPrompt)
 	prompts[prompt] = true
 	Onboarding.promptShown(onboarding, true)
+	renderTouch()
 end)
 ProximityPromptService.PromptHidden:Connect(function(prompt: ProximityPrompt)
 	prompts[prompt] = nil
 	Onboarding.promptShown(onboarding, next(prompts) ~= nil)
+	renderTouch()
 end)
 
 ----------------------------------------------------------------
@@ -978,7 +997,12 @@ local function renderOnboarding()
 	onboardingHint.Text = view.hint or ""
 	onboardingHint.Visible = view.hint ~= nil
 	skipButton.Visible = view.skip
-	thumbRing.Visible = view.ring and layout.ring ~= nil
+	-- round the thumbstick where the player module has it, found each frame
+	local around = if view.ring then ScreenLayout.ringAround(layout, thumbstick()) else nil
+	thumbRing.Visible = around ~= nil
+	if around then
+		thumbRing.Position, thumbRing.Size = offsets(around)
+	end
 	talkRing.Visible = view.pulse and layout.pulse ~= nil
 	if talkRing.Visible then -- the pulse: the ring's stroke fades in and out
 		talkStroke.Transparency = 0.5 - 0.5 * math.cos(os.clock() * 2 * math.pi / PULSE_SECONDS)
@@ -1191,10 +1215,6 @@ end)
 local inputKind: DeviceClass.InputKind =
 	DeviceClass.starting(preferred, UserInputService.TouchEnabled, UserInputService.KeyboardEnabled)
 
-local function offsets(rect: ScreenLayout.Rect): (UDim2, UDim2)
-	return UDim2.fromOffset(rect.x, rect.y), UDim2.fromOffset(rect.width, rect.height)
-end
-
 local function absolute(gui: GuiObject): ScreenLayout.Rect
 	local at, size = gui.AbsolutePosition, gui.AbsoluteSize
 	return { x = at.X, y = at.Y, width = size.X, height = size.Y }
@@ -1224,11 +1244,10 @@ local function applyLayout()
 	placeTouchControls()
 	onboardingHint.Position, onboardingHint.Size = offsets(layout.hint)
 	onboardingHint.TextSize = text.hint
+	talkButton.Position, talkButton.Size = offsets(layout.talk)
+	talkButton.TextSize = text.speaker
 	skipButton.Position, skipButton.Size = offsets(layout.skip)
 	skipButton.TextSize = text.hint
-	if layout.ring then
-		thumbRing.Position, thumbRing.Size = offsets(layout.ring)
-	end
 	if layout.pulse then
 		talkRing.Position, talkRing.Size = offsets(layout.pulse)
 	end
@@ -1260,6 +1279,15 @@ local function applyLayout()
 	subtitleLabel.Size = UDim2.fromOffset(cardLayout.width, 0)
 
 	titleWords.Position, titleWords.Size = offsets(layout.safe)
+	local pillLayout = layout.title.pill
+	pill.TextSize = pillLayout.text
+	pill.Rotation = pillLayout.rotation
+	pill.Position = UDim2.fromOffset(
+		pillLayout.x + pillLayout.width / 2 - layout.safe.x,
+		pillLayout.y + pillLayout.height / 2 - layout.safe.y
+	)
+	-- as wide as its words (AutomaticSize), round the layout's centre
+	pill.Size = UDim2.fromOffset(0, pillLayout.height)
 
 	local choices = layout.title
 	titleChoices.Position = UDim2.fromOffset(choices.x + choices.width / 2, choices.bottom)
@@ -1359,6 +1387,9 @@ RunService.RenderStepped:Connect(function(seconds)
 	if dialogue.lines then
 		DialogueViewModel.tick(dialogue, seconds)
 		renderDialogue()
+	end
+	if listening() ~= controlsDisabled then
+		renderTouch() -- the player module was not ready yet: again until it is
 	end
 	if card then
 		renderCard()

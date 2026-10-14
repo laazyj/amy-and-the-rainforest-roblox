@@ -329,6 +329,25 @@ return function(t: any)
 			end
 		end)
 
+		it("tilts shot:ForestWallReveal from Amy's shoulders to the canopies, the camera staying put", function()
+			local tilt = CameraModel.FOREST_WALL_TILT
+			local amy = { x = 2, y = 3, z = 136 }
+			local scene = { amy = amy, subject = { x = 0, y = 5, z = 160 }, heading = 0.1 }
+			local path = CameraModel.PATHS.ForestWallReveal
+			local seconds = Shot.HOLD.ForestWallReveal :: number
+			local first, last = path(scene, 0), path(scene, seconds)
+			expect(first.lookAt).toEqual({ x = amy.x, y = amy.y + tilt.shoulders, z = amy.z })
+			expect(last.lookAt).toEqual({ x = 0, y = tilt.canopies, z = 160 })
+			expect(path(scene, seconds + 5).lookAt).toEqual(last.lookAt)
+			local middle = path(scene, seconds / 2).lookAt.y
+			expect(middle > first.lookAt.y and middle < last.lookAt.y).toBe(true)
+			-- the camera itself never moves: the same Rig but for the look-at
+			local camera = CameraModel.frame(first, amy).camera
+			for i = 0, 40 do
+				expect(CameraModel.frame(path(scene, i * SAMPLE), amy).camera).toEqual(camera)
+			end
+		end)
+
 		for _, framing in FRAMINGS do
 			local name = named(framing)
 

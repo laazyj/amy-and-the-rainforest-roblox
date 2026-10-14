@@ -20,6 +20,10 @@
 	                     the largest Text scale at which every Line fits
 	                     the screen's dialogue box: brief 015's setting is
 	                     capped at it
+	  ringAround(layout, control, area)
+	                     where the Onboarding's ring goes: round Roblox's
+	                     thumbstick as it really is on screen, or the left
+	                     zone's bottom-left corner while it is not found
 
 	The rules, the same for every class with its own numbers:
 
@@ -37,9 +41,14 @@
 	  tracker         while a Dialogue shows
 	  touch control   the bottom-left and bottom-right corners of the
 	  zones           viewport: 35% x 40% on a Phone, 25% x 35% on a
-	                  Tablet; none on a PC. The thumbstick has the left
-	                  one, the Talk-and-advance button (and the Skip button
-	                  while a Hint shows) sit in the right one
+	                  Tablet; none on a PC. Roblox's thumbstick has the
+	                  left one, where the player module puts it (the binder
+	                  never moves it); the button row sits in the right one
+	  button row      at the bottom right on every class: the
+	                  Talk-and-advance button ("Talk", "Next") in the
+	                  corner, the Skip button (while a Hint shows in free
+	                  play) beside it, or above it where a row would leave
+	                  the right zone (portrait)
 	  touch targets   at least 48 x 48, 8 apart
 	  Pause screen    its button at the top right of the safe area, on
 	                  every class, clear of Roblox's buttons at the top
@@ -50,10 +59,10 @@
 
 	While a Dialogue shows on touch, Amy listens: the player's controls are
 	disabled (the old full-screen click catcher already took every touch),
-	so the box may use the left zone, and keeps clear of the right zone's
-	Talk-and-advance button, beside it in landscape and above it in
-	portrait. The Skip button shows only in free play (the Onboarding's
-	Hint on the first Line is skipped by tapping), above the Talk button.
+	so the box may use the left zone. On every class it keeps clear of the
+	Talk-and-advance button, beside it in landscape (and on a PC) and above
+	it in portrait. The Skip button shows only in free play (the
+	Onboarding's Hint on the first Line is skipped by tapping).
 ]]
 
 local DeviceClass = require("./DeviceClass")
@@ -106,17 +115,24 @@ export type Layout = {
 	objective: { x: number, y: number, width: number, collapses: boolean, icon: Rect },
 	-- the touch control zones, left then right; none on a PC
 	zones: { Rect },
-	-- touch only: the Talk-and-advance button, the ring the Onboarding
-	-- draws round where the thumb goes, and the one it pulses round the button
-	talk: Rect?,
+	-- the button row at the bottom right, on every class: the
+	-- Talk-and-advance button, and the Onboarding's Skip button beside it
+	talk: Rect,
+	skip: Rect,
+	-- touch only: the ring the Onboarding draws round where the thumb goes
+	-- while the thumbstick is not found (ringAround has it where the
+	-- thumbstick is), and the one it pulses round the button
 	ring: Rect?,
 	pulse: Rect?,
-	-- the onboarding: where a Hint shows in free play, and its Skip button
+	-- where a Hint shows in free play
 	hint: Rect,
-	skip: Rect,
 	-- the title's bottom edge is at `centre`, the subtitle's top `gap` below
 	card: { x: number, width: number, centre: number, gap: number, title: number, subtitle: number },
 	title: {
+		-- the pill label, as wide as its words and padding (estimated),
+		-- centred at (x + width / 2, y + height / 2) and tilted by `rotation`
+		-- degrees, its left end lower; its words at `text`
+		pill: Rect & { text: number, rotation: number },
 		x: number,
 		width: number,
 		bottom: number,
@@ -195,6 +211,8 @@ ScreenLayout.TARGET_GAP = 8
 -- The longest Skip label the Skip button is sized for, in characters: it
 -- fits beside the phone's portrait zone at Text scale 1.5.
 ScreenLayout.SKIP_CHARACTERS = 6
+-- The longest Talk-and-advance label ("Talk", "Next"), in characters.
+ScreenLayout.TALK_CHARACTERS = 4
 
 -- For the estimates: a character is a little over half the text size wide
 -- (feel.md says about half; this leaves room), and a line of text is 1.1
@@ -208,6 +226,18 @@ local MARGIN = 12
 local BOTTOM_MARGIN = 24
 -- A Title screen button's padding each side of its label.
 ScreenLayout.BUTTON_PADDING = 16
+-- The title's lines over the safe area, as shares of it: the centre and
+-- height of "Amy" and of "& the Rain Forest", and the pill label's centre
+-- across (left of the middle, as the website has it); the pill sits just
+-- above "Amy".
+ScreenLayout.TITLE = table.freeze({
+	pill = 0.44,
+	name = table.freeze({ y = 0.29, height = 0.15 }),
+	rest = table.freeze({ y = 0.43, height = 0.13 }),
+})
+-- The pill's padding each side of and above and below its words, and its
+-- tilt in degrees.
+ScreenLayout.PILL = table.freeze({ side = 18, ends = 6, rotation = -4 })
 -- The Objective tracker's padding (above, below and each side) and the gap
 -- under its header; and its width, in Objective text sizes.
 ScreenLayout.TRACKER = table.freeze({ top = 8, bottom = 10, side = 14, between = 4 })
@@ -217,7 +247,8 @@ local TRACKER_EMS = 18
 -- top edge the Speaker's name tag ends (it rises above the box), and the
 -- tag's padding round its name, above and below.
 ScreenLayout.BOX = table.freeze({ top = 18, bottom = 10, between = 6, tag = 6, tagPadding = 12 })
-local TALK: { [Class]: number } = { Phone = 64, Tablet = 72 }
+-- The Talk-and-advance button's least side; it widens for its label.
+local TALK: { [Class]: number } = { Phone = 64, Tablet = 72, PC = 64 }
 local RING: { [Class]: number } = { Phone = 96, Tablet = 112 }
 
 -- The longest of `labels`, in graphemes.
@@ -342,7 +373,6 @@ function ScreenLayout.new(screen: Screen): Layout
 	local hintHeight = 2 * text.hint * ScreenLayout.LINE + MARGIN
 	local hintWidth = math.min(safe.width - 2 * MARGIN, ScreenLayout.COLUMN_EMS * text.hint)
 	local zones: { Rect } = {}
-	local talk, ring, pulse, skip, hint, box
 	if touch then
 		local share = ScreenLayout.ZONES[class]
 		local zoneWidth, zoneHeight = width * share.width, height * share.height
@@ -350,24 +380,46 @@ function ScreenLayout.new(screen: Screen): Layout
 			rect(0, height - zoneHeight, zoneWidth, zoneHeight),
 			rect(width - zoneWidth, height - zoneHeight, zoneWidth, zoneHeight),
 		}
+	end
 
-		-- the right zone's buttons, in a column at the bottom-right corner
-		local size = TALK[class]
-		talk = rect(right - MARGIN - size, bottom - MARGIN - size, size, size)
+	-- The button row at the bottom right, on every class: the
+	-- Talk-and-advance button in the corner, the Skip button beside it, or
+	-- above it where the row would leave the right touch control zone
+	-- (portrait, at the larger Text scales).
+	local side = TALK[class]
+	local talkWidth =
+		math.max(side, math.ceil(ScreenLayout.TALK_CHARACTERS * ScreenLayout.CHARACTER * text.speaker) + 2 * MARGIN)
+	local talk = rect(right - MARGIN - talkWidth, bottom - MARGIN - side, talkWidth, side)
+	local skip = rect(
+		talk.x - ScreenLayout.TARGET_GAP - skipWidth,
+		talk.y + talk.height - ScreenLayout.TARGET,
+		skipWidth,
+		ScreenLayout.TARGET
+	)
+	if touch and skip.x < zones[2].x then
 		skip = rect(
 			right - MARGIN - skipWidth,
 			talk.y - ScreenLayout.TARGET_GAP - ScreenLayout.TARGET,
 			skipWidth,
 			ScreenLayout.TARGET
 		)
-		local around = 6
-		pulse = rect(talk.x - around, talk.y - around, size + 2 * around, size + 2 * around)
+	end
 
+	-- the dialogue box's space beside the Talk-and-advance button
+	local besideTalk = talk.x - ScreenLayout.TARGET_GAP - (safe.x + MARGIN)
+
+	local ring, pulse, hint, box
+	if touch then
+		local around = 6
+		pulse = rect(talk.x - around, talk.y - around, talk.width + 2 * around, talk.height + 2 * around)
+
+		-- the left zone's bottom-left corner, inside the safe area, where
+		-- Roblox puts its thumbstick
 		local reach = RING[class]
 		local left = zones[1]
 		ring = rect(
-			math.max(safe.x + MARGIN, left.x + left.width * 0.4 - reach / 2),
-			math.min(bottom - MARGIN - reach, left.y + left.height * 0.6 - reach / 2),
+			math.max(safe.x, left.x) + MARGIN,
+			math.min(bottom, left.y + left.height) - MARGIN - reach,
 			reach,
 			reach
 		)
@@ -381,13 +433,12 @@ function ScreenLayout.new(screen: Screen): Layout
 		if portrait then
 			box = { left = safe.x, space = safe.width, bottom = talk.y - ScreenLayout.TARGET_GAP }
 		else
-			local space = talk.x - ScreenLayout.TARGET_GAP - (safe.x + MARGIN)
-			box = { left = safe.x + MARGIN, space = space, bottom = bottom - MARGIN }
+			box = { left = safe.x + MARGIN, space = besideTalk, bottom = bottom - MARGIN }
 		end
 	else
-		skip = rect(safe.x + MARGIN, safe.y + MARGIN, skipWidth, ScreenLayout.TARGET)
 		hint = rect(safe.x + (safe.width - hintWidth) / 2, bottom - BOTTOM_MARGIN - hintHeight, hintWidth, hintHeight)
-		box = { left = safe.x + MARGIN, space = safe.width - 2 * MARGIN, bottom = bottom - BOTTOM_MARGIN }
+		-- clear of the Talk-and-advance button, which shows with it
+		box = { left = safe.x + MARGIN, space = besideTalk, bottom = bottom - BOTTOM_MARGIN }
 	end
 
 	local speaker = text.speaker + ScreenLayout.BOX.tagPadding
@@ -403,6 +454,29 @@ function ScreenLayout.new(screen: Screen): Layout
 	end
 
 	local titleWidth = safe.width - 2 * MARGIN
+	-- the pill's words at the body size, smaller (down to the hint size)
+	-- until the pill, tilted, fits across the safe area and above "Amy"
+	local pill = ScreenLayout.PILL
+	local tilt = math.rad(math.abs(pill.rotation))
+	local pillCharacters = DialogueViewModel.graphemes(TitleScreen.WORDS.pill)
+	local nameTop = safe.y + safe.height * (ScreenLayout.TITLE.name.y - ScreenLayout.TITLE.name.height / 2)
+	local pillText, pillWidth, pillHeight, pillTall
+	for size = text.body, text.hint, -1 do
+		pillText = size
+		pillWidth = math.ceil(pillCharacters * ScreenLayout.CHARACTER * size) + 2 * pill.side
+		pillHeight = math.ceil(size * ScreenLayout.LINE) + 2 * pill.ends
+		pillTall = pillWidth * math.sin(tilt) + pillHeight * math.cos(tilt)
+		local pillWide = pillWidth * math.cos(tilt) + pillHeight * math.sin(tilt)
+		if pillWide <= titleWidth and pillTall <= nameTop - safe.y then
+			break
+		end
+	end
+	local pillCentre = math.clamp(
+		safe.x + safe.width * ScreenLayout.TITLE.pill,
+		safe.x + MARGIN + pillWidth / 2,
+		right - MARGIN - pillWidth / 2
+	)
+	local pillMiddle = math.max(safe.y + pillTall / 2, nameTop - pillTall / 2)
 
 	-- the Pause screen's panel. A Settings row is its label beside its
 	-- controls, or above them where a label does not fit beside them in
@@ -475,6 +549,14 @@ function ScreenLayout.new(screen: Screen): Layout
 			subtitle = round(CARD[class].subtitle, scale),
 		},
 		title = {
+			pill = {
+				x = pillCentre - pillWidth / 2,
+				y = pillMiddle - pillHeight / 2,
+				width = pillWidth,
+				height = pillHeight,
+				text = pillText,
+				rotation = pill.rotation,
+			},
 			x = safe.x + MARGIN,
 			width = titleWidth,
 			bottom = bottom - BOTTOM_MARGIN,
@@ -508,6 +590,34 @@ function ScreenLayout.new(screen: Screen): Layout
 			height = 2 * gap + #Settings.ORDER * (row + gap) + footer,
 		},
 	}
+end
+
+-- Where the Onboarding's ring goes round `control`, Roblox's thumbstick's
+-- frame as it is on screen (in layout units), or nil while it is not
+-- found: then the layout's ring, in the left zone's bottom-left corner.
+-- The classic thumbstick's frame is the stick itself, and the ring is
+-- centred on it; the dynamic thumbstick's (`area`) is its touch area, and
+-- the ring sits in its bottom-left corner, where the stick rests. Always
+-- inside the safe area; nil on a PC.
+function ScreenLayout.ringAround(layout: Layout, control: Rect?, area: boolean): Rect?
+	local fallback = layout.ring
+	if not (fallback and control and control.width > 0 and control.height > 0) then
+		return fallback
+	end
+	local reach = fallback.width
+	local x, y
+	if area then
+		x, y = control.x + MARGIN, control.y + control.height - MARGIN - reach
+	else
+		x, y = control.x + (control.width - reach) / 2, control.y + (control.height - reach) / 2
+	end
+	local safe = layout.safe
+	return rect(
+		math.clamp(x, safe.x, safe.x + safe.width - reach),
+		math.clamp(y, safe.y, safe.y + safe.height - reach),
+		reach,
+		reach
+	)
 end
 
 -- The first Line of `lines` that would not fit `layout`'s dialogue box
