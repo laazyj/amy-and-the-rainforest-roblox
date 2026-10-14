@@ -211,7 +211,7 @@ Against each piece the issue lists:
 | A `card-chapter3.png` | `card:chapter3` | Placeholder | Needs drawing: the three animals in the paradise |
 | A `card-chapter4.png` | `card:chapter4` | Placeholder | Needs drawing: the machine, the village people, Amy small from behind |
 | A `card-end.png` | `card:end` | Placeholder | Needs drawing: the animals on the treetops, the machine leaving |
-| B `icon.png` | `store:icon` | Placeholder | Needs drawing. No square crop of the website art reads at thumbnail size without Amy |
+| B `icon.png` | `store:icon` | **Stop-gap crop** | A square crop of `title.png`, until Clara draws the icon; no crop of the website art with Amy in it reads at thumbnail size. See [store/art.md](store/art.md) |
 | B `thumbnail-1.png` | `store:thumbnail_1` | **Reused after cropping** | Shares `card:chapter2`'s file |
 | B `thumbnail-2.png`, `thumbnail-3.png` | `store:thumbnail_2`, `_3` | Placeholder | Share `card:chapter3`'s and `card:chapter4`'s files |
 | C `title.png` | `ui:title_screen` | **Reused after retouching** | `background.png`, retouched and cropped; the title text is game-rendered over it (see `design/feel.md`, "Title screen") |

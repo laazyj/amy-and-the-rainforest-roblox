@@ -21,4 +21,18 @@ return function(t: any)
 			expect(Contrast.ratio(grey, white) > 4.4).toBe(true)
 		end)
 	end)
+
+	describe("Contrast.over", function()
+		it("is the colour itself when opaque, the backdrop when clear, and their mix between", function()
+			local red = { r = 200, g = 0, b = 0 }
+			expect(Contrast.over(red, 0, white)).toEqual(red)
+			expect(Contrast.over(red, 1, white)).toEqual(white)
+			expect(Contrast.over(red, 0.5, black)).toEqual({ r = 100, g = 0, b = 0 })
+		end)
+
+		it("asks 7:1 for the high-contrast Setting, above the usual 4.5:1", function()
+			expect(Contrast.HIGH).toBe(7)
+			expect(Contrast.HIGH > Contrast.MINIMUM).toBe(true)
+		end)
+	end)
 end

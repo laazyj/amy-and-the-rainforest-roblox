@@ -3,7 +3,8 @@
 	WorldImpl: the World interface (src/core/World) for one player, over the
 	engine adapters. Commands that reach the client go through `toClient`,
 	which carries them over Net; the rest move Characters, Props, Lighting,
-	Pickups and the Player Character in the world.
+	Pickups and the Player Character in the world. A Wait counts down only
+	while `held()` is false (World.waitLeft).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -23,7 +24,12 @@ local ROOT_HEIGHT = 3.5
 
 local WorldImpl = {}
 
-function WorldImpl.new(story: Story.Story, player: any, toClient: (command: Events.WorldCommand) -> ()): World.World
+function WorldImpl.new(
+	story: Story.Story,
+	player: any,
+	toClient: (command: Events.WorldCommand) -> (),
+	held: () -> boolean
+): World.World
 	return {
 		showDialogue = function(lines)
 			toClient({ kind = "ShowDialogue", lines = lines })
@@ -60,7 +66,11 @@ function WorldImpl.new(story: Story.Story, player: any, toClient: (command: Even
 		offerTalk = CharacterHost.offerTalk,
 		withdrawTalk = CharacterHost.withdrawTalk,
 		wait = function(seconds)
-			task.wait(seconds)
+			-- a frame at a time, so a pause mid-Wait holds it at once
+			local left = seconds
+			while left > 0 do
+				left = World.waitLeft(left, task.wait(), held())
+			end
 		end,
 	}
 end

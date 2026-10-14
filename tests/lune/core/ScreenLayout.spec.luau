@@ -1,9 +1,11 @@
 -- ScreenLayout: feel.md's layout rules, for every Device class and
--- orientation, at Text scale 1, 1.25 and 1.5, each capped at the largest
+-- orientation, at every Text scale the Settings offer (1, 1.25 and 1.5), each capped at the largest
 -- scale at which every Line of the Story fits the device.
 
 local Content = require("../../../src/content/Story")
 local ScreenLayout = require("../../../src/core/ScreenLayout")
+local PauseScreen = require("../../../src/core/PauseScreen")
+local Settings = require("../../../src/core/Settings")
 local Story = require("../../../src/core/Story")
 local TitleScreen = require("../../../src/core/TitleScreen")
 local hints = require("../../../src/content/hints")
@@ -110,22 +112,12 @@ local DEVICES: { ScreenLayout.Screen } = {
 }
 
 -- Every Line of the Story, and the longest Objective.
-local LINES: { string } = {}
+local LINES = Story.lineTexts(Content.story)
 local longestObjective = ""
-for _, chapter in Content.story.chapters do
-	for _, quest in chapter.quests do
-		for _, dialogue: { Story.Line }? in { quest.intro, quest.dialogue, quest.outro } do
-			for _, line in dialogue or {} :: { Story.Line } do
-				table.insert(LINES, line.text)
-			end
-		end
-		if utf8.len(quest.objective) > utf8.len(longestObjective) then
-			longestObjective = quest.objective
-		end
+for _, placed in Story.quests(Content.story) do
+	if utf8.len(placed.quest.objective) > utf8.len(longestObjective) then
+		longestObjective = placed.quest.objective
 	end
-end
-for _, line in Content.story.ending.lines do
-	table.insert(LINES, line.text)
 end
 local FIRST_LINE = LINES[1]
 
@@ -178,7 +170,7 @@ return function(t: any)
 	local function each(rule: string, check: (Layout, ScreenLayout.Screen) -> ())
 		for _, device in DEVICES do
 			local scales: { number } = {}
-			for _, wanted in { 1, 1.25, 1.5 } do
+			for _, wanted in Settings.TEXT_SCALES do
 				local scale = math.min(wanted, CAPS[device])
 				if not table.find(scales, scale) then
 					table.insert(scales, scale)
@@ -264,7 +256,7 @@ return function(t: any)
 				{ x = 1376 * 0.75, y = 1032 * 0.65, width = 1376 * 0.25, height = 1032 * 0.35 }
 			)
 			expect(at(DEVICES[12], 1).zones).toEqual({})
-			expect(at(DEVICES[12], 1).talk).toBeNil()
+			expect(at(DEVICES[12], 1).ring).toBeNil()
 		end)
 
 		it("follow a rotation: a phone turned to portrait has its zones and box laid out again", function()
@@ -279,7 +271,7 @@ return function(t: any)
 			if layout.class == "PC" then
 				return
 			end
-			local talk, ring = layout.talk :: Rect, layout.ring :: Rect
+			local talk, ring = layout.talk, layout.ring :: Rect
 			for _, button in { talk, layout.skip } do
 				expect(inside(button, layout.zones[2])).toBe(true)
 				expect(inside(button, layout.safe)).toBe(true)
@@ -289,12 +281,73 @@ return function(t: any)
 		end)
 	end)
 
+	describe("ScreenLayout.ringAround", function()
+		each("puts the ring round the thumbstick as it is, inside the safe area", function(layout)
+			if not layout.touch then
+				expect(ScreenLayout.ringAround(layout, { x = 0, y = 0, width = 100, height = 100 }, false)).toBeNil()
+				return
+			end
+			local fallback = layout.ring :: Rect
+			-- not found yet: the left zone's bottom-left corner
+			expect(ScreenLayout.ringAround(layout, nil, true)).toEqual(fallback)
+			local left = layout.zones[1]
+			expect(fallback.x - math.max(layout.safe.x, left.x) < left.width / 4).toBe(true)
+			expect(left.y + left.height - (fallback.y + fallback.height) < left.height / 4).toBe(true)
+			-- the classic stick: centred on it
+			local stick = { x = layout.safe.x + 40, y = left.y + 30, width = 90, height = 90 }
+			local round = ScreenLayout.ringAround(layout, stick, false) :: Rect
+			expect(round.x + round.width / 2).toBe(stick.x + 45)
+			expect(round.y + round.height / 2).toBe(stick.y + 45)
+			-- the dynamic thumbstick's touch area, as the player module lays
+			-- it out (40% x 2/3 in landscape, all the width x 40% in
+			-- portrait): its bottom-left corner, never its middle
+			local share = if layout.portrait then { 1, 0.4 } else { 0.4, 2 / 3 }
+			local width, height = left.width / ScreenLayout.ZONES[layout.class].width, left.y + left.height
+			local area = { x = 0, y = height * (1 - share[2]), width = width * share[1], height = height * share[2] }
+			local corner = ScreenLayout.ringAround(layout, area, true) :: Rect
+			expect(inside(corner, layout.safe)).toBe(true)
+			expect(inside(corner, left)).toBe(true)
+			expect(corner.x + corner.width < area.x + area.width / 2).toBe(true)
+			expect(corner.y > area.y + area.height / 2).toBe(true)
+			-- one off the screen is brought back inside the safe area
+			local off =
+				ScreenLayout.ringAround(layout, { x = -200, y = height + 100, width = 50, height = 50 }, false) :: Rect
+			expect(inside(off, layout.safe)).toBe(true)
+			expect(ScreenLayout.ringAround(layout, { x = 10, y = 10, width = 0, height = 0 }, true)).toEqual(fallback)
+		end)
+	end)
+
+	describe("ScreenLayout button row", function()
+		each("pairs the Talk-and-advance and Skip buttons at the bottom right, clear of each other", function(layout)
+			local talk, skip, safe = layout.talk, layout.skip, layout.safe
+			expect(inside(talk, safe) and inside(skip, safe)).toBe(true)
+			-- the Talk-and-advance button in the bottom-right corner
+			expect(talk.x + talk.width > safe.x + safe.width * 0.75).toBe(true)
+			expect(talk.y > safe.y + safe.height / 2).toBe(true)
+			expect(gap(talk, skip) >= ScreenLayout.TARGET_GAP).toBe(true)
+			if skip.y + skip.height == talk.y + talk.height then
+				expect(skip.x + skip.width <= talk.x).toBe(true) -- a row: Skip to its left
+			else
+				-- stacked only where a row would leave the right zone
+				expect(layout.touch).toBe(true)
+				expect(talk.x - ScreenLayout.TARGET_GAP - skip.width < layout.zones[2].x).toBe(true)
+				expect(skip.y + skip.height <= talk.y).toBe(true)
+			end
+			-- out of the top-left corner, where Roblox's own buttons sit
+			expect(skip.y > safe.y + safe.height / 2).toBe(true)
+		end)
+
+		it("is a row beside each other on a PC and a phone in landscape", function()
+			for _, device in { DEVICES[1], DEVICES[12], DEVICES[14] } do
+				local layout = at(device, 1)
+				expect(layout.skip.y + layout.skip.height).toBe(layout.talk.y + layout.talk.height)
+			end
+		end)
+	end)
+
 	describe("ScreenLayout touch targets", function()
 		each("are at least 48 x 48 and 8 apart", function(layout)
-			local targets: { Rect } = { layout.skip }
-			if layout.talk then
-				table.insert(targets, layout.talk)
-			end
+			local targets: { Rect } = { layout.skip, layout.talk, layout.pauseButton }
 			for i, target in targets do
 				expect(target.width >= ScreenLayout.TARGET and target.height >= ScreenLayout.TARGET).toBe(true)
 				for j = i + 1, #targets do
@@ -329,10 +382,9 @@ return function(t: any)
 				objective = tracker(layout, longestObjective),
 				hint = layout.hint,
 				skip = layout.skip,
+				talk = layout.talk,
+				pause = layout.pauseButton,
 			}
-			if layout.talk then
-				shown.talk = layout.talk :: Rect
-			end
 			for name, a in shown do
 				expect(inside(a, layout.safe)).toBe(true)
 				for other, b in shown do
@@ -356,17 +408,69 @@ return function(t: any)
 				then layout.objective.icon
 				else tracker(layout, longestObjective)
 			-- the Skip button shows only in free play
-			local buttons: { Rect } = {}
-			if layout.talk then
-				table.insert(buttons, layout.talk)
-			end
 			for _, text in LINES do
 				local shown = box(layout, text)
 				expect(gap(shown, objective) >= 0).toBe(true)
-				for _, button in buttons do
-					expect(gap(shown, button) >= ScreenLayout.TARGET_GAP).toBe(true)
+				expect(gap(shown, layout.pauseButton) >= 0).toBe(true)
+				expect(gap(shown, layout.talk) >= ScreenLayout.TARGET_GAP).toBe(true)
+			end
+		end)
+	end)
+
+	describe("ScreenLayout Pause screen", function()
+		each(
+			"its button sits at the top right of the safe area, clear of Roblox's buttons at the top left",
+			function(layout)
+				local button = layout.pauseButton
+				expect(inside(button, layout.safe)).toBe(true)
+				expect(button.x > layout.safe.x + layout.safe.width / 2).toBe(true)
+				expect(button.y < layout.safe.y + layout.safe.height / 2).toBe(true)
+			end
+		)
+
+		each("the Objective tracker and its icon keep to the left of its button", function(layout)
+			local button = layout.pauseButton
+			local objective = layout.objective
+			expect(objective.x + objective.width + ScreenLayout.TARGET_GAP <= button.x).toBe(true)
+			expect(gap(objective.icon, button) >= ScreenLayout.TARGET_GAP).toBe(true)
+		end)
+
+		each("the Settings page fits the safe area, every label, value and note in its place", function(layout)
+			local pause = layout.pause
+			expect(pause.x >= layout.safe.x and pause.x + pause.width <= layout.safe.x + layout.safe.width).toBe(true)
+			expect(pause.height <= layout.safe.height).toBe(true)
+			local body, hint = layout.text.body, layout.text.hint
+			local inner = pause.width - 2 * pause.gap
+			-- a row: the label, then (beside it or below) two step buttons round the value
+			expect(pause.controls).toBe(2 * ScreenLayout.TARGET + pause.value + 2 * pause.gap)
+			expect(pause.label + (if pause.stacked then 0 else pause.controls + pause.gap) <= inner).toBe(true)
+			for _, label in Settings.LABELS do
+				local lines = ScreenLayout.lines(label, body, pause.label)
+				expect(lines * body * ScreenLayout.LINE <= pause.labelHeight).toBe(true)
+				if not pause.stacked then
+					expect(lines).toBe(1)
 				end
 			end
+			local controlsBelow = if pause.stacked then pause.gap + ScreenLayout.TARGET else 0
+			expect(pause.row).toBe(pause.labelHeight + controlsBelow)
+			expect(pause.row >= ScreenLayout.TARGET).toBe(true)
+			expect(Settings.LONGEST_VALUE * ScreenLayout.CHARACTER * body <= pause.value).toBe(true)
+			local note = ScreenLayout.lines(Settings.CAPPED, hint, pause.note) * hint * ScreenLayout.LINE
+			expect(note <= pause.footer).toBe(true)
+			expect(pause.note + pause.gap + pause.button.width <= inner).toBe(true)
+		end)
+
+		each("its buttons are touch targets that fit their labels on one line", function(layout)
+			local button = layout.pause.button
+			expect(button.width >= ScreenLayout.TARGET and button.height >= ScreenLayout.TARGET).toBe(true)
+			for _, label in PauseScreen.LABELS do
+				expect(ScreenLayout.lines(label, layout.text.body, button.width - 2 * ScreenLayout.BUTTON_PADDING)).toBe(
+					1
+				)
+			end
+			-- the Pause page: its heading and the two buttons in a row, or one above the other
+			local page = 2 * layout.pause.gap + layout.pause.heading + 2 * (layout.pause.gap + button.height)
+			expect(page <= layout.safe.height).toBe(true)
 		end)
 	end)
 
@@ -386,6 +490,38 @@ return function(t: any)
 			expect(ScreenLayout.lines(continue, layout.text.hint, layout.dialogue.column)).toBe(1)
 			local skip = utf8.len(hints.skip) or 0
 			expect(skip <= ScreenLayout.SKIP_CHARACTERS).toBe(true)
+			for _, label: string in { hints.button.talk, hints.button.next } do
+				expect((utf8.len(label) or 0) <= ScreenLayout.TALK_CHARACTERS).toBe(true)
+			end
+		end)
+	end)
+
+	describe("ScreenLayout Title screen pill", function()
+		each("fits its words, sits left of centre above Amy, tilted left end down, in the safe area", function(layout)
+			local pill = layout.title.pill
+			local safe = layout.safe
+			-- as wide as its words and padding, never the old half screen
+			local words = TitleScreen.WORDS.pill
+			expect(ScreenLayout.lines(words, pill.text, pill.width - 2 * ScreenLayout.PILL.side)).toBe(1)
+			expect(pill.text >= layout.text.hint).toBe(true)
+			-- tilted about 4 degrees, its left end lower
+			expect(pill.rotation).toBe(-4)
+			-- its tilted outline stays inside the safe area
+			local angle = math.rad(math.abs(pill.rotation))
+			local wide = pill.width * math.cos(angle) + pill.height * math.sin(angle)
+			local tall = pill.width * math.sin(angle) + pill.height * math.cos(angle)
+			local cx, cy = pill.x + pill.width / 2, pill.y + pill.height / 2
+			expect(inside({ x = cx - wide / 2, y = cy - tall / 2, width = wide, height = tall }, safe)).toBe(true)
+			-- left of centre (or as far left as it fits), and above "Amy"
+			expect(cx <= safe.x + safe.width / 2).toBe(true)
+			local name = ScreenLayout.TITLE.name
+			expect(cy + tall / 2 <= safe.y + safe.height * (name.y - name.height / 2) + 1e-6).toBe(true)
+		end)
+
+		it("is sized to its words on a PC, not to the screen", function()
+			local small, large = at(DEVICES[12], 1).title.pill, at(DEVICES[14], 1).title.pill
+			expect(small.width).toBe(large.width)
+			expect(small.width < 1280 / 2).toBe(true)
 		end)
 	end)
 

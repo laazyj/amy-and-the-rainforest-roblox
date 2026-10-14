@@ -6,6 +6,7 @@
 ]]
 
 local Save = require("../../../src/core/Save")
+local Settings = require("../../../src/core/Settings")
 local Story = require("../../../src/core/Story")
 local StoryEngine = require("../../../src/core/StoryEngine")
 local fixture = require("./fixtureStory")
@@ -31,7 +32,12 @@ return function(t: any)
 
 	describe("Save.new", function()
 		it("is a Save of this version with fresh Progress and no Checkpoints", function()
-			expect(Save.new()).toEqual({ version = Save.VERSION, progress = StoryEngine.fresh(), checkpoints = {} })
+			expect(Save.new()).toEqual({
+				version = Save.VERSION,
+				progress = StoryEngine.fresh(),
+				checkpoints = {},
+				settings = Settings.DEFAULTS,
+			})
 			expect(Save.started(Save.new())).toBe(false)
 		end)
 	end)
@@ -49,7 +55,7 @@ return function(t: any)
 				local progress = progressAt("chapter2.pick")
 				progress.collected = { "FlowerA" }
 				local save = assert(Save.read(fixture, stored({ version = 1, progress = progress })))
-				expect(save.version).toBe(2)
+				expect(save.version).toBe(Save.VERSION)
 				expect(save.progress).toEqual(progress)
 				expect(save.checkpoints).toEqual({
 					chapter1 = progressAt("chapter1.greet"),
@@ -70,6 +76,65 @@ return function(t: any)
 				expect(save.checkpoints.chapter2).toEqual(progressAt("chapter2.pick"))
 			end)
 		end)
+
+		describe("version 2 -> 3", function()
+			local function version2(): { [string]: any }
+				local save = Save.write(Save.record(fixture, Save.new(), progressAt("chapter2.pick")))
+				save.version = 2
+				save.settings = nil
+				return save
+			end
+
+			it("adds the default Settings, keeping the Progress and the Checkpoints", function()
+				local old = version2()
+				local save = assert(Save.read(fixture, stored(old)))
+				expect(save.version).toBe(3)
+				expect(save.settings).toEqual(Settings.DEFAULTS)
+				expect(save.progress).toEqual(old.progress)
+				expect(save.checkpoints).toEqual(old.checkpoints)
+			end)
+
+			it("is the Migration a version 2 Save goes through, alone", function()
+				local migrated = Save.MIGRATIONS[2](fixture, version2())
+				expect(migrated.version).toBe(3)
+				expect(migrated.settings).toEqual(Settings.DEFAULTS)
+			end)
+
+			it("takes a version 1 Save through both Migrations", function()
+				local save =
+					assert(Save.read(fixture, stored({ version = 1, progress = progressAt("chapter1.go_out") })))
+				expect(save.version).toBe(3)
+				expect(save.settings).toEqual(Settings.DEFAULTS)
+				expect(save.checkpoints).toEqual({ chapter1 = progressAt("chapter1.greet") })
+			end)
+		end)
+	end)
+
+	describe("Save Settings", function()
+		it("reads back the Settings a Save was written with, through JSON", function()
+			local settings = Settings.change(Settings.change(Settings.DEFAULTS, "textScale", 1), "highContrast", 1)
+			local save = Save.withSettings(Save.new(), settings)
+			expect(assert(Save.read(fixture, stored(Save.write(save)))).settings).toEqual(settings)
+		end)
+
+		it("reads a Setting that is not valid as its default, and the Save is still read", function()
+			local data = Save.write(Save.new())
+			data.settings = { volume = 7, textScale = 1.5, highContrast = "yes" }
+			local save = assert(Save.read(fixture, stored(data)))
+			expect(save.settings).toEqual({ volume = 1, textScale = 1.5, highContrast = false, font = "standard" })
+			data.settings = "loud"
+			expect(assert(Save.read(fixture, stored(data))).settings).toEqual(Settings.DEFAULTS)
+		end)
+
+		it("withSettings changes the Settings only, keeping one a newer version added", function()
+			local save = Save.record(fixture, Save.new(), progressAt("chapter1.go_out"))
+			save.settings.narration = "on"
+			local changed = Save.withSettings(save, Settings.change(Settings.DEFAULTS, "volume", -1))
+			expect(changed.settings.volume).toBe(0.75)
+			expect(changed.settings.narration).toBe("on")
+			expect(changed.progress).toEqual(save.progress)
+			expect(save.settings.volume).toBe(1)
+		end)
 	end)
 
 	describe("Save.read", function()
@@ -87,6 +152,8 @@ return function(t: any)
 			newer.version = Save.VERSION + 1
 			newer.bonds = { Guide = "friend" }
 			newer.progress.journal = { "acorn" }
+			newer.settings.textScale = 1.25
+			newer.settings.narration = "on"
 			local save = assert(Save.read(fixture, stored(newer)))
 			expect(save.version).toBe(Save.VERSION + 1)
 			expect(save.bonds).toEqual({ Guide = "friend" })
@@ -96,6 +163,10 @@ return function(t: any)
 			expect(written.version).toBe(Save.VERSION + 1)
 			expect(written.bonds).toEqual({ Guide = "friend" })
 			expect(written.progress.journal).toEqual({ "acorn" })
+			-- a Setting it does not know too, beside those it does
+			expect(save.settings.textScale).toBe(1.25)
+			expect(written.settings.narration).toBe("on")
+			expect(Save.write(Save.withSettings(save, Settings.DEFAULTS)).settings.narration).toBe("on")
 		end)
 
 		local unreadable: { { any } } = {
@@ -149,9 +220,13 @@ return function(t: any)
 			-- and what is kept aside survives the next records
 			local later = Save.record(fixture, save :: Save.Save, progressAt("chapter1.go_out"))
 			expect(later.unreadable).toEqual(corrupt)
-			expect(Save.open(fixture, "garbage")).toEqual(
-				{ version = Save.VERSION, progress = StoryEngine.fresh(), checkpoints = {}, unreadable = "garbage" } :: any
-			)
+			expect(Save.open(fixture, "garbage")).toEqual({
+				version = Save.VERSION,
+				progress = StoryEngine.fresh(),
+				checkpoints = {},
+				settings = Settings.DEFAULTS,
+				unreadable = "garbage",
+			} :: any)
 		end)
 
 		it("opens nothing for a Save two versions newer, which must never be written over", function()

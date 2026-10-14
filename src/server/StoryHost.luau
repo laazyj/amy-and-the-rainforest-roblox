@@ -4,21 +4,33 @@
 	Player events, feeds them to the player's StoryEngine, and carries out
 	the World commands that come back, in order, through WorldImpl:
 
-	  - a Wait pauses for its seconds (the Chapter card, Sam's catch);
+	  - a Wait pauses for its seconds (the Chapter card, Sam's catch), and
+	    holds while the player has the Pause screen open (SetPaused);
 	  - a ShowDialogue is sent; once the step's commands are carried out,
 	    if the engine is showing a Dialogue, the host waits until the client
-	    says DialogueFinished (or 300 s pass) and feeds that to the engine.
+	    says DialogueFinished, however long that takes, and feeds that to
+	    the engine. There is no timed reading: a player who reads slowly,
+	    or leaves the Pause screen open, holds the Story where it is.
 
 	Every World command is held to its schema (World.execute) and every
 	message to a client to the Net contract before it is sent; either
 	failing is an error, not a dropped message.
+
+	Analytics: each Story event is logged as it is raised, and each
+	player's visit, its length on leave (src/server/Analytics).
+
+	Chat: Roblox's text chat window and input bar show only where
+	Config.chat says, on Dev; the server sets them, so they replicate to
+	every client.
 
 	Saves (Persist): a player's Save is opened when they join and written
 	after every step that raised Story events, on a Resume and on leave.
 	When their client is ready, a player who has not started begins the
 	Story at once; a returning player is offered the Title screen
 	(ShowTitle) and their Title choice continues, replays the Chapter from
-	its Checkpoint, or starts again.
+	its Checkpoint, or starts again. Before either, a player whose Settings
+	are not the defaults is sent them (ApplySettings); each change the
+	client sends (ChangeSettings) goes into their Save.
 
 	While a player's commands are being carried out the host is busy for
 	them, and other Player events from them are dropped, as a player cannot
@@ -33,18 +45,22 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextChatService = game:GetService("TextChatService")
 
 local Core = ReplicatedStorage:WaitForChild("core")
 local Events = require(Core:WaitForChild("Events"))
 local Net = require(Core:WaitForChild("Net"))
 local Save = require(Core:WaitForChild("Save"))
+local Settings = require(Core:WaitForChild("Settings"))
 local StoryEngine = require(Core:WaitForChild("StoryEngine"))
 local TitleScreen = require(Core:WaitForChild("TitleScreen"))
 local World = require(Core:WaitForChild("World"))
 local Content = require(ReplicatedStorage:WaitForChild("content"):WaitForChild("Story"))
 local Remotes = require(ReplicatedStorage:WaitForChild("shared"):WaitForChild("Net"))
 
+local Analytics = require(script.Parent.Analytics)
 local CharacterHost = require(script.Parent.CharacterHost)
+local Config = require(script.Parent.Config)
 local LightingHost = require(script.Parent.LightingHost)
 local Persist = require(script.Parent.Persist)
 local PickupHost = require(script.Parent.PickupHost)
@@ -52,9 +68,6 @@ local PromptBridge = require(script.Parent.PromptBridge)
 local PropHost = require(script.Parent.PropHost)
 local SceneBuilder = require(script.Parent.SceneBuilder)
 local WorldImpl = require(script.Parent.WorldImpl)
-
--- How long the host waits for DialogueFinished before going on without it.
-local DIALOGUE_TIMEOUT = 300
 
 type Session = {
 	player: any,
@@ -65,6 +78,8 @@ type Session = {
 	busy: boolean,
 	dialogueDone: boolean,
 	alive: boolean,
+	-- the player has the Pause screen open: a Wait holds
+	paused: boolean,
 }
 
 local story = Content.story
@@ -96,14 +111,15 @@ local function toClient(player: any, command: Events.WorldCommand)
 end
 
 local function awaitDialogue(session: Session)
-	local waited = 0
-	while session.alive and not session.dialogueDone and waited < DIALOGUE_TIMEOUT do
-		waited = waited + task.wait(0.1)
+	while session.alive and not session.dialogueDone do
+		task.wait(0.1)
 	end
 end
 
--- After a step that raised Story events, the player's Save gets their Progress.
+-- After a step that raised Story events, they are logged and the player's
+-- Save gets their Progress.
 local function recordAfter(session: Session, events: { Events.StoryEvent })
+	Analytics.storyEvents(session.player, events)
 	if #events > 0 then
 		Persist.record(session.player, session.engine:snapshot())
 	end
@@ -166,22 +182,29 @@ local function newSession(player: any, progress: StoryEngine.Progress?)
 		old.alive = false
 		PickupHost.clear(player)
 	end
-	sessions[player] = {
+	local session: Session
+	session = {
 		player = player,
 		engine = StoryEngine.new(player.UserId, progress, story),
 		world = WorldImpl.new(story, player, function(command)
 			toClient(player, command)
+		end, function()
+			return session.alive and session.paused
 		end),
 		busy = false,
 		dialogueDone = false,
 		alive = true,
+		-- the Pause screen stays open across a Resume
+		paused = old ~= nil and old.paused,
 	}
+	sessions[player] = session
 end
 
 local function initPlayer(player: any)
 	if not sessions[player] then
 		newSession(player, nil)
 		Persist.open(player)
+		Analytics.joined(player)
 	end
 end
 
@@ -198,6 +221,9 @@ function StoryHost.onClientReady(player: any)
 	initPlayer(player)
 	task.spawn(function()
 		local save = Persist.await(player)
+		if save and not Settings.isDefault(save.settings) then
+			message(player, "ApplySettings", table.pack(Settings.known(save.settings)))
+		end
 		local offer = save and TitleScreen.offer(story, save)
 		local session = sessions[player]
 		if offer and session and not StoryEngine.started(session.engine.progress) then
@@ -252,6 +278,20 @@ function StoryHost.idle(player: any): boolean
 	return session ~= nil and not session.busy
 end
 
+-- The player opened or closed the Pause screen: while it is open, a Wait
+-- holds, so a Beat stops where it is.
+function StoryHost.onSetPaused(player: any, paused: boolean)
+	local session = sessions[player]
+	if session then
+		session.paused = paused
+	end
+end
+
+-- The player changed their Settings (held to the contract by fromClient).
+function StoryHost.onChangeSettings(player: any, settings: Settings.Settings)
+	Persist.changeSettings(player, settings)
+end
+
 -- The client has shown the last Line of the Dialogue it was given.
 function StoryHost.onDialogueFinished(player: any)
 	local session = sessions[player]
@@ -298,6 +338,7 @@ end
 -- The player has left: their Save gets their last Progress and is released.
 function StoryHost.onPlayerRemoving(player: any)
 	Persist.release(player, StoryHost.progress(player))
+	Analytics.left(player)
 	local session = sessions[player]
 	if session then
 		session.alive = false
@@ -306,10 +347,21 @@ function StoryHost.onPlayerRemoving(player: any)
 	PickupHost.clear(player)
 end
 
+-- Roblox's chat window and input bar, shown only where Config.chat says.
+local function applyChat()
+	for _, class in { "ChatWindowConfiguration", "ChatInputBarConfiguration" } do
+		local chat = TextChatService:FindFirstChildOfClass(class)
+		if chat then
+			(chat :: any).Enabled = Config.chat
+		end
+	end
+end
+
 -- Builds what the Story needs in the world and connects the engine's
 -- signals. Once per server.
 function StoryHost.start()
 	assert(not remotes, "StoryHost has already started")
+	applyChat()
 	local made = Remotes.createRemotes()
 	remotes = made
 
@@ -330,6 +382,8 @@ function StoryHost.start()
 	end
 	made.ClientReady.OnServerEvent:Connect(fromClient("ClientReady", StoryHost.onClientReady))
 	made.TitleChoice.OnServerEvent:Connect(fromClient("TitleChoice", StoryHost.onTitleChoice))
+	made.ChangeSettings.OnServerEvent:Connect(fromClient("ChangeSettings", StoryHost.onChangeSettings))
+	made.SetPaused.OnServerEvent:Connect(fromClient("SetPaused", StoryHost.onSetPaused))
 	Players.PlayerRemoving:Connect(StoryHost.onPlayerRemoving)
 
 	print("[StoryServer] Story engine ready: " .. story.title)

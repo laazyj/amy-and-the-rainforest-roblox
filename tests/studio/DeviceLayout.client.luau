@@ -48,7 +48,6 @@
 	in the place.
 ]]
 
-local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -204,18 +203,14 @@ local function touch(): boolean
 		or (UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled)
 end
 
--- The interactive elements on screen: the StoryUI's buttons, the
--- Talk-and-advance button, and on touch each talk prompt's button.
+-- The interactive elements on screen: the StoryUI's buttons (the
+-- Talk-and-advance button among them), and on touch each talk prompt's button.
 local function interactive(): { GuiObject }
 	local found: { GuiObject } = {}
 	for _, gui in ui:GetDescendants() do
 		if gui:IsA("GuiButton") and gui.Active and shown(gui) and draws(gui) and not FULL_SCREEN[gui.Name] then
 			table.insert(found, gui)
 		end
-	end
-	local talk = ContextActionService:GetButton("TalkAndAdvance")
-	if talk and shown(talk) then
-		table.insert(found, talk)
 	end
 	return found
 end

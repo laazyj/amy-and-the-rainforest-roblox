@@ -162,11 +162,11 @@
       "assetId": null,
       "moderation": "pending",
       "upload": false,
-      "placeholder": true,
+      "placeholder": false,
       "amy": "absent",
-      "creator": "This repository",
+      "creator": "Clara (drawing); coloured for the story website",
       "licence": "owner",
-      "origin": "Placeholder for brief 009: a plain bubblegum #ff5da2 card (512x512) with no text, until Clara's drawing replaces it (issue #21)."
+      "origin": "A square crop of ui:title_screen (assets/images/title.png, x 420-1545, y 0-1125, so no sky shows at its edges) scaled to 512x512 (convert title.png -crop 1125x1125+420+0 +repage -resize 512x512): the wall of trunks and the canopy, no one in front of them. A stop-gap until Clara draws the icon (issue #21). The owner's family's work, used with the owner's permission."
     },
     {
       "name": "store:thumbnail_1",

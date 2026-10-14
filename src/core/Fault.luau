@@ -3,8 +3,9 @@
 	Fault: the things that can go wrong for a player and are worth counting,
 	as plain data (docs/GLOSSARY.md, "Faults"). Each has a name that reads
 	as an analytics event name; the server reports one through FaultLog
-	(src/server/FaultLog.luau), which today writes a warning line and which
-	brief 015 routes to AnalyticsService custom events.
+	(src/server/FaultLog.luau), which writes a warning line and logs it to
+	Roblox Analytics as a custom event of the same name
+	(src/core/AnalyticsEvents).
 
 	  NAMES                      every Fault (the glossary says what each means)
 	  line(name, player, why)    the warning line FaultLog writes

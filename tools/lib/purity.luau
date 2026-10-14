@@ -11,18 +11,20 @@
 	(`Vector3`, `Color3`, `CFrame`, `Enum`...): positions and colours are
 	plain tables.
 
-	No external links: no string in content, the core or the client binder
-	(the UI's text) holds `http://` or `https://` (the Roblox compliance
-	list).
+	No external links: no string anywhere in src/ (content, the core, the
+	client binder's UI text, and the server's, such as a kick message)
+	holds a web address, `http://`, `https://` or `www.` (the Roblox
+	compliance list).
 ]]
 
+local Compliance = require("./compliance")
 local Lex = require("./lex")
 
 local Purity = {}
 
--- Purity covers these trees; the links check covers them and the client binder.
+-- Purity covers these trees; the links check covers all of src/.
 Purity.PURE = { "src/core", "src/content" }
-Purity.LINKED = { "src/core", "src/content", "src/client" }
+Purity.LINKED = { "src" }
 
 -- Name -> why the pure core and content never reference it.
 local FORBIDDEN: { [string]: string } = {}
@@ -142,7 +144,7 @@ function Purity.links(path: string, source: string): { string }
 			i += 2
 		end
 		local text = table.concat(parts)
-		if string.find(string.lower(text), "https?://") then
+		if Compliance.isLink(text) then
 			table.insert(violations, `{path}:{token.line}: a link in text ({text}); the game links to nothing`)
 		end
 	end

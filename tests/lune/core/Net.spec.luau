@@ -4,6 +4,7 @@
 ]]
 
 local Net = require("../../../src/core/Net")
+local Settings = require("../../../src/core/Settings")
 
 return function(t: any)
 	local describe, it, expect = t.describe, t.it, t.expect
@@ -21,6 +22,10 @@ return function(t: any)
 			expect(Net.check("ClientReady", { n = 0 })).toBe(true)
 			expect(Net.check("ShowTitle", table.pack("Chapter Two — The Unexplored World", true))).toBe(true)
 			expect(Net.check("TitleChoice", table.pack("continue"))).toBe(true)
+			local settings = Settings.change(Settings.DEFAULTS, "textScale", 1)
+			expect(Net.check("ApplySettings", table.pack(settings))).toBe(true)
+			expect(Net.check("ChangeSettings", table.pack(Settings.DEFAULTS))).toBe(true)
+			expect(Net.check("SetPaused", table.pack(true))).toBe(true)
 		end)
 
 		local malformed: { { any } } = {
@@ -37,6 +42,21 @@ return function(t: any)
 			{ "TitleChoice", table.pack(7), "argument 1 must be string" },
 			{ "FrameShot", table.pack(nil, "Fox"), "argument 1 must be string" },
 			{ "FrameShot", table.pack("MeetCharacter", 7), "argument 2 must be string?" },
+			{ "ApplySettings", table.pack(nil), "argument 1 must be settings" },
+			{ "ApplySettings", table.pack({ volume = 1 }), "argument 1 must be settings" },
+			{ "ChangeSettings", table.pack(Settings.change(Settings.DEFAULTS, "volume", -1), true), "takes 1" },
+			{
+				"ChangeSettings",
+				table.pack({ volume = 11, textScale = 1, highContrast = false, font = "standard" }),
+				"argument 1 must be settings",
+			},
+			{
+				"ChangeSettings",
+				table.pack({ volume = 1, textScale = 1, highContrast = false, font = "standard", admin = true }),
+				"argument 1 must be settings",
+			},
+			{ "SetPaused", table.pack("yes"), "argument 1 must be boolean" },
+			{ "SetPaused", { n = 0 }, "argument 1 must be boolean" },
 		}
 		for _, case in malformed do
 			it(`rejects a malformed {case[1]} payload: {case[3]}`, function()

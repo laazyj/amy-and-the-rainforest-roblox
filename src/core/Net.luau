@@ -12,12 +12,23 @@
 	ShowTitle and TitleChoice carry the Title screen (src/core/TitleScreen),
 	an adapter detail like ClientReady, not World commands: only a returning
 	player is sent ShowTitle, so the golden file has none.
+
+	ApplySettings and ChangeSettings carry the player's Settings
+	(src/core/Settings), held to every allowed value: the server sends them
+	at join only when they are not the defaults, which the client starts
+	from, so the golden file (a fresh player) has none; the client sends
+	each change, and the server keeps it in the Save.
+
+	SetPaused tells the server the player opened or closed the Pause
+	screen (World.waitLeft).
 ]]
 
 local Events = require("./Events")
 
 export type Direction = "toClient" | "toServer"
-export type Remote = { direction: Direction, args: { Events.FieldType } }
+-- `sometimes`: a remote to the client that a fresh player is never sent,
+-- so the golden file has none (tests/engine/contract.luau)
+export type Remote = { direction: Direction, args: { Events.FieldType }, sometimes: boolean? }
 export type Args = { n: number, [number]: any }
 
 local Net = {}
@@ -35,9 +46,15 @@ Net.REMOTES = table.freeze({
 	ClientReady = { direction = "toServer", args = {} },
 	-- the Title screen's offer to a returning player (TitleScreen.Offer):
 	-- the Chapter they are in, and whether there is a Quest to continue
-	ShowTitle = { direction = "toClient", args = { "string", "boolean" } },
+	ShowTitle = { direction = "toClient", args = { "string", "boolean" }, sometimes = true },
 	-- the Title choice: "continue", "replay" or "restart" (TitleScreen.CHOICES)
 	TitleChoice = { direction = "toServer", args = { "string" } },
+	-- the player's Settings from their Save, when not the defaults
+	ApplySettings = { direction = "toClient", args = { "settings" }, sometimes = true },
+	-- the player changed their Settings
+	ChangeSettings = { direction = "toServer", args = { "settings" } },
+	-- the player opened (true) or closed (false) the Pause screen
+	SetPaused = { direction = "toServer", args = { "boolean" } },
 } :: { [string]: Remote })
 
 -- Holds a remote's arguments (from table.pack) to its payload: the right

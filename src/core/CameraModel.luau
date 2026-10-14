@@ -342,6 +342,12 @@ CameraModel.DIALOGUE_HEAD_RISE = 0.24
 -- the steepest the two-shot looks up or down at a speaker
 local DIALOGUE_STEEPEST = math.rad(35)
 
+-- shot:ForestWallReveal's tilt: from Amy's shoulders (studs above her
+-- root) to the canopies over the wall (studs above the ground: the
+-- trunks SceneBuilder raises are about 42 tall, their canopies centred 6
+-- above). It takes the Shot's hold, Shot.HOLD.ForestWallReveal.
+CameraModel.FOREST_WALL_TILT = table.freeze({ shoulders = 1.5, canopies = 48 })
+
 -- The Rig of each Shot `t` seconds after it has eased in (0 while it eases
 -- in), before the clamp: every path keeps the cone by itself (a Shot that would show her
 -- face is not a valid Shot), and tier 1 checks it.
@@ -363,13 +369,14 @@ CameraModel.PATHS = {
 		return rig
 	end,
 
-	-- low behind Amy, tilting up from her to the wall of trunks and the
-	-- canopies over about 3 s, the gap centred and still in view at the end
+	-- low behind Amy, tilting up from her shoulders, up the trunks' full
+	-- height, to the canopies over the wall over about 3 s, the gap
+	-- centred; the camera stays where it is, only the look-at moves
 	ForestWallReveal = function(scene, t)
-		local facing = CameraModel.facing(scene.heading)
-		local from = add(add(scene.amy, UP, 2), facing, 6)
-		local to = v(scene.subject.x, 18, scene.subject.z)
-		local share = smooth(t / 3)
+		local tilt = CameraModel.FOREST_WALL_TILT
+		local from = add(scene.amy, UP, tilt.shoulders)
+		local to = v(scene.subject.x, tilt.canopies, scene.subject.z)
+		local share = smooth(t / (Shot.HOLD.ForestWallReveal :: number))
 		return {
 			yaw = scene.heading,
 			azimuth = math.rad(12),

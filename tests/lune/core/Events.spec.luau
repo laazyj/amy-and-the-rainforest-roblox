@@ -4,6 +4,7 @@
 ]]
 
 local Events = require("../../../src/core/Events")
+local Settings = require("../../../src/core/Settings")
 
 return function(t: any)
 	local describe, it, expect = t.describe, t.it, t.expect
@@ -105,5 +106,14 @@ return function(t: any)
 				expect(reason).toContain(case[3])
 			end)
 		end
+	end)
+
+	describe("Events.matches", function()
+		it("holds a settings field to every allowed value of every Setting", function()
+			expect(Events.matches("settings", Settings.DEFAULTS)).toBe(true)
+			expect(Events.matches("settings", Settings.change(Settings.DEFAULTS, "font", 1))).toBe(true)
+			expect(Events.matches("settings", { volume = 1 })).toBe(false)
+			expect(Events.matches("settings", "loud")).toBe(false)
+		end)
 	end)
 end

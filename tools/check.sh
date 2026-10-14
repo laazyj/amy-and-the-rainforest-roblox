@@ -63,8 +63,13 @@ lune run tools/guard schema
 echo "== Purity: src/core and src/content"
 lune run tools/guard purity
 
-echo "== No external links in content, core or client text"
+echo "== No external links in any text under src/"
 lune run tools/guard links
+
+echo "== Compliance: no surname under src/, assets/ or docs/store/; no web address in the store page kit; nothing to buy or type"
+lune run tools/guard names
+lune run tools/guard store-links
+lune run tools/guard purchases-and-text
 
 echo "== Coverage guards: a spec per core module, glossary names in specs, a Walkthrough per Chapter"
 lune run tools/guard coverage
