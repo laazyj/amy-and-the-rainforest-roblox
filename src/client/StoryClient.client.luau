@@ -451,10 +451,9 @@ local function fontFace(font: typeof(lettering.pill)): Font
 	return Font.new(AssetIds[font.family] or font.family, (Enum.FontWeight :: any)[font.weight])
 end
 
--- A line of title text, white, over its shadow: the website's hard deep-green
--- edge just below the words. (Its soft blurred shadow is left out: Roblox
--- cannot blur text, and an offset copy read as a misprint on a phone.)
--- `rich` is the line with its RichText colours, when it has any.
+-- A line of title text, white, over a hard deep-green shadow just below the
+-- words (feel.md, "Title screen"); `rich` is the line with its RichText
+-- colours, when it has any.
 local function titleText(
 	name: string,
 	line: { y: number, height: number },

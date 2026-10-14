@@ -228,7 +228,7 @@ the nearest built-in:
 
 | Element | Family and weight | Colour | Other |
 |---|---|---|---|
-| "Amy" / "& the Rain Forest" | **Dancing Script**, weight 700 (Google Fonts, Open Font Licence) | white; "Rain Forest" gold `#e7b53a` | shadow in two layers: a hard `0 3px` in deep green `#23401d`, then a soft `4px 8px` blur at 40% black; line height 1.02 |
+| "Amy" / "& the Rain Forest" | **Dancing Script**, weight 700 (Google Fonts, Open Font Licence) | white; "Rain Forest" gold `#e7b53a` | shadow in two layers: a hard `0 3px` in deep green `#23401d`, then a soft `4px 8px` blur at 40% black (the game ships the hard layer only; see "What shipped"); line height 1.02 |
 | "a little tale of the wild" pill | Dancing Script, weight 600 | text deep green `#23401d` on white at 73% opacity | padding 2 × 18, fully rounded corners, rotated **−2°** |
 | UI text elsewhere on the site | Fredoka (the game's FredokaOne is its bold) | | |
 | Hand-written notes on the site | Caveat, weight 500 | | |
