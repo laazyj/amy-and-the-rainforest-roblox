@@ -206,13 +206,18 @@ a phone screenshot of the website). Over the `ui:title_screen` image, Clara's
 scene of the forest wall:
 
 - a rounded pill label, "a little tale of the wild", as wide as its
-  words, left of centre just above "Amy" and tilted about 4° with its
-  left end lower;
-- then "Amy", and below it "& the Rain Forest", in a hand-written script
-  (the family is one constant in `src/content/title.luau`; Kalam until
-  the owner picks another by eye);
-- the words are white, except "Rain Forest", which is gold; each has a soft
-  dark shadow, so it reads over the canopy.
+  words, left of centre just above "Amy" and tilted 2° with its left
+  end lower, in Dancing Script SemiBold on white at 73%;
+- then "Amy", and below it "& the Rain Forest", in Dancing Script Bold
+  (`src/content/title.luau` names the Asset `font:dancing_script`);
+- the words are white, except "Rain Forest", which is gold; each line has
+  the website's two shadows, so it reads over the canopy.
+
+What shipped (brief 019): the family is the manifest's `font:dancing_script`,
+the heading lines Bold and the pill SemiBold, the pill tilted −2°. Roblox
+has no text blur, so the two shadows are offset copies of the line: a hard
+one at (0, 3) in deep green, opaque, over a soft black one at (4, 8), 60%
+transparent, standing in for the blur.
 
 The words are game-rendered text, never part of the image.
 
@@ -231,8 +236,8 @@ Dancing Script is not among Roblox's built-in families (the ones Studio's
 `FontFace` picker lists), but the Creator Store carries it, published by
 Roblox (asset id 8764312106; Regular, Medium, SemiBold and Bold; Open Font
 Licence). The owner confirmed it by eye on Dev on 2026-10-14: the heading
-lines in Bold, the pill in SemiBold. Brief 019 brings it in through an
-entry of kind `font` in the asset manifest; `Kalam` stands in until then.
+lines in Bold, the pill in SemiBold. Brief 019 brought it in through an
+entry of kind `font` in the asset manifest.
 
 ## 4. Touch targets
 

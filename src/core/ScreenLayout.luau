@@ -237,7 +237,7 @@ ScreenLayout.TITLE = table.freeze({
 })
 -- The pill's padding each side of and above and below its words, and its
 -- tilt in degrees.
-ScreenLayout.PILL = table.freeze({ side = 18, ends = 6, rotation = -4 })
+ScreenLayout.PILL = table.freeze({ side = 18, ends = 6, rotation = -2 })
 -- The Objective tracker's padding (above, below and each side) and the gap
 -- under its header; and its width, in Objective text sizes.
 ScreenLayout.TRACKER = table.freeze({ top = 8, bottom = 10, side = 14, between = 4 })

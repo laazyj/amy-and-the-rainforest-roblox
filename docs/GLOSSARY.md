@@ -68,7 +68,7 @@ Scene (look + sound)                     Player
 | **Collectible** | A persistent discoverable with a Journal entry. Found once, remembered forever. | `collectible:maroon_acorn` |
 | **Journal** | The player's record of Collectibles found and Characters met, with entries in Clara's voice. | |
 | **Cue** | A named sound, music track or effect, resolved to an Asset through the Manifest. | `cue:sam_bark`, `music:paradise_theme` |
-| **Asset** | An image, sound or model the game or its store page uses, listed in the Manifest and uploaded to Roblox by CI when the game shows it. Known by its Asset name, an id of the forms in [Ids](#6-ids). See [`ASSETS.md`](ASSETS.md). | `card:chapter2` |
+| **Asset** | An image, sound, model or font the game or its store page uses, listed in the Manifest and uploaded to Roblox by CI when the game shows it (a font is a Creator Store family, referenced by its id and never uploaded). Known by its Asset name, an id of the forms in [Ids](#6-ids). See [`ASSETS.md`](ASSETS.md). | `card:chapter2` |
 | **Manifest** | `assets/manifest.json`: every Asset with its file, Roblox asset id, creator, licence, origin and Moderation status. | |
 | **Moderation status** | Where Roblox moderation is with an Asset. See [Lifecycles](#5-lifecycles). | `approved` |
 | **Placeholder** | A plain palette-coloured stand-in with no text for an illustration not drawn yet, until the real piece replaces it. | `card:chapter1` |
@@ -86,7 +86,7 @@ Scene (look + sound)                     Player
 | **Setting** | One of a player's choices about how the game looks and sounds, kept in their Save and applied by the client binder: the volume, the Text scale, high contrast and the dyslexia-friendly font. Its values are plain data (`src/core/Settings.luau`). The server sends a player's Settings when they join (`ApplySettings`) if they are not the defaults, and the client sends each change (`ChangeSettings`). See [enumeration](#settings). | `highContrast` on |
 | **Pause screen** | What the pause button (top right of the safe area, or P on a PC) opens: Resume, and its Settings page with a row per Setting. While it is open the Story does not advance: the client takes no input to it, and the server, told by `SetPaused`, holds every Wait. Its view-model is `src/core/PauseScreen.luau`. | the Settings page |
 | **Analytics event** | What the server logs to Roblox Analytics: a custom event named after a Story event, a Fault, or `SessionEnded` (a visit's end, its value the seconds played), with the payload as custom fields (`src/core/AnalyticsEvents.luau`, [`ANALYTICS.md`](ANALYTICS.md)). | `QuestCompleted` `chapter3.meet_fox` |
-| **Title screen** | What a player sees first: feel.md's title over `ui:title_screen`, also shown while the client loads. A returning player is offered the Title choices on it; a player with no Save goes straight to the first Chapter card. Its view-model is `src/core/TitleScreen.luau`; its lettering (the font of the title and of the pill label) is one constant in `src/content/title.luau`. | |
+| **Title screen** | What a player sees first: feel.md's title over `ui:title_screen`, also shown while the client loads. A returning player is offered the Title choices on it; a player with no Save goes straight to the first Chapter card. Its view-model is `src/core/TitleScreen.luau`; its lettering (the font of the title and of the pill label) is in `src/content/title.luau`: Dancing Script, the manifest's `font:dancing_script`. | |
 | **Title choice** | What a returning player picks on the Title screen: `continue` ("Continue", a Resume at the current Quest), `replay` ("Play this chapter again", a Resume at the Chapter's Checkpoint) or `restart` ("Start again", behind a confirmation: a new Save). | `replay` |
 | **Resume** | Rebuilding the world for a returning player from Progress alone: `StoryEngine.resume(progress)` returns the World commands that put every Character, Prop, Lighting preset and Pickup where the current Quest expects them, then shows the Objective. "Continue" on the title screen is a Resume. | |
 | **World state** | What the World looks like to the Story, as plain data: where each Character stands, each Prop's state, the Lighting preset, the Pickups out, the Objective, the offered talk affordances. What the World commands mean without the engine (`src/core/WorldState.luau`); a Resume rebuilds it. | Sam at `spot:Farm`, `lighting:paradise` |
@@ -423,6 +423,7 @@ position or raw coordinate.
 | Asset: store page art | `store:<snake_case>` | `store:icon`, `store:thumbnail_1` |
 | Asset: reference for building a Character or Prop | `ref:<the Character's or Prop's PascalCase name>` | `ref:Sam`, `ref:Machine` |
 | Asset: a Prop's model or a Cue's sound | the Prop's or Cue's own id | `prop:Machine`, `cue:sam_bark` |
+| Asset: a Creator Store font family | `font:<snake_case>` | `font:dancing_script` |
 | Collectible | `collectible:<snake_case>` | `collectible:maroon_acorn` |
 
 Inside content files the prefix is dropped where the field already says

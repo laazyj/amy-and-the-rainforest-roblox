@@ -4,7 +4,7 @@ local Manifest = require("../../../tools/lib/manifest")
 local M = require("../fixtures/manifest")
 local bootstrap = require("../bootstrap")
 
-local PNG, HASH, UPLOADED, REMOVE = M.PNG, M.HASH, M.UPLOADED, M.REMOVE
+local PNG, HASH, UPLOADED, REMOVE, FONT = M.PNG, M.HASH, M.UPLOADED, M.REMOVE, M.FONT
 local entry, manifest = M.entry, M.manifest
 
 local function readFile(path: string): string?
@@ -61,6 +61,33 @@ return function(t: any)
 			end)
 		end
 
+		it("accepts a font: an id with no file, never uploaded", function()
+			expect(Manifest.validate(manifest(entry(FONT)), readFile)).toEqual({})
+		end)
+
+		-- Each: what makes a font entry invalid, and the problem reported.
+		local NO_FILE, REFERENCED, NEEDS_ID =
+			"a font has no path, sha256 or amy",
+			'a font has upload false and moderation "approved"',
+			"a font needs its Creator Store assetId"
+		local fontCases: { { any } } = {
+			{ "a path", { path = M.PNG_PATH }, NO_FILE },
+			{ "a sha256", { sha256 = HASH }, NO_FILE },
+			{ "an amy", { amy = "absent" }, NO_FILE },
+			{ "upload true", { upload = true }, REFERENCED },
+			{ "moderation pending", { moderation = "pending" }, REFERENCED },
+			{ "no assetId", { assetId = REMOVE }, NEEDS_ID },
+			{ "a content id for an assetId", { assetId = "rbxassetid://8764312106" }, NEEDS_ID },
+		}
+		for _, case in fontCases do
+			local how: string, overrides: { [string]: any }, needle: string = case[1], case[2], case[3]
+			it(`rejects a font with {how}`, function()
+				local problems = Manifest.validate(manifest(entry(FONT, overrides)), readFile)
+				expect(#problems).toBe(1)
+				expect(problems[1]).toContain(needle)
+			end)
+		end
+
 		it("rejects a name listed twice", function()
 			local problems = Manifest.validate(manifest(entry(), entry()), readFile)
 			expect(problems).toEqual({ "card:chapter2: is listed twice" })
@@ -85,14 +112,17 @@ return function(t: any)
 			expect(Manifest.isPending(entry({ upload = false }), HASH)).toBe(false)
 		end)
 
-		it("generates AssetIds for uploaded entries only, sorted", function()
+		it("generates AssetIds for uploaded entries and fonts only, sorted", function()
 			local m = manifest(
 				entry({ name = "ui:leaf", assetId = "2", sha256 = HASH, moderation = "approved" }),
 				entry(),
+				entry(FONT),
 				entry({ name = "card:end", assetId = "1", sha256 = HASH, moderation = "approved" })
 			)
 			local source = Manifest.generateAssetIds(m)
-			expect(source).toContain('\t["card:end"] = "rbxassetid://1",\n\t["ui:leaf"] = "rbxassetid://2",\n}')
+			expect(source).toContain(
+				'\t["card:end"] = "rbxassetid://1",\n\t["font:dancing_script"] = "rbxassetid://8764312106",\n\t["ui:leaf"] = "rbxassetid://2",\n}'
+			)
 			expect(source).never.toContain("card:chapter2")
 			expect(source).toContain("return table.freeze(AssetIds)")
 		end)
@@ -187,6 +217,12 @@ return function(t: any)
 		it("fails on an invalid manifest before scanning", function()
 			local mock = repo(manifest(entry({ licence = "?" })))
 			expect(Manifest.check(mock.ctx)[1]).toContain("licence must be one of")
+		end)
+
+		it("passes a font, which has no file to read", function()
+			local mock = repo(manifest(entry(UPLOADED), entry(FONT)))
+			expect(Manifest.check(mock.ctx)).toEqual({})
+			expect(mock:stderr()).never.toContain("font:dancing_script")
 		end)
 
 		it("notes each entry waiting for upload", function()

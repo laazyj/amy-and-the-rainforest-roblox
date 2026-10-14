@@ -16,6 +16,18 @@ Fixtures.REMOVE = table.freeze({})
 -- The fields that mark an entry as uploaded (as asset 4242, in review).
 Fixtures.UPLOADED = table.freeze({ assetId = "4242", sha256 = Fixtures.HASH, moderation = "reviewing" })
 
+-- The fields that make an entry a Creator Store font, referenced by its id.
+Fixtures.FONT = table.freeze({
+	name = "font:dancing_script",
+	kind = "font",
+	path = Fixtures.REMOVE,
+	amy = Fixtures.REMOVE,
+	assetId = "8764312106",
+	moderation = "approved",
+	upload = false,
+	licence = "creator-store-free",
+})
+
 -- A valid image entry, not yet uploaded, with each `overrides` table applied in turn.
 function Fixtures.entry(...: { [string]: any }): Manifest.Entry
 	local e: { [string]: any } = {
