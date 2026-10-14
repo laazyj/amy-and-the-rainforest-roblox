@@ -1,0 +1,38 @@
+# The `needs-playtest` label asks the Mac for a tier 3 playthrough of a pull
+# request (brief mac-002). This runs on GitHub's runners, never on the Mac:
+# it only dispatches studio-playtest.yml on main with the pull request's
+# number, so the Mac runs main's workflow on CI's build of the pull request,
+# never the pull request's own workflow files (docs/MAC_RUNNER.md). A fork's
+# pull request has a read-only token and cannot dispatch.
+name: Playtest label
+
+on:
+  pull_request:
+    types: [labeled]
+
+permissions: {}
+
+# One dispatch per pull request at a time; a second label event waits.
+concurrency:
+  group: playtest-label-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: Ask the Mac to play this pull request
+    if: github.event.label.name == 'needs-playtest'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write # to dispatch studio-playtest.yml
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch the playtest on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          gh workflow run studio-playtest.yml --repo "$GITHUB_REPOSITORY" --ref main -f pr="$PR"
+          {
+            echo "Asked the Mac to play pull request #$PR."
+            echo "The run is under Actions -> Studio playtest; it waits while the Mac is asleep."
+          } >> "$GITHUB_STEP_SUMMARY"

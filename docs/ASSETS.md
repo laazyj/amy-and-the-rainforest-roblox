@@ -70,7 +70,10 @@ back to plain UI (or silence, for a Cue). Nothing in `src/` reads
 ## How to add an asset
 
 1. Put the file under `assets/images/`, `assets/audio/` or
-   `assets/meshes/`. For an image, check the rules in the GitHub issue
+   `assets/meshes/`. A free Creator Store model is fetched on the Mac with
+   `lune run tools/studio-playtest/fetch-model --asset <id> --name prop:<name> --out assets/meshes/<name>.rbxm`
+   (plan section 5.5, [`MAC_RUNNER.md`](MAC_RUNNER.md#fetching-creator-store-models-studio-wins-spike-mac-002)),
+   which refuses a model with scripts and prints the manifest entry. For an image, check the rules in the GitHub issue
    "Illustrations needed for the game": no words in the picture, the
    important part inside the middle 80%, nothing that identifies anyone,
    and **never Amy's face**.

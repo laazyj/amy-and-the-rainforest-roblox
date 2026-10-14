@@ -321,6 +321,18 @@
       "creator": "Impallari Type; published on the Creator Store by Roblox",
       "licence": "creator-store-free",
       "origin": "Creator Store, Fonts: Dancing Script (Regular, Medium, SemiBold, Bold), published by Roblox under the SIL Open Font License 1.1; chosen by the owner on Dev for the Title screen (brief 019)."
+    },
+    {
+      "name": "prop:low_poly_tree",
+      "kind": "model",
+      "path": "assets/meshes/low-poly-tree.rbxm",
+      "assetId": null,
+      "moderation": "pending",
+      "upload": false,
+      "placeholder": false,
+      "creator": "Remadex Development",
+      "licence": "creator-store-free",
+      "origin": "Creator Store asset 12549617200, \"Low Poly Tree\" by Remadex Development, inserted through Studio's MCP server and saved with SerializationService on 2026-10-14 (tools/studio-playtest/fetch-model.luau, brief mac-002's asset-fetch spike). Meshes stay on Roblox under the creator's ids (12545269850, 12545267056). Not used by the game yet."
     }
   ]
 }

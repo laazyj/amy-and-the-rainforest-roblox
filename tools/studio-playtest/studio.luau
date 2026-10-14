@@ -292,6 +292,40 @@ function Studio.bridge(options: Options): Smoke.Bridge
 			return luminance
 		end,
 
+		setDevice = function(device)
+			local simulator = 'local s = game:GetService("StudioDeviceSimulatorService")\n'
+			run("Edit", simulator .. if device
+				then `s:SetDeviceAsync({string.format("%q", device.simulator)})\n`
+					.. `s:SetOrientationAsync(Enum.ScreenOrientation.{if device.orientation == "Portrait"
+						then "Portrait"
+						else "LandscapeRight"})\nreturn true`
+				-- It raises when no device is active.
+				else "pcall(s.StopSimulationAsync, s)\nreturn true")
+		end,
+
+		press = function(key)
+			tool(
+				"user_keyboard_input",
+				{ datamodel_type = "Client", actions = { { action = "keyPress", key_code = key } } }
+			)
+		end,
+
+		walkTo = function(position)
+			tool("character_navigation", { datamodel_type = "Client", x = position.x, y = position.y, z = position.z })
+		end,
+
+		insertAsset = function(assetId)
+			local result = serde.decode(
+				"json",
+				tool("insert_asset", { assetId = assetId, assetType = "Model", parentPath = "game.ServerStorage" })
+			)
+			local inserted = result.insertedInstances and result.insertedInstances[1]
+			if result.status ~= "success" or not inserted then
+				error(`Studio did not insert asset {assetId}: {serde.encode("json", result)}`, 0)
+			end
+			return inserted.fullPath
+		end,
+
 		close = function()
 			if client then
 				client.close()

@@ -1,0 +1,106 @@
+# Tier 3 playthrough on the Mac (brief mac-002): on the self-hosted runner
+# inside the Mac's virtual machine, play a CI-built place in Roblox Studio
+# from a fresh Save to the end card, once per device (PC, and a phone and a
+# tablet preset in both orientations), with a screenshot at every Shot,
+# Chapter card and Scene entry (tools/studio-playtest/play.luau). Uploads the
+# screenshots and report.json, which holds the Studio version against the one
+# the bridge was proven on. See docs/MAC_RUNNER.md.
+#
+# Started by hand, or for a pull request by its `needs-playtest` label
+# through playtest-label.yml, which runs on GitHub's runners and dispatches
+# this workflow on main with the pull request's number. So the Mac only ever
+# runs this file as it is on main, as the rules for every Mac job require
+# (docs/MAC_RUNNER.md): the tools come from main, the place is CI's artifact,
+# read-only permissions, no secrets, a timeout and one Studio at a time.
+name: Studio playtest
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "Pull request number whose CI-built place to play (empty: the latest built from main)"
+        required: false
+        default: ""
+      devices:
+        description: "Devices, comma-separated: pc, phone-landscape, phone-portrait, tablet-landscape, tablet-portrait (empty: all)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+# One Studio, one screen.
+concurrency:
+  group: studio
+  cancel-in-progress: false
+
+jobs:
+  playtest:
+    name: Play the Story in Studio on the Mac
+    runs-on: [self-hosted, studio]
+    # Only main may deploy to this environment (docs/MAC_RUNNER.md).
+    environment: studio
+    permissions:
+      contents: read
+      actions: read # to find and download CI's place artifact
+    timeout-minutes: 60
+    # A playtest of a pull request reports; it never fails the pull request
+    # (plan section 4: tier 3 is not on a PR's critical path).
+    continue-on-error: ${{ inputs.pr != '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main # the tools from main, whatever ref the run was started on
+          persist-credentials: false
+
+      - name: Install the pinned toolchain
+        uses: ./.github/actions/setup-tools
+
+      - name: Download the place artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ inputs.pr }}
+        run: |
+          if [ -z "$PR" ]; then
+            run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --event push \
+              --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+            source="main"
+          else
+            case "$PR" in
+            *[!0-9]*) echo "::error::pr must be a pull request number, not '$PR'"; exit 1 ;;
+            esac
+            # CI's latest successful run for the pull request (a fork's runs
+            # carry no pull request, and forks never reach here).
+            run_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?event=pull_request&status=success&per_page=100" \
+              --jq "[.workflow_runs[] | select(any(.pull_requests[]; .number == $PR))][0].id")
+            source="pull request #$PR"
+          fi
+          if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
+            echo "::error::no successful CI run for $source to take the place artifact from"
+            exit 1
+          fi
+          rm -rf build/place build/studio-playtest
+          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name place --dir build/place
+          echo "Place file from CI run $run_id ($source)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Play it in Studio
+        env:
+          DEVICES: ${{ inputs.devices }}
+        run: |
+          case "$DEVICES" in
+          *[!a-z,-]*) echo "::error::devices must be device names separated by commas"; exit 1 ;;
+          esac
+          lune run tools/studio-playtest/play --file build/place/AmyAndTheRainforest.rbxl \
+            --out build/studio-playtest ${DEVICES:+--devices "$DEVICES"}
+
+      - name: Add the results to the summary
+        if: always()
+        run: lune run tools/studio-playtest/summary build/studio-playtest/report.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the screenshots and the report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: studio-playtest
+          path: build/studio-playtest
+          if-no-files-found: error

@@ -38,6 +38,12 @@ local function fakeStudio(overrides: { [string]: any }?): (Smoke.Bridge, { strin
 		close = function()
 			table.insert(calls, "close")
 		end,
+		setDevice = function() end,
+		press = function() end,
+		walkTo = function() end,
+		insertAsset = function()
+			return ""
+		end,
 	}
 	for name, fn in overrides or {} :: { [string]: any } do
 		bridge[name] = fn

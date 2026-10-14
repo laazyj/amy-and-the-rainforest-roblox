@@ -7,6 +7,13 @@
 
 export type DataModel = "Edit" | "Client" | "Server"
 
+export type Vector = { x: number, y: number, z: number }
+
+-- A device Studio's device simulator plays as: its preset id (from
+-- StudioDeviceSimulatorService:GetDeviceListAsync) and its orientation.
+export type Device = { simulator: string, orientation: "Landscape" | "Portrait" }
+
+-- What tools/studio-playtest drives Studio through; studio.luau is the live one.
 export type Bridge = {
 	studioVersion: () -> string,
 	-- Launches Studio on the place file and returns once the place is open.
@@ -22,6 +29,17 @@ export type Bridge = {
 	capture: (path: string) -> number,
 	-- Quits the Studio this bridge launched. Safe to call at any point.
 	close: () -> (),
+	-- The device the next Play simulates, or nil for none (a PC). Only in
+	-- Edit: Studio takes it at the start of Play.
+	setDevice: (device: Device?) -> (),
+	-- During Play: a key press, as the player's keyboard sends it.
+	press: (key: string) -> (),
+	-- During Play: walks the Player Character to `position`.
+	walkTo: (position: Vector) -> (),
+	-- In Edit: inserts a Creator Store asset under ServerStorage, as Studio's
+	-- Toolbox does, and returns the inserted instance's path in the Edit
+	-- DataModel ("game.ServerStorage.<name>").
+	insertAsset: (assetId: string) -> string,
 }
 
 export type Options = {
@@ -58,6 +76,9 @@ local Smoke = {}
 -- A session that renders nothing gives a black viewport (near 0); the game's
 -- darkest Scene is far above this.
 Smoke.LUMINANCE_FLOOR = 0.03
+-- A Studio panel or dialog over the viewport (the start page, an update
+-- prompt) is nearly white; the game's brightest frames are under 0.5.
+Smoke.LUMINANCE_CEILING = 0.85
 
 -- Run on the server during Play. A local file's DataModel is named "Game"
 -- there; the file name is checked in Edit, before Play starts.
