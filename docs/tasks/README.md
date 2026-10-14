@@ -39,7 +39,7 @@ Rules every build session follows, regardless of brief:
 | 016 Visual pass | Phase 1 | after 011, 012, 014; Mac required |
 | 017 Agent bootstrap and Selene standard library | tooling | done (#24) |
 | 018 Playtest fixes, round 1 | Phase 1 | done (#44) |
-| 019 Title lettering: Dancing Script through the manifest | Phase 1 | ready: after #42 and #45; the owner confirmed the font on Dev 2026-10-14 |
+| 019 Title lettering: Dancing Script through the manifest | Phase 1 | done (#46); the owner confirms the look on Dev, phone included |
 | mac-001 Runner bootstrap | Phase 1 | superseded by mac-001a |
 | mac-001a Runner in an isolated virtual machine | Phase 1 | ready: run on the MacBook, the VM spike first |
 | mac-002 Studio bridge, emulation and asset spikes | Phase 1 | after mac-001a |
