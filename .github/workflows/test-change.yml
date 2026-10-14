@@ -33,7 +33,7 @@ jobs:
           persist-credentials: false
 
       - name: Install the pinned toolchain
-        uses: ./.github/actions/setup-tools
+        uses: $/.github/actions/setup-tools
 
       # The labels and body are passed as environment variables, never
       # expanded into the script.

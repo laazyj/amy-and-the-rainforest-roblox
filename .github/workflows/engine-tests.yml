@@ -64,7 +64,7 @@ jobs:
           persist-credentials: false
 
       - name: Install the pinned toolchain
-        uses: ./.github/actions/setup-tools
+        uses: $/.github/actions/setup-tools
 
       - name: Build the place
         run: tools/build.sh
