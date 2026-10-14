@@ -321,7 +321,8 @@ and the snapshot had to be discarded and the VM booted cold.
 | The host is asleep, or the VM is not running after a restart | The job stays queued | Wake the Mac; `tools/mac/vm.sh start`. |
 | Studio's sign-in has expired | "Studio did not open the place: no new Studio connected to the MCP server; is Studio signed in?" after 90 seconds | `vm.sh stop`, `vm.sh start window`, sign in again, `stop`, `seal`. |
 | Studio's MCP server is switched off | "Studio's MCP server is not enabled" at once | Step 7 above. |
-| The runner is offline although the VM runs | `vm.sh status` says running; GitHub shows the runner offline | `tools/mac/vm.sh stop && tools/mac/vm.sh start`. Seen once, after the VM was frozen and resumed: the guest had an address but no route out. |
+| The guest has no way out | `vm.sh start` warns "cannot reach GitHub; restarting it" | Nothing: `start` boots the VM a second time, which has always cured it. About one boot in four under Softnet came up with an address and gateway but no traffic getting through (cause not found). If both boots fail, `start` says so; try again, or `STUDIO_VM_NET=nat` to tell Softnet apart from the network. |
+| The runner is offline although the VM runs | `vm.sh status` says running; GitHub shows the runner offline | `tools/mac/vm.sh stop && tools/mac/vm.sh start`. |
 | Studio cannot capture | "could not create image from window" | Step 9: Screen Recording for `node`. A runner update that replaces its Node.js may ask again. |
 | A job left the guest in a bad state | Anything | `tools/mac/vm.sh reset`. |
 | Tart is updated by Homebrew | `vm.sh` warns that the version differs | If the VM still starts and the smoke job passes, bump `TART_VERSION` in `vm.sh`. |

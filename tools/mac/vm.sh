@@ -59,6 +59,27 @@ need_vm() {
 	exists "$VM" || fail "there is no VM '$VM'; run: tools/mac/vm.sh create"
 }
 
+# Runs a command up to <tries> times, <interval> seconds apart, until it succeeds.
+wait_until() {
+	local tries=$1 interval=$2
+	shift 2
+	for _ in $(seq "$tries"); do
+		"$@" && return 0
+		sleep "$interval"
+	done
+	return 1
+}
+
+# Whether the guest agent of the VM that `start` launched answers; fails at
+# once if that tart process has exited.
+booted() {
+	if ! kill -0 "$tart_pid" 2>/dev/null; then
+		cat "$LOG" >&2
+		fail "'$VM' did not start (above)"
+	fi
+	tart exec "$VM" true 2>/dev/null
+}
+
 need_running() {
 	need_vm
 	running || fail "the VM '$VM' is not running; run: tools/mac/vm.sh start"
@@ -102,20 +123,22 @@ start)
 	*) fail "STUDIO_VM_NET must be softnet or nat" ;;
 	esac
 	mkdir -p "$(dirname "$LOG")"
-	nohup tart run "$VM" "${options[@]}" >"$LOG" 2>&1 &
-	# Booted when the guest agent answers.
-	for _ in $(seq 60); do
-		if tart exec "$VM" true 2>/dev/null; then
+	# Booted when the guest agent answers; ready when the guest reaches GitHub.
+	# About one boot in four under Softnet came up with an address and no
+	# route out (docs/MAC_RUNNER.md); a second boot has always cured it.
+	for attempt in 1 2; do
+		nohup tart run "$VM" "${options[@]}" >"$LOG" 2>&1 &
+		tart_pid=$!
+		wait_until 60 2 booted || fail "'$VM' did not answer within two minutes; see $LOG"
+		if wait_until 10 1 tart exec "$VM" curl -fs -m 3 -o /dev/null https://api.github.com/; then
 			echo "'$VM' is running"
 			exit 0
 		fi
-		if ! kill -0 $! 2>/dev/null; then
-			cat "$LOG" >&2
-			fail "'$VM' did not start (above)"
-		fi
-		sleep 2
+		echo "warning: '$VM' cannot reach GitHub (attempt $attempt); restarting it" >&2
+		tart stop "$VM"
+		wait "$tart_pid" 2>/dev/null || true # the old tart run, and its Softnet, gone
 	done
-	fail "'$VM' did not answer within two minutes; see $LOG"
+	fail "'$VM' started twice without reaching GitHub (is GitHub up?); see docs/MAC_RUNNER.md"
 	;;
 
 stop)
