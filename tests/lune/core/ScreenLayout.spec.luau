@@ -1,9 +1,11 @@
 -- ScreenLayout: feel.md's layout rules, for every Device class and
--- orientation, at Text scale 1, 1.25 and 1.5, each capped at the largest
+-- orientation, at every Text scale the Settings offer (1, 1.25 and 1.5), each capped at the largest
 -- scale at which every Line of the Story fits the device.
 
 local Content = require("../../../src/content/Story")
 local ScreenLayout = require("../../../src/core/ScreenLayout")
+local PauseScreen = require("../../../src/core/PauseScreen")
+local Settings = require("../../../src/core/Settings")
 local Story = require("../../../src/core/Story")
 local TitleScreen = require("../../../src/core/TitleScreen")
 local hints = require("../../../src/content/hints")
@@ -110,22 +112,12 @@ local DEVICES: { ScreenLayout.Screen } = {
 }
 
 -- Every Line of the Story, and the longest Objective.
-local LINES: { string } = {}
+local LINES = Story.lineTexts(Content.story)
 local longestObjective = ""
-for _, chapter in Content.story.chapters do
-	for _, quest in chapter.quests do
-		for _, dialogue: { Story.Line }? in { quest.intro, quest.dialogue, quest.outro } do
-			for _, line in dialogue or {} :: { Story.Line } do
-				table.insert(LINES, line.text)
-			end
-		end
-		if utf8.len(quest.objective) > utf8.len(longestObjective) then
-			longestObjective = quest.objective
-		end
+for _, placed in Story.quests(Content.story) do
+	if utf8.len(placed.quest.objective) > utf8.len(longestObjective) then
+		longestObjective = placed.quest.objective
 	end
-end
-for _, line in Content.story.ending.lines do
-	table.insert(LINES, line.text)
 end
 local FIRST_LINE = LINES[1]
 
@@ -178,7 +170,7 @@ return function(t: any)
 	local function each(rule: string, check: (Layout, ScreenLayout.Screen) -> ())
 		for _, device in DEVICES do
 			local scales: { number } = {}
-			for _, wanted in { 1, 1.25, 1.5 } do
+			for _, wanted in Settings.TEXT_SCALES do
 				local scale = math.min(wanted, CAPS[device])
 				if not table.find(scales, scale) then
 					table.insert(scales, scale)
@@ -355,7 +347,7 @@ return function(t: any)
 
 	describe("ScreenLayout touch targets", function()
 		each("are at least 48 x 48 and 8 apart", function(layout)
-			local targets: { Rect } = { layout.skip, layout.talk }
+			local targets: { Rect } = { layout.skip, layout.talk, layout.pauseButton }
 			for i, target in targets do
 				expect(target.width >= ScreenLayout.TARGET and target.height >= ScreenLayout.TARGET).toBe(true)
 				for j = i + 1, #targets do
@@ -391,6 +383,7 @@ return function(t: any)
 				hint = layout.hint,
 				skip = layout.skip,
 				talk = layout.talk,
+				pause = layout.pauseButton,
 			}
 			for name, a in shown do
 				expect(inside(a, layout.safe)).toBe(true)
@@ -418,8 +411,66 @@ return function(t: any)
 			for _, text in LINES do
 				local shown = box(layout, text)
 				expect(gap(shown, objective) >= 0).toBe(true)
+				expect(gap(shown, layout.pauseButton) >= 0).toBe(true)
 				expect(gap(shown, layout.talk) >= ScreenLayout.TARGET_GAP).toBe(true)
 			end
+		end)
+	end)
+
+	describe("ScreenLayout Pause screen", function()
+		each(
+			"its button sits at the top right of the safe area, clear of Roblox's buttons at the top left",
+			function(layout)
+				local button = layout.pauseButton
+				expect(inside(button, layout.safe)).toBe(true)
+				expect(button.x > layout.safe.x + layout.safe.width / 2).toBe(true)
+				expect(button.y < layout.safe.y + layout.safe.height / 2).toBe(true)
+			end
+		)
+
+		each("the Objective tracker and its icon keep to the left of its button", function(layout)
+			local button = layout.pauseButton
+			local objective = layout.objective
+			expect(objective.x + objective.width + ScreenLayout.TARGET_GAP <= button.x).toBe(true)
+			expect(gap(objective.icon, button) >= ScreenLayout.TARGET_GAP).toBe(true)
+		end)
+
+		each("the Settings page fits the safe area, every label, value and note in its place", function(layout)
+			local pause = layout.pause
+			expect(pause.x >= layout.safe.x and pause.x + pause.width <= layout.safe.x + layout.safe.width).toBe(true)
+			expect(pause.height <= layout.safe.height).toBe(true)
+			local body, hint = layout.text.body, layout.text.hint
+			local inner = pause.width - 2 * pause.gap
+			-- a row: the label, then (beside it or below) two step buttons round the value
+			expect(pause.controls).toBe(2 * ScreenLayout.TARGET + pause.value + 2 * pause.gap)
+			expect(pause.label + (if pause.stacked then 0 else pause.controls + pause.gap) <= inner).toBe(true)
+			for _, label in Settings.LABELS do
+				local lines = ScreenLayout.lines(label, body, pause.label)
+				expect(lines * body * ScreenLayout.LINE <= pause.labelHeight).toBe(true)
+				if not pause.stacked then
+					expect(lines).toBe(1)
+				end
+			end
+			local controlsBelow = if pause.stacked then pause.gap + ScreenLayout.TARGET else 0
+			expect(pause.row).toBe(pause.labelHeight + controlsBelow)
+			expect(pause.row >= ScreenLayout.TARGET).toBe(true)
+			expect(Settings.LONGEST_VALUE * ScreenLayout.CHARACTER * body <= pause.value).toBe(true)
+			local note = ScreenLayout.lines(Settings.CAPPED, hint, pause.note) * hint * ScreenLayout.LINE
+			expect(note <= pause.footer).toBe(true)
+			expect(pause.note + pause.gap + pause.button.width <= inner).toBe(true)
+		end)
+
+		each("its buttons are touch targets that fit their labels on one line", function(layout)
+			local button = layout.pause.button
+			expect(button.width >= ScreenLayout.TARGET and button.height >= ScreenLayout.TARGET).toBe(true)
+			for _, label in PauseScreen.LABELS do
+				expect(ScreenLayout.lines(label, layout.text.body, button.width - 2 * ScreenLayout.BUTTON_PADDING)).toBe(
+					1
+				)
+			end
+			-- the Pause page: its heading and the two buttons in a row, or one above the other
+			local page = 2 * layout.pause.gap + layout.pause.heading + 2 * (layout.pause.gap + button.height)
+			expect(page <= layout.safe.height).toBe(true)
 		end)
 	end)
 

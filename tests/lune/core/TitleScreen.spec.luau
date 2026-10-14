@@ -5,6 +5,7 @@
 ]]
 
 local Save = require("../../../src/core/Save")
+local Settings = require("../../../src/core/Settings")
 local StoryEngine = require("../../../src/core/StoryEngine")
 local TitleScreen = require("../../../src/core/TitleScreen")
 local fixture = require("./fixtureStory")
@@ -73,6 +74,13 @@ return function(t: any)
 			local chosen, progress = TitleScreen.choose(fixture, savedAt("chapter2.pick"), "restart")
 			expect(chosen).toEqual(Save.new())
 			expect(progress).toEqual(StoryEngine.fresh())
+		end)
+
+		it("restart keeps the player's Settings in the new Save", function()
+			local save = Save.withSettings(savedAt("chapter2.pick"), Settings.change(Settings.DEFAULTS, "font", 1))
+			local chosen = TitleScreen.choose(fixture, save, "restart")
+			expect(Save.started(chosen)).toBe(false)
+			expect(chosen.settings.font).toBe("dyslexia")
 		end)
 
 		it("knows exactly the three Title choices", function()

@@ -125,6 +125,17 @@ Mutate.FAULTS = {
 		edits = { { from = "< DeviceClass.PHONE_SHORTER_SIDE", to = "<= DeviceClass.PHONE_SHORTER_SIDE" } },
 	},
 	{
+		-- no timed reading: only the player's advance moves a Dialogue on
+		name = "a Dialogue moves on by itself after 8 seconds (timed reading)",
+		file = "src/core/DialogueViewModel.luau",
+		edits = {
+			{
+				from = "\t\tvm.elapsed += seconds\n",
+				to = "\t\tvm.elapsed += seconds\n\t\tif vm.elapsed > 8 then\n\t\t\tDialogueViewModel.advance(vm)\n\t\tend\n",
+			},
+		},
+	},
+	{
 		name = "drop the dialogue column's cap (wider than 30 x the text size on a tablet)",
 		file = "src/core/ScreenLayout.luau",
 		edits = {

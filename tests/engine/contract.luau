@@ -18,6 +18,15 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Net = (require :: any)(ReplicatedStorage:WaitForChild("core"):WaitForChild("Net"))
 
+-- Why `remote` drops `...`, or nil when its payload holds.
+local function rejection(remote: string, ...: any): string?
+	local rejected: string? = nil
+	Net.guard(remote, function() end, function(reason)
+		rejected = reason
+	end)(...)
+	return rejected
+end
+
 describe("remote contract", function()
 	local lines = Golden.lines(GOLDEN)
 
@@ -37,20 +46,33 @@ describe("remote contract", function()
 			args.n = #contract.args
 			assert(Golden.messageLine(message.remote, message.quest, args) == line, `message {i} does not round-trip`)
 
-			local rejected: string? = nil
-			Net.guard(message.remote, function() end, function(reason)
-				rejected = reason
-			end)(table.unpack(args, 1, args.n))
+			local rejected = rejection(message.remote, table.unpack(args, 1, args.n))
 			assert(rejected == nil, `message {i}: {rejected}`)
 			counts[message.remote] = (counts[message.remote] or 0) + 1
 		end
 		for remote, contract in Net.REMOTES do
-			-- only a returning player is sent ShowTitle; tests/engine/persist.luau checks it
-			if contract.direction == "toClient" and remote ~= "ShowTitle" then
+			-- a remote a fresh player is never sent (ShowTitle, ApplySettings)
+			-- is checked by tests/engine/persist.luau and below
+			if contract.direction == "toClient" and not contract.sometimes then
 				print(`  {remote}: {counts[remote] or 0} payloads hold`)
 				expect((counts[remote] or 0) > 0).toBe(true)
 			end
 		end
+	end)
+
+	it("holds the Settings both ways, through JSON as they travel", function()
+		local Settings = (require :: any)(ReplicatedStorage:WaitForChild("core"):WaitForChild("Settings"))
+		local changed = { volume = 0, textScale = 1.5, highContrast = true, font = "dyslexia" }
+		for _, settings in { Settings.DEFAULTS, changed } do
+			local payload = HttpService:JSONDecode(HttpService:JSONEncode(settings))
+			for _, remote in { "ApplySettings", "ChangeSettings" } do
+				local rejected = rejection(remote, payload)
+				assert(rejected == nil, rejected)
+			end
+		end
+		expect(
+			rejection("ChangeSettings", { volume = 2, textScale = 1, highContrast = false, font = "standard" }) ~= nil
+		).toBe(true)
 	end)
 end)
 

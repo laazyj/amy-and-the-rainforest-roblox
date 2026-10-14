@@ -80,4 +80,28 @@ return function(t: any)
 			end)
 		end
 	end)
+
+	describe("World.waitLeft", function()
+		-- Counts a Wait down a frame at a time, as the server adapter does,
+		-- `held` for the frames the player has the Pause screen open.
+		local function countDown(seconds: number, frames: number, held: boolean): number
+			local left = seconds
+			for _ = 1, frames do
+				left = World.waitLeft(left, 0.1, held)
+			end
+			return left
+		end
+
+		it("does not advance through a Wait while the player has paused, and resumes after", function()
+			local paused = countDown(3.2, 100, true) -- ten seconds paused
+			expect(paused).toBe(3.2)
+			local resumed = countDown(paused, 20, false)
+			expect(math.abs(resumed - 1.2) < 1e-9).toBe(true)
+			expect(countDown(resumed, 20, false)).toBe(0)
+		end)
+
+		it("never leaves less than nothing", function()
+			expect(World.waitLeft(0.05, 1, false)).toBe(0)
+		end)
+	end)
 end

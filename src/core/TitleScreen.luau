@@ -13,8 +13,9 @@
 	  continue  a Resume at the current Quest
 	  replay    "Play this chapter again": a Resume at the current
 	            Chapter's Checkpoint
-	  restart   "Start again", behind a confirmation: a new Save, and the
-	            Story from its first Chapter card
+	  restart   "Start again", behind a confirmation: a new Save that
+	            keeps the player's Settings, and the Story from its first
+	            Chapter card
 
 	The client's: the view-model the client binder renders. The Title
 	screen shows from the moment the client loads (it is the loading
@@ -91,7 +92,8 @@ end
 
 function TitleScreen.choose(story: Story.Story, save: Save.Save, choice: Choice): (Save.Save, StoryEngine.Progress)
 	if choice == "restart" then
-		return Save.new(), StoryEngine.fresh()
+		-- a new Save, but the player's Settings stay theirs
+		return Save.new(save.settings), StoryEngine.fresh()
 	end
 	local progress = Save.restore(story, save.progress)
 	if choice == "continue" then

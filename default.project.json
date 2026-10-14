@@ -29,6 +29,12 @@
         "Technology": "ShadowMap"
       }
     },
+    "SoundService": {
+      "$className": "SoundService",
+      "Master": {
+        "$className": "SoundGroup"
+      }
+    },
     "StarterPlayer": {
       "$className": "StarterPlayer",
       "StarterPlayerScripts": {

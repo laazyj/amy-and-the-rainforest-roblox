@@ -7,6 +7,7 @@
 	compared with whitespace collapsed.
 ]]
 
+local Lex = require("../../../tools/lib/lex")
 local Net = require("../../../src/core/Net")
 local bootstrap = require("../bootstrap")
 local fs = require("@lune/fs")
@@ -59,6 +60,41 @@ local WIRING: { { file: string, label: string, code: string } } = {
 		file = "StoryHost.luau",
 		label = "Progress is recorded after every step that raised Story events",
 		code = "if #events > 0 then\n\t\tPersist.record(session.player, session.engine:snapshot())",
+	},
+	{
+		file = "StoryHost.luau",
+		label = "the host waits for DialogueFinished with no time limit: no timed reading",
+		code = "while session.alive and not session.dialogueDone do\n\t\ttask.wait(0.1)\n\tend",
+	},
+	{
+		file = "StoryHost.luau",
+		label = "every Story event a step raises is logged to analytics",
+		code = "local function recordAfter(session: Session, events: { Events.StoryEvent })\n\tAnalytics.storyEvents(session.player, events)",
+	},
+	{
+		file = "StoryHost.luau",
+		label = "a player's visit is logged: joining, and leaving with its length",
+		code = "Persist.open(player)\n\t\tAnalytics.joined(player)",
+	},
+	{
+		file = "StoryHost.luau",
+		label = "a leaving player's SessionEnded is logged",
+		code = "Analytics.left(player)",
+	},
+	{
+		file = "FaultLog.luau",
+		label = "every Fault is logged to analytics",
+		code = "warn(Fault.line(name, playerId, why))\n\tAnalytics.fault(name, player)",
+	},
+	{
+		file = "StoryHost.luau",
+		label = "Roblox's text chat shows only where Config.chat says (Dev, not Release)",
+		code = "(chat :: any).Enabled = Config.chat",
+	},
+	{
+		file = "StoryHost.luau",
+		label = "the chat is set when the Story starts",
+		code = 'assert(not remotes, "StoryHost has already started")\n\tapplyChat()',
 	},
 	{
 		file = "Persist.luau",
@@ -151,7 +187,7 @@ return function(t: any)
 
 		it("has the Talk-and-advance button press as TalkAndAdvance says, on every class", function()
 			expect(source(CLIENT)).toContain(
-				"talkButton.Activated:Connect(function() local action = TalkAndAdvance.press(dialogue.lines ~= nil, promptDistances())"
+				"talkButton.Activated:Connect(function() if PauseScreen.paused(pause) then return end local action = TalkAndAdvance.press(dialogue.lines ~= nil, promptDistances())"
 			)
 			expect(source(CLIENT)).toContain("talkButton.Visible = TalkAndAdvance.shown(open, prompts)")
 		end)
@@ -173,5 +209,46 @@ return function(t: any)
 				end)
 			end
 		end
+	end)
+
+	-- No timed reading, in the binder: the only way a Dialogue moves on is
+	-- advance(), and it is reached only from the player's input. Each
+	-- input below holds one call; a call anywhere else (a task.delay, a
+	-- timer) makes the count differ.
+	describe("client wiring", function()
+		local INPUTS: { { input: string, code: string } } = {
+			{ input = "a click anywhere on a PC", code = "clickCatcher.Activated:Connect(advance)" },
+			{ input = "a tap or click on the dialogue box", code = "dialogueFrame.Activated:Connect(advance)" },
+			{ input = "a tap or click on the Chapter card", code = "titleOverlay.Activated:Connect(advance)" },
+			{
+				input = "E or Enter",
+				code = "or input.KeyCode == Enum.KeyCode.Return then advance() end end)",
+			},
+			{
+				input = "the Talk-and-advance button (Next on every class, a PC included)",
+				code = 'if action == "advance" then advance()',
+			},
+		}
+
+		for _, each in INPUTS do
+			it(`advances a Dialogue on {each.input}`, function()
+				expect(source(CLIENT)).toContain(each.code)
+			end)
+		end
+
+		it("reaches advance() only from those inputs: no timed reading", function()
+			local uses = 0
+			-- the raw file, not source(): the lexer needs it uncollapsed
+			local tokens = Lex.tokens(bootstrap.readSource(CLIENT))
+			for i, token in tokens do
+				local before = tokens[i - 1]
+				local member = before and before.kind == "symbol" and (before.value == "." or before.value == ":")
+				local defined = before and before.value == "function"
+				if token.kind == "name" and token.value == "advance" and not member and not defined then
+					uses += 1
+				end
+			end
+			expect(uses).toBe(#INPUTS)
+		end)
 	end)
 end
