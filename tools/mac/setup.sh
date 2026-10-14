@@ -131,6 +131,9 @@ install_runner() {
 		echo "already running"
 	else
 		[ -f .service ] || ./svc.sh install
+		# svc.sh asks launchd for a session of the runner's own, which has no
+		# window server: Studio would render nothing. Stay in the desktop session.
+		plutil -replace SessionCreate -bool false "$(cat .service)"
 		./svc.sh start
 	fi
 	echo "Runner '$RUNNER_NAME' is set up."
