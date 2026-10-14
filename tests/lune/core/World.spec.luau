@@ -96,7 +96,7 @@ return function(t: any)
 			local paused = countDown(3.2, 100, true) -- ten seconds paused
 			expect(paused).toBe(3.2)
 			local resumed = countDown(paused, 20, false)
-			expect(math.abs(resumed - 1.2) < 1e-9).toBe(true)
+			expect(resumed).toBeCloseTo(1.2)
 			expect(countDown(resumed, 20, false)).toBe(0)
 		end)
 
