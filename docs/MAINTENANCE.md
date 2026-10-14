@@ -45,7 +45,7 @@ start CI by closing and reopening it. The `upload-assets` workflow opens its
 |---|---|---|
 | actionlint and zizmor | `tools/install-workflow-linters.sh` | Pinned by version and checksum per platform; the script's header says how to bump. |
 | A pin in `rokit.toml` changed by hand | `tools/toolchain-checksums.txt` | Change the tool's tag, asset names and SHA-256s with it (the digests are on the release page); `tools/bootstrap-agent.sh` refuses a pin without matching lines. |
-| Roblox Studio on the Mac | The Mac runner (brief mac-001) | Studio auto-updates weekly and can break the tier 3 bridge. The Mac job reports the Studio version with every run. When a tier 3 run fails after a Studio update, compare the reported version with the last green run's, and fix the wrapper in `tools/studio-playtest/` rather than holding Studio back. |
+| Roblox Studio on the Mac | The Mac runner's virtual machine ([`MAC_RUNNER.md`](MAC_RUNNER.md)) | Studio auto-updates weekly and can break the tier 3 bridge. The Mac job reports the Studio version with every run. When a tier 3 run fails after a Studio update, compare the reported version with the last green run's, and fix the wrapper in `tools/studio-playtest/` rather than holding Studio back. |
 | Roblox engine and Open Cloud API changes | `tools/opencloud.luau` | Tier 2 fails on a changed endpoint. Re-check against the creator-docs OpenAPI specs (see "What was verified" in `OPEN_CLOUD.md`). |
 
 ## Repository settings (one-time, owner)
@@ -171,8 +171,8 @@ DataStores (plan section 3).
 ## The camera rule in Studio (tier 3, by hand until the Mac runner)
 
 `tests/studio/CameraRule.client.luau` is the tier 3 assertion for "Amy's
-face is never seen" (feel.md, Invariants and section 2). Until brief
-mac-001's runner runs it, the owner runs it by hand on the Mac:
+face is never seen" (feel.md, Invariants and section 2). Until the Mac
+runner ([`MAC_RUNNER.md`](MAC_RUNNER.md)) runs it, the owner runs it by hand on the Mac:
 
 1. Build the place (`tools/build.sh`, or download the `place` artifact
    of the PR's CI run) and open `build/AmyAndTheRainforest.rbxl` in

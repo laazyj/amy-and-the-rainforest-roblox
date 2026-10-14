@@ -1,0 +1,4 @@
+# The Mac runner's own label (tools/mac/setup.sh, docs/MAC_RUNNER.md).
+self-hosted-runner:
+  labels:
+    - studio

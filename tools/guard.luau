@@ -23,6 +23,10 @@
 	                                Walkthrough spec per Chapter
 	  lune run tools/guard faults   every canned fault of the mutation check
 	                                (tools/lib/mutate.luau) still applies
+	  lune run tools/guard mac-workflows
+	                                a workflow with a job on the Mac runner
+	                                never starts from a pull request
+	                                (tools/lib/mac-workflows.luau)
 	  lune run tools/guard test-change
 	                                a PR changing src/core changes tests/
 	                                (CHANGED_FILES, PR_LABELS as JSON,
@@ -36,11 +40,13 @@ local Cli = require("./lib/cli")
 local Compliance = require("./lib/compliance")
 local Coverage = require("./lib/coverage")
 local Files = require("./lib/files")
+local MacWorkflows = require("./lib/mac-workflows")
 local Mutate = require("./lib/mutate")
 local Purity = require("./lib/purity")
 local Schema = require("./lib/schema")
 local Story = require("../src/content/Story")
 
+local fs = require("@lune/fs")
 local serde = require("@lune/serde")
 
 local GUARDS: { [string]: (Cli.Context) -> { string } } = {
@@ -90,6 +96,18 @@ local GUARDS: { [string]: (Cli.Context) -> { string } } = {
 	end,
 	faults = function()
 		return Mutate.stale(Mutate.FAULTS, Files.read)
+	end,
+	["mac-workflows"] = function()
+		local problems = {}
+		for _, name in fs.readDir(`{Files.ROOT}/.github/workflows`) do
+			if string.match(name, "%.ya?ml$") then
+				local path = `.github/workflows/{name}`
+				local found = MacWorkflows.check(path, serde.decode("yaml", MacWorkflows.explicit(Files.read(path))))
+				table.move(found, 1, #found, #problems + 1, problems)
+			end
+		end
+		table.sort(problems)
+		return problems
 	end,
 	["test-change"] = function(ctx)
 		local changed = string.split(ctx.env.CHANGED_FILES or "", "\n")

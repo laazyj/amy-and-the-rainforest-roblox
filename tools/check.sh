@@ -74,5 +74,8 @@ lune run tools/guard purchases-and-text
 echo "== Coverage guards: a spec per core module, glossary names in specs, a Walkthrough per Chapter"
 lune run tools/guard coverage
 
+echo "== Mac runner: no workflow with a self-hosted job starts from a pull request"
+lune run tools/guard mac-workflows
+
 echo "== Mutation check: every canned fault still applies (the nightly job runs them)"
 lune run tools/guard faults

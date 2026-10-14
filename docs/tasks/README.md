@@ -41,5 +41,5 @@ Rules every build session follows, regardless of brief:
 | 018 Playtest fixes, round 1 | Phase 1 | done (#44) |
 | 019 Title lettering: Dancing Script through the manifest | Phase 1 | done (#46); the owner confirms the look on Dev, phone included |
 | mac-001 Runner bootstrap | Phase 1 | superseded by mac-001a |
-| mac-001a Runner in an isolated virtual machine | Phase 1 | ready: run on the MacBook, the VM spike first |
-| mac-002 Studio bridge, emulation and asset spikes | Phase 1 | after mac-001a |
+| mac-001a Runner in an isolated virtual machine | Phase 1 | done (#47) |
+| mac-002 Studio bridge, emulation and asset spikes | Phase 1 | ready: run on the MacBook |
