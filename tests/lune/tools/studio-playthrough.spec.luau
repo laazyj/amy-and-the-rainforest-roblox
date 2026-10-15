@@ -35,7 +35,9 @@ local function fakeStudio(screens: { { [string]: any } }, overrides: { [string]:
 			shown = math.min(shown + 1, #screens)
 			local screen = table.clone(screens[shown])
 			screen.now = now
-			screen.shots = screen.shots or {}
+			-- The client sends only the Shots after the first `since`.
+			local since = tonumber(string.match(code, "^local SINCE = (%d+)")) or 0
+			screen.shots = { table.unpack(screen.shots or {}, since + 1) }
 			screen.dialogue = screen.dialogue or false
 			return serde.encode("json", screen)
 		end,
@@ -88,26 +90,20 @@ local function only(calls: { string }, prefix: string): { string }
 	return found
 end
 
-local TALK_FAR = {
-	objective = "Ask Dad",
-	target = {
-		quest = "chapter1.ask_dad",
-		kind = "talk",
-		promptEnabled = true,
-		distance = 20,
-		position = { x = 4, y = 0, z = -26 },
-	},
-}
-local TALK_NEAR = {
-	objective = "Ask Dad",
-	target = {
-		quest = "chapter1.ask_dad",
-		kind = "talk",
-		promptEnabled = true,
-		distance = 3,
-		position = { x = 4, y = 0, z = -26 },
-	},
-}
+-- The first Quest, Dad `distance` studs away with his talk prompt offered.
+local function talkToDad(distance: number)
+	return {
+		objective = "Ask Dad",
+		target = {
+			quest = "chapter1.ask_dad",
+			kind = "talk",
+			promptEnabled = true,
+			distance = distance,
+			position = { x = 4, y = 0, z = -26 },
+		},
+	}
+end
+local TALK_FAR, TALK_NEAR = talkToDad(20), talkToDad(3)
 local SHOT = { name = "Dialogue", at = 0 }
 local THE_END = { card = { title = "The End", settled = true }, ended = true, shots = { SHOT } }
 

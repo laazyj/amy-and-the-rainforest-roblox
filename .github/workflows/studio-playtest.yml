@@ -22,7 +22,7 @@ on:
         required: false
         default: ""
       devices:
-        description: "Devices, comma-separated: pc, phone-landscape, phone-portrait, tablet-landscape, tablet-portrait (empty: all)"
+        description: "Devices, comma-separated, as named in Playthrough.DEVICES (empty: all)"
         required: false
         default: ""
 
@@ -57,31 +57,10 @@ jobs:
         uses: ./.github/actions/setup-tools
 
       - name: Download the place artifact
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ inputs.pr }}
-        run: |
-          if [ -z "$PR" ]; then
-            run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --event push \
-              --status success --limit 1 --json databaseId --jq '.[0].databaseId')
-            source="main"
-          else
-            case "$PR" in
-            *[!0-9]*) echo "::error::pr must be a pull request number, not '$PR'"; exit 1 ;;
-            esac
-            # CI's latest successful run for the pull request (a fork's runs
-            # carry no pull request, and forks never reach here).
-            run_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?event=pull_request&status=success&per_page=100" \
-              --jq "[.workflow_runs[] | select(any(.pull_requests[]; .number == $PR))][0].id")
-            source="pull request #$PR"
-          fi
-          if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
-            echo "::error::no successful CI run for $source to take the place artifact from"
-            exit 1
-          fi
-          rm -rf build/place build/studio-playtest
-          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name place --dir build/place
-          echo "Place file from CI run $run_id ($source)" >> "$GITHUB_STEP_SUMMARY"
+        uses: ./.github/actions/download-place
+        with:
+          pr: ${{ inputs.pr }}
+          token: ${{ github.token }}
 
       - name: Play it in Studio
         env:
@@ -90,6 +69,7 @@ jobs:
           case "$DEVICES" in
           *[!a-z,-]*) echo "::error::devices must be device names separated by commas"; exit 1 ;;
           esac
+          rm -rf build/studio-playtest # the runner keeps its work directory between jobs
           lune run tools/studio-playtest/play --file build/place/AmyAndTheRainforest.rbxl \
             --out build/studio-playtest ${DEVICES:+--devices "$DEVICES"}
 

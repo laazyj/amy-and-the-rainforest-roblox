@@ -16,9 +16,7 @@ local USAGE =
 
 Cli.main(function(ctx)
 	local values, dryRun = Cli.options(ctx.args, USAGE, { "asset", "name", "out", "place" })
-	if dryRun then
-		error("there is no --dry-run: this tool only drives the local Studio", 0)
-	end
+	Studio.refuseDryRun(dryRun)
 	local assetId = Cli.required(values, "asset")
 	if not string.match(assetId, "^%d+$") then
 		error("--asset must be a numeric asset id", 0)
@@ -48,7 +46,7 @@ Cli.main(function(ctx)
 		local entry = Fetch.entry(name, out, assetId, described, os.date("!%Y-%m-%d") :: string)
 		ctx.out(serde.encode("json", entry, true))
 	end)
-	bridge.close()
+	pcall(bridge.close)
 	if not ok then
 		error(err, 0)
 	end

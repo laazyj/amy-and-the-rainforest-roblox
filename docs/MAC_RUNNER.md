@@ -290,7 +290,7 @@ has no DataStores, so every Play is a new player) to the end card, as a
 player would. `playthrough.luau` is the sequence, pure and unit-tested
 against a scripted fake client:
 
-- **Looking.** At every step a script on the client (`OBSERVE_SCRIPT`)
+- **Looking.** At every step a script on the client (`Playthrough.observeScript`)
   reports what is on screen: a Dialogue, a Chapter card and whether it
   has faded in, the Objective, Amy's position, and the Shots framed so
   far, which a recorder installed at the start of Play
@@ -316,9 +316,28 @@ The devices, one Play each, in order: `pc` (no simulation),
 `phone-landscape` and `phone-portrait` (Studio's `iphone_16` preset, 852
 x 393 units, the 6-inch phone of `feel.md`), `tablet-landscape` and
 `tablet-portrait` (`ipad_10th_generation`, 1180 x 820). `report.json`
-holds, per device, pass or fail, the seconds, each Quest as it became
-active and each capture with its luminance; and the Studio version against
+holds, per device, pass or fail, the seconds, the viewport and orientation
+the client actually played in, each Quest as it became active and each
+capture with its luminance; and the Studio version against
 `studio-version.txt`.
+
+Run in the VM on 2026-10-15 (Studio 0.743.0.7431133), the place built from
+`main` at 3debd6b plus this branch: every device passed, 13 Quests and 22
+screenshots each, 936 s in all.
+
+| Device | Seconds | The client played at |
+|---|---|---|
+| `pc` | 231 | 541 x 414 (Studio's viewport) |
+| `phone-landscape` | 189 | 733 x 392, landscape |
+| `phone-portrait` | 168 | 733 x 392, landscape (see "Device emulation") |
+| `tablet-landscape` | 169 | 1178 x 819, landscape |
+| `tablet-portrait` | 170 | 1178 x 819, landscape |
+
+Studio updated itself in the guest overnight, from 0.742.0.7421053 to
+0.743.0.7431133, between two runs: the first launch after it failed at
+once with "Studio exited while starting", the installer took about 15
+minutes in the guest, and the bridge then passed unchanged, so
+`studio-version.txt` moved to 0.743.0.7431133 and the VM was sealed again.
 
 Limits today:
 
@@ -341,11 +360,24 @@ Edit DataModel: `GetDeviceListAsync` lists Studio's presets (phones such
 as `iphone_16`, tablets such as `ipad_10th_generation`), `SetDeviceAsync`
 and `SetOrientationAsync` choose one, and `StopSimulationAsync` returns to
 a PC. Set before Play, the client starts as that device: on `iphone_16`
-it reported touch input, Studio's device frame showed in the capture, and
-the scaling mode was `ScaleToPhysicalSize` with the preset's pixel density.
+it reported touch input and Studio's device frame showed in the capture.
+The bridge sets the scaling mode to `FitToWindow`: at Studio's default,
+`ScaleToPhysicalSize`, a tablet is larger than the guest's viewport and
+only part of its screen is captured.
 The setting can only change in Edit ("Edit datamodel is not available in
 Play mode"), so each device and orientation is its own Play. The older
 `StudioDeviceEmulatorService` is not reachable from the MCP server.
+
+**Portrait does not play today, because the game holds itself to
+landscape.** The place's `StarterGui.ScreenOrientation` is Roblox's
+default, `LandscapeSensor`, and the simulator honours it as a real phone
+would: asked for a portrait `iphone_16`, the client plays
+`LandscapeRight`. So the `phone-portrait` and `tablet-portrait` runs play
+landscape, and `report.json` records each device's actual viewport and
+orientation, with a warning when portrait was asked for. `feel.md` says
+the phone and tablet work in portrait too; making the game allow it
+(`StarterGui.ScreenOrientation` set to `Sensor`) is a game change for a
+later brief, after which these runs test portrait with no change here.
 
 So no AppleScript window resizing is needed, and DPI-dependent checks can
 use the simulated device's own units: the simulator emulates the device's

@@ -109,8 +109,22 @@ local size = workspace.CurrentCamera.ViewportSize
 return `{math.round(size.X)}x{math.round(size.Y)} {seconds / frames * 1000}`
 ]]
 
-local function round(seconds: number): number
+-- Seconds to one decimal, as the reports keep them.
+function Smoke.round(seconds: number): number
 	return math.round(seconds * 10) / 10
+end
+local round = Smoke.round
+
+-- Reads Studio's version into a report and logs it against the pinned one.
+function Smoke.readVersion(
+	bridge: Bridge,
+	report: { studioVersion: string?, studioVersionDrift: boolean, pinnedStudioVersion: string },
+	log: (string) -> ()
+)
+	local version = bridge.studioVersion()
+	report.studioVersion = version
+	report.studioVersionDrift = version ~= report.pinnedStudioVersion
+	log(`Studio {version} (pinned {report.pinnedStudioVersion})`)
 end
 
 local function baseName(path: string): string
@@ -150,10 +164,7 @@ function Smoke.run(bridge: Bridge, options: Options): Report
 		{
 			name = "Read the Studio version",
 			run = function()
-				local version = bridge.studioVersion()
-				report.studioVersion = version
-				report.studioVersionDrift = version ~= options.pinnedStudioVersion
-				options.log(`Studio {version} (pinned {options.pinnedStudioVersion})`)
+				Smoke.readVersion(bridge, report, options.log)
 			end,
 		},
 		{

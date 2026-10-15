@@ -91,7 +91,7 @@ function Fetch.entry(name: string, path: string, assetId: string, described: Des
 		name = name,
 		kind = "model",
 		path = path,
-		assetId = nil,
+		-- "assetId": null goes in by hand: a Luau table cannot hold a nil.
 		moderation = "pending",
 		upload = false,
 		placeholder = false,

@@ -7,6 +7,7 @@
 local serde = require("@lune/serde")
 
 local Cli = require("../lib/cli")
+local Files = require("../lib/files")
 local Bmp = require("./bmp")
 local Mcp = require("./mcp")
 local Smoke = require("./smoke")
@@ -105,6 +106,36 @@ function Studio.liveSystem(): System
 	}
 end
 
+-- The Studio version the bridge was last proven on.
+function Studio.pinnedVersion(): string
+	return (string.gsub(Files.read("tools/studio-playtest/studio-version.txt"), "%s+", ""))
+end
+
+-- For the entry points: none has a dry run, since each only drives the local Studio.
+function Studio.refuseDryRun(dryRun: boolean)
+	if dryRun then
+		error("there is no --dry-run: this tool only drives the local Studio", 0)
+	end
+end
+
+-- For the entry points: writes <out>/report.json, warns of Studio version
+-- drift (a GitHub annotation in Actions), and raises unless it passed.
+-- `report` is a Smoke.Report or a Playthrough.Report: both have result,
+-- failure, durationSeconds and the Studio version fields used here.
+function Studio.finish(ctx: Cli.Context, out: string, report: any)
+	ctx.writeFile(`{out}/report.json`, serde.encode("json", report, true) .. "\n")
+	if report.studioVersionDrift then
+		local message = `Studio is {report.studioVersion}, the bridge was last proven on {report.pinnedStudioVersion}`
+		ctx.log(
+			if ctx.env.GITHUB_ACTIONS then `::warning title=Studio version drift::{message}` else `warning: {message}`
+		)
+	end
+	if report.result ~= "pass" then
+		error(`failed after {report.durationSeconds} seconds: {report.failure}`, 0)
+	end
+	ctx.log(`pass in {report.durationSeconds} seconds`)
+end
+
 function Studio.bridge(options: Options): Smoke.Bridge
 	local system = options.system or Studio.liveSystem()
 	local ctx = options.ctx
@@ -153,6 +184,7 @@ function Studio.bridge(options: Options): Smoke.Bridge
 
 	local client: Mcp.Client? = nil
 	local studioId: string? = nil
+	local windowId: number? = nil -- Studio's window, for capture
 	local pid: string? = nil
 
 	local function mcp(): Mcp.Client
@@ -232,6 +264,7 @@ function Studio.bridge(options: Options): Smoke.Bridge
 				path,
 			})
 			pid = launched
+			windowId = nil
 			ctx.log(`launched Studio (pid {launched}) on {path}`)
 
 			-- What the last probe of a new Studio answered, for the failure.
@@ -275,13 +308,20 @@ function Studio.bridge(options: Options): Smoke.Bridge
 
 		capture = function(path)
 			local studioPid = pid or error("Studio is not running", 0)
-			local windowId =
-				serde.decode("json", exec("osascript", { "-l", "JavaScript", "-e", WINDOW_SCRIPT, studioPid }))
-			if not windowId then
-				error("Studio has no window to capture", 0)
+			local function lookUp(): number
+				return serde.decode("json", exec("osascript", { "-l", "JavaScript", "-e", WINDOW_SCRIPT, studioPid }))
+					or error("Studio has no window to capture", 0)
 			end
+			-- The window is looked up once per Studio, and again if it has gone.
+			windowId = windowId or lookUp()
 			-- -l: only Studio's window, whatever else is on screen; -o: no shadow.
-			exec("screencapture", { "-x", "-o", "-l", tostring(windowId), path })
+			local arguments = function()
+				return { "-x", "-o", "-l", tostring(windowId), path }
+			end
+			if not system.exec("screencapture", arguments()).ok then
+				windowId = lookUp()
+				exec("screencapture", arguments())
+			end
 			if not system.isFile(path) then
 				error("screencapture wrote no image; does the runner have Screen Recording permission?", 0)
 			end
@@ -293,14 +333,19 @@ function Studio.bridge(options: Options): Smoke.Bridge
 		end,
 
 		setDevice = function(device)
-			local simulator = 'local s = game:GetService("StudioDeviceSimulatorService")\n'
-			run("Edit", simulator .. if device
-				then `s:SetDeviceAsync({string.format("%q", device.simulator)})\n`
-					.. `s:SetOrientationAsync(Enum.ScreenOrientation.{if device.orientation == "Portrait"
-						then "Portrait"
-						else "LandscapeRight"})\nreturn true`
-				-- It raises when no device is active.
-				else "pcall(s.StopSimulationAsync, s)\nreturn true")
+			local lines = { 'local s = game:GetService("StudioDeviceSimulatorService")' }
+			if device then
+				local orientation = if device.orientation == "Portrait" then "Portrait" else "LandscapeRight"
+				table.insert(lines, `s:SetDeviceAsync({string.format("%q", device.simulator)})`)
+				table.insert(lines, `s:SetOrientationAsync(Enum.ScreenOrientation.{orientation})`)
+				-- The whole device in the viewport: at physical size a tablet
+				-- overflows Studio's window and only part of it is captured.
+				table.insert(lines, "s:SetScalingModeAsync(Enum.DeviceSimulatorScalingMode.FitToWindow)")
+			else
+				table.insert(lines, "pcall(s.StopSimulationAsync, s) -- it raises when no device is active")
+			end
+			table.insert(lines, "return true")
+			run("Edit", table.concat(lines, "\n"))
 		end,
 
 		press = function(key)

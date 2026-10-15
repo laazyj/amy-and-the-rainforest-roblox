@@ -6,7 +6,7 @@
 -- is taken at every Shot, Chapter card and Scene entry.
 --
 -- Pure: Studio is reached through the Bridge (studio.luau), and what the
--- client sees comes back from OBSERVE_SCRIPT as JSON, so the spec drives the
+-- client sees comes back from Playthrough.observeScript as JSON, so the spec drives the
 -- whole sequence with a fake client.
 
 local serde = require("@lune/serde")
@@ -82,15 +82,21 @@ return "installed"
 -- active Quest is the one whose Objective is on screen; its target comes
 -- from the place's own content, so a pull request's Story is played as it
 -- is in that pull request.
-Playthrough.OBSERVE_SCRIPT = [[
+local OBSERVE_BODY = [[
 local http = game:GetService("HttpService")
 local storage = game:GetService("ReplicatedStorage")
 local player = game:GetService("Players").LocalPlayer
 local out = { now = os.clock(), shots = {}, dialogue = false }
+local camera = workspace.CurrentCamera
+out.screen = {
+	viewport = string.format("%dx%d", camera.ViewportSize.X, camera.ViewportSize.Y),
+	orientation = player.PlayerGui.CurrentScreenOrientation.Name,
+}
 
 local log = player:FindFirstChild("PlaytestLog")
 if log then
-	out.shots = http:JSONDecode(log:GetAttribute("shots"))
+	local shots = http:JSONDecode(log:GetAttribute("shots"))
+	out.shots = { table.unpack(shots, SINCE + 1) }
 	out.ended = log:GetAttribute("ended") == true
 end
 
@@ -191,7 +197,7 @@ export type Target = {
 
 export type Observation = {
 	now: number, -- the client's clock, as the Shots' `at`
-	shots: { Shot }, -- every Shot framed since Play started, in order
+	shots: { Shot }, -- the Shots framed since the first `since`, in order
 	dialogue: boolean,
 	ended: boolean?, -- the server has sent the end card
 	card: { title: string, settled: boolean }?,
@@ -199,6 +205,9 @@ export type Observation = {
 	target: Target?,
 	scene: string?, -- the Scene of the Zone Amy stands in, if any
 	amy: Smoke.Vector?,
+	-- The client's viewport and the orientation it actually plays in (the
+	-- place's StarterGui.ScreenOrientation can hold it to landscape).
+	screen: { viewport: string, orientation: string }?,
 }
 
 export type Capture = { file: string, kind: "shot" | "card" | "scene", name: string, luminance: number }
@@ -210,6 +219,7 @@ export type DeviceReport = {
 	failure: string?,
 	seconds: number,
 	quests: { string }, -- each Quest as it became active
+	screen: { viewport: string, orientation: string }?, -- as the client first saw it
 	captures: { Capture },
 }
 
@@ -234,8 +244,11 @@ export type Options = {
 	log: (string) -> (),
 }
 
-local function round(seconds: number): number
-	return math.round(seconds * 10) / 10
+local round = Smoke.round
+
+-- The observing script, reporting only the Shots after the first `since`.
+function Playthrough.observeScript(since: number): string
+	return `local SINCE = {since}\n` .. OBSERVE_BODY
 end
 
 -- A file name part from a Shot, card or Scene name.
@@ -247,8 +260,9 @@ end
 -- Plays the Story once on the device Studio simulates; fills `report`.
 local function playDevice(bridge: Smoke.Bridge, options: Options, run: DeviceRun, report: DeviceReport)
 	local started = options.clock()
+	local shotsTaken, cardsTaken, scenesTaken = 0, {}, {}
 	local function observe(): Observation
-		return serde.decode("json", bridge.run("Client", Playthrough.OBSERVE_SCRIPT))
+		return serde.decode("json", bridge.run("Client", Playthrough.observeScript(shotsTaken)))
 	end
 	local function capture(kind: "shot" | "card" | "scene", name: string)
 		local file = string.format("%s/%02d-%s-%s.png", run.name, #report.captures + 1, kind, slug(name))
@@ -266,7 +280,6 @@ local function playDevice(bridge: Smoke.Bridge, options: Options, run: DeviceRun
 	end
 
 	bridge.run("Client", Playthrough.INSTALL_SCRIPT)
-	local shotsTaken, cardsTaken, scenesTaken = 0, {}, {}
 	local lastChange, lastState = options.clock(), ""
 	while true do
 		local now = options.clock()
@@ -274,23 +287,36 @@ local function playDevice(bridge: Smoke.Bridge, options: Options, run: DeviceRun
 			error(`the Story did not end within {Playthrough.DEVICE_TIMEOUT} seconds`, 0)
 		end
 		local seen = observe()
+		if not report.screen and seen.screen then
+			report.screen = seen.screen
+			options.log(`  {seen.screen.viewport}, {seen.screen.orientation}`)
+			local device = run.device
+			if device and device.orientation == "Portrait" and not string.find(seen.screen.orientation, "Portrait") then
+				options.log(`  warning: asked for portrait, the place plays {seen.screen.orientation}`)
+			end
+		end
+		-- The client's clock now: its clock when it looked, plus the time since.
+		local function clientNow(): number
+			return seen.now + options.clock() - now
+		end
 
 		-- Captures first, before anything moves on.
-		for i = shotsTaken + 1, #seen.shots do
-			local shot = seen.shots[i]
-			local wait = shot.at + Playthrough.SHOT_SETTLE - seen.now
+		for _, shot in seen.shots do
+			local wait = shot.at + Playthrough.SHOT_SETTLE - clientNow()
 			if wait > 0 then
 				options.sleep(wait)
 			end
 			capture("shot", shot.name)
-			shotsTaken = i
+			shotsTaken += 1
 		end
 		local card = seen.card
 		if card and card.settled and not cardsTaken[card.title] then
 			cardsTaken[card.title] = true
 			capture("card", card.title)
+			-- The run ends on both signals: the recorder saw the server send
+			-- the end card, and the card on screen has faded in and been captured.
 			if seen.ended then
-				break -- the end card: the Story is over
+				break
 			end
 		end
 		if seen.scene and not scenesTaken[seen.scene] and not seen.dialogue and not card then
@@ -338,7 +364,6 @@ local function playDevice(bridge: Smoke.Bridge, options: Options, run: DeviceRun
 			options.sleep(Playthrough.POLL)
 		end
 	end
-	report.seconds = round(options.clock() - started)
 end
 
 -- The report as Markdown for the job summary: a line per device.
@@ -347,13 +372,15 @@ function Playthrough.summary(report: Report): string
 		`**Studio playtest: {report.result}** in {report.durationSeconds} s, Studio {report.studioVersion or "unknown"}`
 			.. if report.studioVersionDrift then ` (the bridge was proven on {report.pinnedStudioVersion})` else "",
 		"",
-		"| Device | Result | Seconds | Quests | Screenshots |",
-		"|---|---|---|---|---|",
+		"| Device | Result | Seconds | Quests | Screenshots | Screen |",
+		"|---|---|---|---|---|---|",
 	}
 	for _, device in report.devices do
 		table.insert(
 			lines,
-			`| {device.name} | {device.result} | {device.seconds} | {#device.quests} | {#device.captures} |`
+			`| {device.name} | {device.result} | {device.seconds} | {#device.quests} | {#device.captures} | {if device.screen
+				then device.screen.viewport .. " " .. device.screen.orientation
+				else "-"} |`
 		)
 	end
 	if report.failure then
@@ -382,10 +409,7 @@ function Playthrough.run(bridge: Smoke.Bridge, options: Options): Report
 	end
 
 	local ok, err = pcall(function()
-		local version = bridge.studioVersion()
-		report.studioVersion = version
-		report.studioVersionDrift = version ~= options.pinnedStudioVersion
-		options.log(`Studio {version} (pinned {options.pinnedStudioVersion})`)
+		Smoke.readVersion(bridge, report, options.log)
 		bridge.open(options.placeFile)
 	end)
 	if not ok then
@@ -407,10 +431,10 @@ function Playthrough.run(bridge: Smoke.Bridge, options: Options): Report
 			if playing then
 				pcall(bridge.stopPlay)
 			end
+			device.seconds = round(options.clock() - deviceStarted)
 			if not played then
 				device.result = "fail"
 				device.failure = tostring(failure)
-				device.seconds = round(options.clock() - deviceStarted)
 				fail(`{run.name}: {failure}`)
 			end
 		end

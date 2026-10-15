@@ -44,21 +44,14 @@ jobs:
         uses: ./.github/actions/setup-tools
 
       - name: Download the latest place artifact from main
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --event push \
-            --status success --limit 1 --json databaseId --jq '.[0].databaseId')
-          if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
-            echo "::error::no successful CI run on main to take the place artifact from"
-            exit 1
-          fi
-          rm -rf build/place build/studio-smoke
-          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name place --dir build/place
-          echo "Place file from CI run $run_id on main" >> "$GITHUB_STEP_SUMMARY"
+        uses: ./.github/actions/download-place
+        with:
+          token: ${{ github.token }}
 
       - name: Play it in Studio
-        run: lune run tools/studio-playtest/run --file build/place/AmyAndTheRainforest.rbxl --out build/studio-smoke
+        run: |
+          rm -rf build/studio-smoke # the runner keeps its work directory between jobs
+          lune run tools/studio-playtest/run --file build/place/AmyAndTheRainforest.rbxl --out build/studio-smoke
 
       - name: Add the report to the summary
         if: always()
