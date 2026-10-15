@@ -126,7 +126,8 @@ return function(t: any)
 				local amy = { x = between(rng, -200, 200), y = between(rng, 0, 10), z = between(rng, -200, 400) }
 				local frame = CameraModel.step(CameraModel.new(facing), 1 / 60, amy)
 				holds(frame, amy, `spawn {i}`)
-				expect(math.abs(frame.facing.x - facing.x) + math.abs(frame.facing.z - facing.z) < 1e-9).toBe(true)
+				expect(frame.facing.x).toBeCloseTo(facing.x)
+				expect(frame.facing.z).toBeCloseTo(facing.z)
 			end
 		end)
 
@@ -140,7 +141,8 @@ return function(t: any)
 				local amy = { x = between(rng, -200, 200), y = 3, z = between(rng, -200, 400) }
 				local frame = CameraModel.step(camera, 1 / 60, amy)
 				holds(frame, amy, `respawn {i}`)
-				expect(math.abs(frame.facing.x - facing.x) + math.abs(frame.facing.z - facing.z) < 1e-9).toBe(true)
+				expect(frame.facing.x).toBeCloseTo(facing.x)
+				expect(frame.facing.z).toBeCloseTo(facing.z)
 			end
 		end)
 
@@ -189,7 +191,7 @@ return function(t: any)
 			for _ = 1, 8 do
 				CameraModel.turn(camera, math.pi / 4, 0)
 				local frame = CameraModel.step(camera, 1 / 60, amy)
-				expect(CameraModel.yawOf(frame.facing)).toBe(camera.yaw)
+				expect(CameraModel.yawOf(frame.facing)).toBeCloseTo(camera.yaw)
 				expect(CameraModel.cosine(frame, amy) > 0.9).toBe(true)
 			end
 		end)
@@ -211,7 +213,7 @@ return function(t: any)
 				local before = CameraModel.step(camera, 1 / 60, amy).facing
 				CameraModel.turn(camera, theta, 0)
 				local after = CameraModel.step(camera, 1 / 60, amy).facing
-				expect(math.abs(angleBetween(before, after) - math.abs(theta)) < 1e-9).toBe(true)
+				expect(angleBetween(before, after)).toBeCloseTo(math.abs(theta))
 				-- a positive turn is to her left: facing +z, left is +x
 				expect(math.sign(after.x)).toBe(math.sign(theta))
 			end
@@ -237,7 +239,7 @@ return function(t: any)
 			CameraModel.observe(camera, { x = 0, y = 0, z = -1 })
 			local frame = CameraModel.step(camera, SAMPLE, amy, always({ x = 0, y = 5, z = 8 }))
 			expect(frame.shot).toBeNil()
-			expect(frame.facing.z).toBe(-1)
+			expect(frame.facing.z).toBeCloseTo(-1)
 			holds(frame, amy, "after the teleport")
 		end)
 
@@ -313,7 +315,7 @@ return function(t: any)
 			for _, outside in { rig(math.pi, 0), rig(math.rad(80), 0), rig(0, math.rad(85)), rig(-2, -1) } do
 				local clamped = CameraModel.clamp(outside)
 				local cosine = math.cos(clamped.azimuth) * math.cos(clamped.elevation)
-				expect(math.abs(cosine - CameraModel.CLAMP_COSINE) < 1e-6).toBe(true)
+				expect(cosine).toBeCloseTo(CameraModel.CLAMP_COSINE, 1e-6)
 				expect(clamped.distance).toBe(outside.distance)
 			end
 		end)
@@ -405,15 +407,15 @@ return function(t: any)
 				expect(framed).toBe(seconds)
 				expect(frame.settled).toBeNil()
 				-- Amy faces the subject, and the follow camera goes behind her there
-				expect(math.abs(frame.facing.z - 1) < 1e-6).toBe(true)
+				expect(frame.facing.z).toBeCloseTo(1, 1e-6)
 				local behind = CameraModel.step(CameraModel.new({ x = 0, y = 0, z = 1 }), 0, amy)
 				for _ = 1, Shot.HAND_BACK / TICK - 1 do
 					frame = CameraModel.step(camera, TICK, amy, find)
 				end
 				expect(apart(frame.camera, behind.camera) > 1e-3).toBe(true) -- a tick short of 0.5 s: still returning
 				frame = CameraModel.step(camera, TICK, amy, find)
-				expect(apart(frame.camera, behind.camera) < 1e-6).toBe(true)
-				expect(apart(frame.lookAt, behind.lookAt) < 1e-6).toBe(true)
+				expect(apart(frame.camera, behind.camera)).toBeCloseTo(0, 1e-6)
+				expect(apart(frame.lookAt, behind.lookAt)).toBeCloseTo(0, 1e-6)
 			end)
 		end
 
@@ -514,7 +516,7 @@ return function(t: any)
 			CameraModel.place(camera, { x = -1, y = 0, z = 0 })
 			local frame = CameraModel.step(camera, SAMPLE, { x = 0, y = 3, z = 0 }, find)
 			expect(frame.shot).toBeNil()
-			expect(frame.facing.x).toBe(-1)
+			expect(frame.facing.x).toBeCloseTo(-1)
 		end)
 
 		it("clamps a Shot path that would leave the cone, in the Frame step returns", function()
@@ -531,7 +533,7 @@ return function(t: any)
 					frame = CameraModel.step(camera, SAMPLE, amy, always({ x = 0, y = 3, z = 10 }))
 					holds(frame, amy, "a path in front of Amy")
 				end
-				expect(math.abs(CameraModel.cosine(frame, amy) - CameraModel.CLAMP_COSINE) < 1e-6).toBe(true)
+				expect(CameraModel.cosine(frame, amy)).toBeCloseTo(CameraModel.CLAMP_COSINE, 1e-6)
 			end)
 			paths.InFrontOfAmy = nil
 			assert(ok, failure)

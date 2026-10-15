@@ -19,8 +19,9 @@
 			end)
 		end
 
-	Matchers: toBe, toEqual (deep), toBeNil, toContain, toBeA (typeof),
-	toThrow; prefix with `never.` to negate, e.g. expect(x).never.toBeNil().
+	Matchers: toBe, toEqual (deep), toBeCloseTo (a number within a tolerance,
+	1e-9 unless given), toBeNil, toContain, toBeA (typeof), toThrow; prefix
+	with `never.` to negate, e.g. expect(x).never.toBeNil().
 	t.expectError(fn, needle) calls fn, fails unless it raises an error whose
 	message contains `needle`, and returns that message.
 
@@ -106,6 +107,13 @@ local function expect(actual: any)
 			end,
 			toEqual = function(expected: any)
 				check(deepEqual(actual, expected), `to deep-equal {format(expected)}`)
+			end,
+			-- For computed angles, dot products and lengths: libm differs by an
+			-- ulp between platforms, so an exact toBe fails on one and not another.
+			toBeCloseTo = function(expected: number, tolerance: number?)
+				local within = tolerance or 1e-9
+				local close = type(actual) == "number" and math.abs(actual - expected) <= within
+				check(close, `to be within {within} of {format(expected)}`)
 			end,
 			toBeNil = function()
 				check(actual == nil, "to be nil")
