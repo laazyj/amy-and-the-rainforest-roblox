@@ -1,7 +1,12 @@
 --!strict
 -- Fetching a free Creator Store model through Studio (brief mac-002, plan
 -- section 5.5): what runs in Studio, the checks on what came back, and the
--- manifest entry. Pure; fetch-model.luau runs it against the live Studio.
+-- manifest entry. Pure: Studio is reached through the Bridge, and
+-- fetch-model.luau passes the live one.
+
+local serde = require("@lune/serde")
+
+local Smoke = require("./smoke")
 
 local Fetch = {}
 
@@ -9,19 +14,68 @@ export type Described = {
 	name: string,
 	creator: string,
 	free: boolean,
-	classes: { [string]: number },
+	classes: { [string]: number }, -- every instance's class, the root's included
+	code: { [string]: number }, -- the classes of those that are scripts (LuaSourceContainer)
 }
 
--- In Edit: what the inserted model at `path` holds and what the Creator
--- Store says about it, as JSON.
-function Fetch.describeScript(path: string, assetId: string): string
-	return "local model = "
-		.. path
-		.. "\n"
+-- The folder in ServerStorage the model is inserted into: named by the
+-- tool, never by the model's creator, so no creator-chosen text is ever
+-- part of the Luau sent to Studio. `stamp` makes it unique.
+function Fetch.folderName(assetId: string, stamp: number): string
+	return `StudioPlaytestFetch_{assetId}_{stamp}`
+end
+
+local function checked(folder: string): string
+	assert(string.match(folder, "^[%w_]+$"), "a fetch folder's name is letters, digits and underscores")
+	return folder
+end
+
+-- In Edit: creates the empty folder to insert into.
+function Fetch.prepareScript(folder: string): string
+	return `local name = "{checked(folder)}"\n`
 		.. [[
-local classes = {}
-for _, item in model:GetDescendants() do
+local storage = game:GetService("ServerStorage")
+if storage:FindFirstChild(name) then
+	error("ServerStorage already has " .. name)
+end
+local folder = Instance.new("Folder")
+folder.Name = name
+folder.Parent = storage
+return "ready"]]
+end
+
+-- Studio's path to the folder, for insert_asset's parentPath.
+function Fetch.folderPath(folder: string): string
+	return `game.ServerStorage.{checked(folder)}`
+end
+
+-- The start of both scripts below: `items` is the one model in the folder
+-- and everything under it.
+local function itemsIn(folder: string): string
+	return `local folder = game:GetService("ServerStorage"):FindFirstChild("{checked(folder)}")\n`
+		.. [[
+local inserted = if folder then folder:GetChildren() else {}
+if #inserted ~= 1 then
+	error(string.format("expected one inserted instance, found %d", #inserted))
+end
+local model = inserted[1]
+local items = model:GetDescendants()
+table.insert(items, model)
+]]
+end
+
+-- In Edit: what the inserted model holds and what the Creator Store says
+-- about it, as JSON. Off sale (no price) is not free.
+function Fetch.describeScript(folder: string, assetId: string): string
+	assert(string.match(assetId, "^%d+$"), "an asset id is digits")
+	return itemsIn(folder)
+		.. [[
+local classes, code = {}, {}
+for _, item in items do
 	classes[item.ClassName] = (classes[item.ClassName] or 0) + 1
+	if item:IsA("LuaSourceContainer") then
+		code[item.ClassName] = (code[item.ClassName] or 0) + 1
+	end
 end
 local info = game:GetService("MarketplaceService"):GetProductInfoAsync(]]
 		.. assetId
@@ -29,16 +83,24 @@ local info = game:GetService("MarketplaceService"):GetProductInfoAsync(]]
 return game:GetService("HttpService"):JSONEncode({
 	name = info.Name,
 	creator = info.Creator and info.Creator.Name or "unknown",
-	free = info.IsPublicDomain == true or (info.PriceInRobux or 0) == 0,
+	free = info.IsPublicDomain == true or info.PriceInRobux == 0,
 	classes = classes,
+	code = code,
 })]]
 end
 
--- In Edit: the model at `path` as a binary .rbxm, base64-encoded.
-function Fetch.serialiseScript(path: string): string
-	return 'local bytes = game:GetService("SerializationService"):SerializeInstancesAsync({ '
-		.. path
-		.. ' })\nreturn buffer.tostring(game:GetService("EncodingService"):Base64Encode(bytes))'
+-- In Edit: the model as a binary .rbxm, base64-encoded; refuses again if
+-- it holds a script now.
+function Fetch.serialiseScript(folder: string): string
+	return itemsIn(folder)
+		.. [[
+for _, item in items do
+	if item:IsA("LuaSourceContainer") then
+		error("the model carries code: " .. item.ClassName)
+	end
+end
+local bytes = game:GetService("SerializationService"):SerializeInstancesAsync({ model })
+return buffer.tostring(game:GetService("EncodingService"):Base64Encode(bytes))]]
 end
 
 -- Why the model must not be saved, or nil: it is not free, or it carries
@@ -48,10 +110,8 @@ function Fetch.refusal(described: Described): string?
 		return `'{described.name}' is not free on the Creator Store`
 	end
 	local code = {}
-	for class, count in described.classes do
-		if string.find(class, "Script$") then
-			table.insert(code, `{count} {class}`)
-		end
+	for class, count in described.code do
+		table.insert(code, `{count} {class}`)
 	end
 	if #code > 0 then
 		table.sort(code)
@@ -69,7 +129,12 @@ end
 -- Standard base64 (with = padding) to bytes.
 function Fetch.base64Decode(text: string): string
 	local clean = string.gsub(text, "%s", "")
-	if #clean % 4 ~= 0 or string.find(clean, "[^%w+/=]") then
+	if
+		#clean % 4 ~= 0
+		or string.find(clean, "[^%w+/=]")
+		or string.find(clean, "=[^=]")
+		or string.find(clean, "===")
+	then
 		error("not base64", 0)
 	end
 	local out = table.create(#clean // 4)
@@ -99,6 +164,19 @@ function Fetch.entry(name: string, path: string, assetId: string, described: Des
 		licence = "creator-store-free",
 		origin = `Creator Store asset {assetId}, "{described.name}" by {described.creator}, inserted through Studio's MCP server and saved with SerializationService on {date} (tools/studio-playtest/fetch-model.luau). Meshes stay on Roblox under the creator's ids.`,
 	}
+end
+
+-- Inserts the asset into a fresh folder, describes it, refuses it if it
+-- must not be saved, and returns it serialised as .rbxm bytes.
+function Fetch.fetch(bridge: Smoke.Bridge, assetId: string, folder: string): (Described, string)
+	bridge.run("Edit", Fetch.prepareScript(folder))
+	bridge.insertAsset(assetId, Fetch.folderPath(folder))
+	local described: Described = serde.decode("json", bridge.run("Edit", Fetch.describeScript(folder, assetId)))
+	local refusal = Fetch.refusal(described)
+	if refusal then
+		error(refusal, 0)
+	end
+	return described, Fetch.base64Decode(bridge.run("Edit", Fetch.serialiseScript(folder)))
 end
 
 return Fetch

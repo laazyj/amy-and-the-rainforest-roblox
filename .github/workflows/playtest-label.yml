@@ -4,6 +4,13 @@
 # number, so the Mac runs main's workflow on CI's build of the pull request,
 # never the pull request's own workflow files (docs/MAC_RUNNER.md). A fork's
 # pull request has a read-only token and cannot dispatch.
+#
+# Only the owner's label counts: a pull request's place runs its scripts in
+# Studio in the Mac's guest, so the label is given after reading the diff,
+# and another account with write access labels in vain. (A session using
+# the owner's own token passes the check; agents never apply the label.)
+# The Tier 0 guard covers only workflows that run on the Mac, so this
+# condition is the rule here.
 name: Playtest label
 
 on:
@@ -20,7 +27,7 @@ concurrency:
 jobs:
   dispatch:
     name: Ask the Mac to play this pull request
-    if: github.event.label.name == 'needs-playtest'
+    if: github.event.label.name == 'needs-playtest' && github.actor == github.repository_owner
     runs-on: ubuntu-latest
     permissions:
       actions: write # to dispatch studio-playtest.yml

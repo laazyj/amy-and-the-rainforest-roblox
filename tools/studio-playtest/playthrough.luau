@@ -52,6 +52,15 @@ Playthrough.TALK_RANGE = 8
 Playthrough.STALL = 60
 -- The whole Story, per device.
 Playthrough.DEVICE_TIMEOUT = 600
+-- The whole run, Studio's start included: well inside the job's 60 minutes,
+-- leaving time to install the tools, stop and upload. A device is not
+-- started with less than MIN_DEVICE of it left (one takes about 200 s).
+Playthrough.BUDGET = 45 * 60
+Playthrough.MIN_DEVICE = 300
+-- How far the client's viewport may differ from the simulated device's
+-- size in points, as a fraction: its short side, and at most its long side
+-- (a phone's long side loses its safe-area insets).
+Playthrough.VIEWPORT_TOLERANCE = 0.02
 
 -- Run on the client once Play has started: records every Shot the server
 -- frames, and the end card's arrival (a Chapter card is read off the screen
@@ -112,7 +121,11 @@ local gui = player.PlayerGui:FindFirstChild("StoryUI")
 if not gui then
 	return http:JSONEncode(out)
 end
-out.dialogue = gui:FindFirstChild("DialogueFrame", true).Visible
+local dialogueFrame = gui:FindFirstChild("DialogueFrame", true)
+out.dialogue = dialogueFrame.Visible
+if out.dialogue then
+	out.line = dialogueFrame:FindFirstChild("Body", true).Text
+end
 local overlay = gui:FindFirstChild("TitleOverlay", true)
 if overlay.Visible then
 	local title = overlay:FindFirstChildWhichIsA("TextLabel")
@@ -199,6 +212,7 @@ export type Observation = {
 	now: number, -- the client's clock, as the Shots' `at`
 	shots: { Shot }, -- the Shots framed since the first `since`, in order
 	dialogue: boolean,
+	line: string?, -- the Dialogue's text so far, while it shows
 	ended: boolean?, -- the server has sent the end card
 	card: { title: string, settled: boolean }?,
 	objective: string?,
@@ -210,20 +224,32 @@ export type Observation = {
 	screen: { viewport: string, orientation: string }?,
 }
 
-export type Capture = { file: string, kind: "shot" | "card" | "scene", name: string, luminance: number }
+export type Capture = {
+	file: string,
+	kind: "shot" | "card" | "scene",
+	name: string,
+	luminance: number,
+	pixels: string,
+}
 
 export type DeviceReport = {
 	name: string,
 	class: string,
-	result: "pass" | "fail",
-	failure: string?,
+	result: "pass" | "fail" | "skipped",
+	failure: string?, -- or why it was skipped
 	seconds: number,
+	-- What the device simulator reported after it was set; nil for a PC.
+	simulation: Smoke.Simulation?,
 	quests: { string }, -- each Quest as it became active
 	screen: { viewport: string, orientation: string }?, -- as the client first saw it
 	captures: { Capture },
+	warnings: { string },
 }
 
 export type Report = {
+	-- False while the run is going: report.json is written after every
+	-- device, so a job cut short still leaves what it played.
+	finished: boolean,
 	result: "pass" | "fail",
 	failure: string?,
 	studioVersion: string?,
@@ -239,6 +265,8 @@ export type Options = {
 	outDir: string,
 	devices: { DeviceRun },
 	pinnedStudioVersion: string,
+	budget: number?, -- seconds; Playthrough.BUDGET when nil
+	progress: ((Report) -> ())?, -- called with the report after every device
 	clock: () -> number,
 	sleep: (seconds: number) -> (),
 	log: (string) -> (),
@@ -257,8 +285,37 @@ local function slug(text: string): string
 	return (string.gsub(lowered, "^%-*(.-)%-*$", "%1"))
 end
 
--- Plays the Story once on the device Studio simulates; fills `report`.
-local function playDevice(bridge: Smoke.Bridge, options: Options, run: DeviceRun, report: DeviceReport)
+-- A failure of the Story itself, not of Studio or the runner: raised as a
+-- table so the run can tell the two apart.
+type StoryFailure = { story: string }
+
+local function storyFailure(message: string): never
+	error({ story = message } :: StoryFailure)
+end
+
+-- Why the client's viewport is not the simulated device's, or nil.
+local function viewportMismatch(viewport: string, simulation: Smoke.Simulation): string?
+	local width, height = string.match(viewport, "^(%d+)x(%d+)$")
+	local w, h = tonumber(width) or 0, tonumber(height) or 0
+	local short, long = math.min(w, h), math.max(w, h)
+	local deviceShort, deviceLong =
+		math.min(simulation.width, simulation.height), math.max(simulation.width, simulation.height)
+	local tolerance = Playthrough.VIEWPORT_TOLERANCE
+	if math.abs(short - deviceShort) > deviceShort * tolerance or long > deviceLong * (1 + tolerance) then
+		return `the client's viewport is {viewport}, not the {simulation.device}'s {simulation.width}x{simulation.height}`
+	end
+	return nil
+end
+
+-- Plays the Story once on the device Studio simulates, until `deadline`;
+-- fills `report`.
+local function playDevice(
+	bridge: Smoke.Bridge,
+	options: Options,
+	run: DeviceRun,
+	report: DeviceReport,
+	deadline: number
+)
 	local started = options.clock()
 	local shotsTaken, cardsTaken, scenesTaken = 0, {}, {}
 	local function observe(): Observation
@@ -266,15 +323,18 @@ local function playDevice(bridge: Smoke.Bridge, options: Options, run: DeviceRun
 	end
 	local function capture(kind: "shot" | "card" | "scene", name: string)
 		local file = string.format("%s/%02d-%s-%s.png", run.name, #report.captures + 1, kind, slug(name))
-		local luminance = bridge.capture(`{options.outDir}/{file}`)
-		table.insert(
-			report.captures,
-			{ file = file, kind = kind, name = name, luminance = math.round(luminance * 1000) / 1000 }
-		)
+		local shot = bridge.capture(`{options.outDir}/{file}`)
+		table.insert(report.captures, {
+			file = file,
+			kind = kind,
+			name = name,
+			luminance = Smoke.roundLuminance(shot.luminance),
+			pixels = shot.pixels,
+		})
 		options.log(`  {file}`)
-		if luminance < Smoke.LUMINANCE_FLOOR then
+		if shot.luminance < Smoke.LUMINANCE_FLOOR then
 			error(`{file} is black where the viewport should be: Studio rendered nothing`, 0)
-		elseif luminance > Smoke.LUMINANCE_CEILING then
+		elseif shot.luminance > Smoke.LUMINANCE_CEILING then
 			error(`{file} is nearly white where the viewport should be: something covers the game`, 0)
 		end
 	end
@@ -283,16 +343,23 @@ local function playDevice(bridge: Smoke.Bridge, options: Options, run: DeviceRun
 	local lastChange, lastState = options.clock(), ""
 	while true do
 		local now = options.clock()
-		if now - started > Playthrough.DEVICE_TIMEOUT then
-			error(`the Story did not end within {Playthrough.DEVICE_TIMEOUT} seconds`, 0)
+		if now > deadline then
+			storyFailure(`the Story did not end within {round(deadline - started)} seconds`)
 		end
 		local seen = observe()
-		if not report.screen and seen.screen then
-			report.screen = seen.screen
-			options.log(`  {seen.screen.viewport}, {seen.screen.orientation}`)
+		local screen = seen.screen
+		if not report.screen and screen then
+			report.screen = screen
+			options.log(`  {screen.viewport}, {screen.orientation}`)
+			local mismatch = report.simulation and viewportMismatch(screen.viewport, report.simulation)
+			if mismatch then
+				error(mismatch, 0)
+			end
 			local device = run.device
-			if device and device.orientation == "Portrait" and not string.find(seen.screen.orientation, "Portrait") then
-				options.log(`  warning: asked for portrait, the place plays {seen.screen.orientation}`)
+			if device and device.orientation == "Portrait" and not string.find(screen.orientation, "Portrait") then
+				local warning = `asked for portrait, the place plays {screen.orientation}`
+				table.insert(report.warnings, warning)
+				options.log(`  warning: {warning}`)
 			end
 		end
 		-- The client's clock now: its clock when it looked, plus the time since.
@@ -328,18 +395,25 @@ local function playDevice(bridge: Smoke.Bridge, options: Options, run: DeviceRun
 		if target and report.quests[#report.quests] ~= target.quest then
 			table.insert(report.quests, target.quest)
 			options.log(`  Quest {target.quest}`)
+			if target.kind ~= "reach" and target.kind ~= "talk" then
+				storyFailure(`the playthrough cannot play a {target.kind} Quest yet ({target.quest})`)
+			end
 		end
+		-- Amy walking, or a Line still being written, is a change too.
+		local amy = seen.amy
 		local state = table.concat({
 			tostring(seen.objective),
 			tostring(seen.dialogue),
+			seen.line or "",
 			card and card.title or "",
 			tostring(#seen.shots),
 			tostring(seen.scene),
+			if amy then `{amy.x // 2},{amy.z // 2}` else "",
 		}, "|")
 		if state ~= lastState then
 			lastState, lastChange = state, now
 		elseif now - lastChange > Playthrough.STALL then
-			error(`the Story is stuck: nothing changed for {Playthrough.STALL} seconds ({state})`, 0)
+			storyFailure(`the Story is stuck: nothing changed for {Playthrough.STALL} seconds ({state})`)
 		end
 
 		-- A card holds, then fades by itself; a talk prompt comes once a Beat
@@ -369,7 +443,7 @@ end
 -- The report as Markdown for the job summary: a line per device.
 function Playthrough.summary(report: Report): string
 	local lines = {
-		`**Studio playtest: {report.result}** in {report.durationSeconds} s, Studio {report.studioVersion or "unknown"}`
+		`**Studio playtest: {if report.finished then report.result else "stopped before the end"}** in {report.durationSeconds} s, Studio {report.studioVersion or "unknown"}`
 			.. if report.studioVersionDrift then ` (the bridge was proven on {report.pinnedStudioVersion})` else "",
 		"",
 		"| Device | Result | Seconds | Quests | Screenshots | Screen |",
@@ -383,6 +457,12 @@ function Playthrough.summary(report: Report): string
 				else "-"} |`
 		)
 	end
+	for _, device in report.devices do
+		for _, warning in device.warnings do
+			table.insert(lines, "")
+			table.insert(lines, `Warning, {device.name}: {warning}`)
+		end
+	end
 	if report.failure then
 		table.insert(lines, "")
 		table.insert(lines, `Failure: {report.failure}`)
@@ -392,7 +472,9 @@ end
 
 function Playthrough.run(bridge: Smoke.Bridge, options: Options): Report
 	local started = options.clock()
+	local budget = options.budget or Playthrough.BUDGET
 	local report: Report = {
+		finished = false,
 		result = "pass",
 		pinnedStudioVersion = options.pinnedStudioVersion,
 		studioVersionDrift = false,
@@ -407,6 +489,33 @@ function Playthrough.run(bridge: Smoke.Bridge, options: Options): Report
 			report.failure = message
 		end
 	end
+	local function progress()
+		report.durationSeconds = round(options.clock() - started)
+		if options.progress then
+			options.progress(report)
+		end
+	end
+	local function deviceReport(run: DeviceRun): DeviceReport
+		local device: DeviceReport = {
+			name = run.name,
+			class = run.class,
+			result = "pass",
+			seconds = 0,
+			quests = {},
+			captures = {},
+			warnings = {},
+		}
+		table.insert(report.devices, device)
+		return device
+	end
+	-- The devices from `index` on are not played.
+	local function skip(index: number, reason: string)
+		for i = index, #options.devices do
+			local device = deviceReport(options.devices[i])
+			device.result = "skipped"
+			device.failure = reason
+		end
+	end
 
 	local ok, err = pcall(function()
 		Smoke.readVersion(bridge, report, options.log)
@@ -415,32 +524,66 @@ function Playthrough.run(bridge: Smoke.Bridge, options: Options): Report
 	if not ok then
 		fail(`Open the place in Studio: {err}`)
 	else
-		for _, run in options.devices do
+		local simulated, stopped = false, true
+		for index, run in options.devices do
+			local remaining = budget - (options.clock() - started)
+			if remaining < Playthrough.MIN_DEVICE then
+				fail(`the run's {budget}-second budget was spent before {run.name}`)
+				skip(index, "the run's time budget was spent")
+				break
+			end
 			options.log(`== {run.name}`)
-			local device: DeviceReport =
-				{ name = run.name, class = run.class, result = "pass", seconds = 0, quests = {}, captures = {} }
-			table.insert(report.devices, device)
+			local device = deviceReport(run)
 			local deviceStarted = options.clock()
+			local deadline = deviceStarted + math.min(Playthrough.DEVICE_TIMEOUT, remaining)
 			local playing = false
 			local played, failure = pcall(function()
-				bridge.setDevice(run.device)
+				simulated = simulated or run.device ~= nil
+				device.simulation = Smoke.checkSimulation(run.device, bridge.setDevice(run.device))
 				playing = true
 				bridge.startPlay()
-				playDevice(bridge, options, run, device)
+				playDevice(bridge, options, run, device, deadline)
 			end)
+			local stopFailure = nil
 			if playing then
-				pcall(bridge.stopPlay)
+				stopped, stopFailure = pcall(bridge.stopPlay)
 			end
 			device.seconds = round(options.clock() - deviceStarted)
+			local story = type(failure) == "table"
 			if not played then
 				device.result = "fail"
-				device.failure = tostring(failure)
-				fail(`{run.name}: {failure}`)
+				device.failure = if story then (failure :: StoryFailure).story else tostring(failure)
+				fail(`{run.name}: {device.failure}`)
+			end
+			local skipRest = nil
+			if not stopped then
+				device.result = "fail"
+				device.failure = device.failure or `Stop Play: {stopFailure}`
+				fail(`{run.name}: Stop Play: {stopFailure}`)
+				skipRest = "Studio did not stop Play" -- the next device would play in a session still in Play
+			elseif story and run.class == "PC" then
+				skipRest = "the Story did not end on PC" -- nor will it on a phone
+			end
+			if skipRest then
+				skip(index + 1, skipRest)
+				progress()
+				break
+			end
+			progress()
+		end
+		-- Studio as it was found: no device simulated.
+		if simulated and stopped then
+			local restored, restoreFailure = pcall(function()
+				Smoke.checkSimulation(nil, bridge.setDevice(nil))
+			end)
+			if not restored then
+				fail(`Stop the device simulator: {restoreFailure}`)
 			end
 		end
 	end
 	pcall(bridge.close)
-	report.durationSeconds = round(options.clock() - started)
+	report.finished = true
+	progress()
 	return report
 end
 

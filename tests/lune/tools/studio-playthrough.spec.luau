@@ -4,6 +4,24 @@ local serde = require("@lune/serde")
 
 local CARD = { title = "Chapter One", settled = true }
 
+-- The presets' sizes in points, as Studio's simulator reports them.
+local SIZES = { iphone_16 = { 852, 393 }, ipad_10th_generation = { 1180, 820 } }
+
+-- What a simulator that took the setting reports.
+local function simulating(device: any): any
+	if not device then
+		return nil
+	end
+	local size = SIZES[device.simulator]
+	return {
+		device = device.simulator,
+		orientation = if device.orientation == "Portrait" then "Portrait" else "LandscapeRight",
+		scaling = "FitToWindow",
+		width = size[1],
+		height = size[2],
+	}
+end
+
 -- A Studio whose client shows `screens` one after another, one per look,
 -- and keeps showing the last; records what was asked of it.
 local function fakeStudio(screens: { { [string]: any } }, overrides: { [string]: any }?)
@@ -19,6 +37,7 @@ local function fakeStudio(screens: { { [string]: any } }, overrides: { [string]:
 		end,
 		setDevice = function(device: any)
 			table.insert(calls, `device {if device then device.simulator .. " " .. device.orientation else "none"}`)
+			return simulating(device)
 		end,
 		startPlay = function()
 			table.insert(calls, "startPlay")
@@ -43,7 +62,7 @@ local function fakeStudio(screens: { { [string]: any } }, overrides: { [string]:
 		end,
 		capture = function(path)
 			table.insert(calls, `capture {path}`)
-			return 0.4
+			return { luminance = 0.4, pixels = "1024x768" }
 		end,
 		press = function(key)
 			table.insert(calls, `press {key}`)
@@ -68,8 +87,14 @@ local function fakeStudio(screens: { { [string]: any } }, overrides: { [string]:
 	return bridge, calls, clock, sleep
 end
 
-local function play(bridge: any, clock: () -> number, sleep: (number) -> (), devices: { any }?): Playthrough.Report
-	return Playthrough.run(bridge, {
+local function play(
+	bridge: any,
+	clock: () -> number,
+	sleep: (number) -> (),
+	devices: { any }?,
+	extra: { [string]: any }?
+): Playthrough.Report
+	local options: any = {
 		placeFile = "build/Place.rbxl",
 		outDir = "out",
 		devices = devices or { Playthrough.DEVICES[1] },
@@ -77,8 +102,14 @@ local function play(bridge: any, clock: () -> number, sleep: (number) -> (), dev
 		clock = clock,
 		sleep = sleep,
 		log = function() end,
-	})
+	}
+	for key, value in extra or {} :: { [string]: any } do
+		options[key] = value
+	end
+	return Playthrough.run(bridge, options)
 end
+
+local PHONE, PHONE_PORTRAIT, TABLET = Playthrough.DEVICES[2], Playthrough.DEVICES[3], Playthrough.DEVICES[4]
 
 local function only(calls: { string }, prefix: string): { string }
 	local found = {}
@@ -139,7 +170,9 @@ return function(t: any)
 				kind = "shot",
 				name = "Dialogue",
 				luminance = 0.4,
+				pixels = "1024x768",
 			})
+			t.expect(report.finished).toBe(true)
 		end)
 
 		t.it("captures a Shot only once it has eased in", function()
@@ -150,7 +183,7 @@ return function(t: any)
 				{
 					capture = function()
 						captured = captured or clock()
-						return 0.4
+						return { luminance = 0.4, pixels = "1024x768" }
 					end,
 				}
 			)
@@ -200,15 +233,140 @@ return function(t: any)
 			t.expect(only(calls, "walk")).toEqual({})
 		end)
 
-		t.it("fails a stuck Story, stops Play, and plays the next device", function()
+		t.it("fails a stuck Story on a phone, stops Play, plays the next device and stops the simulator", function()
 			local bridge, calls, clock, sleep = fakeStudio({ { objective = "Wait forever" } })
-			local report = play(bridge, clock, sleep, { Playthrough.DEVICES[1], Playthrough.DEVICES[2] })
+			local report = play(bridge, clock, sleep, { PHONE, TABLET })
 			t.expect(report.result).toBe("fail")
-			t.expect(string.find(report.failure :: string, "pc: the Story is stuck", 1, true)).toBe(1)
+			t.expect(string.find(report.failure :: string, "phone-landscape: the Story is stuck", 1, true)).toBe(1)
 			t.expect(#report.devices).toBe(2)
 			t.expect(report.devices[1].result).toBe("fail")
+			t.expect(report.devices[2].result).toBe("fail")
+			t.expect((report.devices[2].simulation :: any).device).toBe("ipad_10th_generation")
 			t.expect(only(calls, "stopPlay")).toEqual({ "stopPlay", "stopPlay" })
-			t.expect(only(calls, "device")).toEqual({ "device none", "device iphone_16 Landscape" })
+			t.expect(only(calls, "device")).toEqual({
+				"device iphone_16 Landscape",
+				"device ipad_10th_generation Landscape",
+				"device none",
+			})
+		end)
+
+		t.it("skips the other devices when the Story does not end on PC", function()
+			local bridge, calls, clock, sleep = fakeStudio({ { objective = "Wait forever" } })
+			local report = play(bridge, clock, sleep, { Playthrough.DEVICES[1], PHONE })
+			t.expect(string.find(report.failure :: string, "pc: the Story is stuck", 1, true)).toBe(1)
+			t.expect(report.devices[2].result).toBe("skipped")
+			t.expect(report.devices[2].failure).toBe("the Story did not end on PC")
+			t.expect(only(calls, "startPlay")).toEqual({ "startPlay" })
+		end)
+
+		t.it("fails at once on a Quest kind it cannot play", function()
+			local collect = { objective = "Gather seeds", target = { quest = "chapter9.gather", kind = "collect" } }
+			local bridge, _, clock, sleep = fakeStudio({ collect })
+			local report = play(bridge, clock, sleep)
+			t.expect(report.failure).toBe("pc: the playthrough cannot play a collect Quest yet (chapter9.gather)")
+			t.expect(report.devices[1].seconds < Playthrough.STALL).toBe(true)
+		end)
+
+		t.it("counts Amy walking and a Line being written as change, not a stall", function()
+			local screens = {}
+			for step = 1, 400 do
+				table.insert(
+					screens,
+					{ dialogue = step % 2 == 0, line = string.rep("a", step), amy = { x = step * 3, y = 0, z = 0 } }
+				)
+			end
+			table.insert(screens, THE_END)
+			local bridge, _, clock, sleep = fakeStudio(screens, {
+				press = function() end,
+			})
+			t.expect(play(bridge, clock, sleep).result).toBe("pass")
+		end)
+
+		t.it("fails a device whose simulator did not take the setting, and plays nothing on it", function()
+			local bridge, calls, clock, sleep = fakeStudio({ THE_END }, {
+				setDevice = function()
+					return nil
+				end,
+			})
+			local report = play(bridge, clock, sleep, { PHONE })
+			t.expect(report.failure).toBe("phone-landscape: Studio simulates no device, not iphone_16")
+			t.expect(only(calls, "startPlay")).toEqual({})
+		end)
+
+		t.it("fails a PC run while a device is still simulated", function()
+			local bridge, _, clock, sleep = fakeStudio({ THE_END }, {
+				setDevice = function()
+					return simulating(TABLET.device)
+				end,
+			})
+			local report = play(bridge, clock, sleep)
+			t.expect(report.failure)
+				.toBe("pc: Studio still simulates ipad_10th_generation after the simulator was stopped")
+		end)
+
+		t.it("fails when the client's viewport is not the simulated device's size", function()
+			local wrong = table.clone(THE_END)
+			wrong.screen = { viewport = "541x414", orientation = "LandscapeRight" }
+			local bridge, _, clock, sleep = fakeStudio({ wrong })
+			local report = play(bridge, clock, sleep, { PHONE })
+			t.expect(report.failure)
+				.toBe("phone-landscape: the client's viewport is 541x414, not the iphone_16's 852x393")
+		end)
+
+		t.it("records portrait played as landscape as a warning in the report and the summary", function()
+			local landscape = table.clone(THE_END)
+			landscape.screen = { viewport = "733x392", orientation = "LandscapeRight" }
+			local bridge, _, clock, sleep = fakeStudio({ landscape })
+			local report = play(bridge, clock, sleep, { PHONE_PORTRAIT })
+			t.expect(report.result).toBe("pass")
+			t.expect(report.devices[1].warnings).toEqual({ "asked for portrait, the place plays LandscapeRight" })
+			t.expect(
+				string.find(
+					Playthrough.summary(report),
+					"Warning, phone-portrait: asked for portrait, the place plays LandscapeRight",
+					1,
+					true
+				) ~= nil
+			).toBe(true)
+		end)
+
+		t.it("stops playing devices when Stop Play fails, and leaves the simulator alone", function()
+			local bridge, calls, clock, sleep = fakeStudio({ THE_END }, {
+				stopPlay = function()
+					error("Studio did not stop Play (waited 60 seconds)", 0)
+				end,
+			})
+			local report = play(bridge, clock, sleep, { PHONE, TABLET })
+			t.expect(report.failure).toBe("phone-landscape: Stop Play: Studio did not stop Play (waited 60 seconds)")
+			t.expect(report.devices[2].result).toBe("skipped")
+			t.expect(only(calls, "device")).toEqual({ "device iphone_16 Landscape" })
+		end)
+
+		t.it("starts no device without enough of the run's budget left, and says so", function()
+			local bridge, calls, clock, sleep = fakeStudio({ THE_END })
+			local budget = Playthrough.MIN_DEVICE + 10
+			local report = play(bridge, clock, sleep, { PHONE, TABLET }, {
+				budget = budget,
+				-- Each device takes as long as the budget.
+				sleep = function(seconds: number)
+					sleep(seconds + budget)
+				end,
+			})
+			t.expect(report.devices[1].result).toBe("pass")
+			t.expect(report.devices[2].result).toBe("skipped")
+			t.expect(report.failure).toBe(`the run's {budget}-second budget was spent before tablet-landscape`)
+			t.expect(only(calls, "startPlay")).toEqual({ "startPlay" })
+		end)
+
+		t.it("hands over the report after every device, finished only at the end", function()
+			local seen = {}
+			local bridge, _, clock, sleep = fakeStudio({ THE_END })
+			play(bridge, clock, sleep, { PHONE, TABLET }, {
+				progress = function(report)
+					table.insert(seen, `{#report.devices} {report.finished}`)
+				end,
+			})
+			t.expect(seen).toEqual({ "1 false", "2 false", "2 true" })
 		end)
 
 		t.it("reports a place that does not open, plays nothing, and quits Studio", function()
@@ -227,7 +385,7 @@ return function(t: any)
 			for _, luminance in { 0.01, 0.95 } do
 				local bridge, _, clock, sleep = fakeStudio({ { card = CARD }, THE_END }, {
 					capture = function()
-						return luminance
+						return { luminance = luminance, pixels = "1024x768" }
 					end,
 				})
 				local report = play(bridge, clock, sleep)

@@ -118,12 +118,17 @@ function Studio.refuseDryRun(dryRun: boolean)
 	end
 end
 
+-- Writes <out>/report.json.
+function Studio.writeReport(ctx: Cli.Context, out: string, report: any)
+	ctx.writeFile(`{out}/report.json`, serde.encode("json", report, true) .. "\n")
+end
+
 -- For the entry points: writes <out>/report.json, warns of Studio version
 -- drift (a GitHub annotation in Actions), and raises unless it passed.
 -- `report` is a Smoke.Report or a Playthrough.Report: both have result,
 -- failure, durationSeconds and the Studio version fields used here.
 function Studio.finish(ctx: Cli.Context, out: string, report: any)
-	ctx.writeFile(`{out}/report.json`, serde.encode("json", report, true) .. "\n")
+	Studio.writeReport(ctx, out, report)
 	if report.studioVersionDrift then
 		local message = `Studio is {report.studioVersion}, the bridge was last proven on {report.pinnedStudioVersion}`
 		ctx.log(
@@ -134,6 +139,44 @@ function Studio.finish(ctx: Cli.Context, out: string, report: any)
 		error(`failed after {report.durationSeconds} seconds: {report.failure}`, 0)
 	end
 	ctx.log(`pass in {report.durationSeconds} seconds`)
+end
+
+-- In Edit: sets Studio's device simulator to `device`, or stops it for
+-- none, then returns what it reports as JSON (null when no device is
+-- active), so a switch that did not take is seen.
+function Studio.deviceScript(device: Smoke.Device?): string
+	local lines = {
+		'local s = game:GetService("StudioDeviceSimulatorService")',
+	}
+	if device then
+		local orientation = if device.orientation == "Portrait" then "Portrait" else "LandscapeRight"
+		table.insert(lines, `s:SetDeviceAsync({string.format("%q", device.simulator)})`)
+		table.insert(lines, `s:SetOrientationAsync(Enum.ScreenOrientation.{orientation})`)
+		-- The whole device in the viewport: at physical size a tablet
+		-- overflows Studio's window and only part of it is captured.
+		table.insert(lines, "s:SetScalingModeAsync(Enum.DeviceSimulatorScalingMode.FitToWindow)")
+	else
+		table.insert(lines, "s:StopSimulationAsync()")
+	end
+	table.insert(
+		lines,
+		[[
+-- With no device active Studio calls the device "default", and the reads
+-- below raise (and a raise is reported even inside a pcall).
+local id = s:GetDeviceAsync()
+if id == "default" then
+	return "null"
+end
+local resolution = s:GetResolutionAsync()
+return game:GetService("HttpService"):JSONEncode({
+	device = id,
+	orientation = s:GetOrientationAsync().Name,
+	scaling = s:GetScalingModeAsync().Name,
+	width = resolution.X,
+	height = resolution.Y,
+})]]
+	)
+	return table.concat(lines, "\n")
 end
 
 function Studio.bridge(options: Options): Smoke.Bridge
@@ -185,6 +228,7 @@ function Studio.bridge(options: Options): Smoke.Bridge
 	local client: Mcp.Client? = nil
 	local studioId: string? = nil
 	local windowId: number? = nil -- Studio's window, for capture
+	local windowPixels: string? = nil -- its screenshots' size, read once per window
 	local pid: string? = nil
 
 	local function mcp(): Mcp.Client
@@ -264,7 +308,7 @@ function Studio.bridge(options: Options): Smoke.Bridge
 				path,
 			})
 			pid = launched
-			windowId = nil
+			windowId, windowPixels = nil, nil
 			ctx.log(`launched Studio (pid {launched}) on {path}`)
 
 			-- What the last probe of a new Studio answered, for the failure.
@@ -319,33 +363,26 @@ function Studio.bridge(options: Options): Smoke.Bridge
 				return { "-x", "-o", "-l", tostring(windowId), path }
 			end
 			if not system.exec("screencapture", arguments()).ok then
-				windowId = lookUp()
+				windowId, windowPixels = lookUp(), nil
 				exec("screencapture", arguments())
 			end
 			if not system.isFile(path) then
 				error("screencapture wrote no image; does the runner have Screen Recording permission?", 0)
 			end
+			if not windowPixels then
+				local size = exec("sips", { "-g", "pixelWidth", "-g", "pixelHeight", path })
+				local width, height = string.match(size, "pixelWidth: (%d+)%s+pixelHeight: (%d+)")
+				windowPixels = `{width or "?"}x{height or "?"}`
+			end
 			local middle = `{path}.middle.bmp`
 			exec("sips", { "-c", LUMINANCE_SQUARE, LUMINANCE_SQUARE, "-s", "format", "bmp", path, "--out", middle })
 			local luminance = Bmp.luminance(ctx.readFile(middle) or error("sips wrote no image", 0))
 			system.removeFile(middle)
-			return luminance
+			return { luminance = luminance, pixels = windowPixels :: string }
 		end,
 
 		setDevice = function(device)
-			local lines = { 'local s = game:GetService("StudioDeviceSimulatorService")' }
-			if device then
-				local orientation = if device.orientation == "Portrait" then "Portrait" else "LandscapeRight"
-				table.insert(lines, `s:SetDeviceAsync({string.format("%q", device.simulator)})`)
-				table.insert(lines, `s:SetOrientationAsync(Enum.ScreenOrientation.{orientation})`)
-				-- The whole device in the viewport: at physical size a tablet
-				-- overflows Studio's window and only part of it is captured.
-				table.insert(lines, "s:SetScalingModeAsync(Enum.DeviceSimulatorScalingMode.FitToWindow)")
-			else
-				table.insert(lines, "pcall(s.StopSimulationAsync, s) -- it raises when no device is active")
-			end
-			table.insert(lines, "return true")
-			run("Edit", table.concat(lines, "\n"))
+			return serde.decode("json", run("Edit", Studio.deviceScript(device)))
 		end,
 
 		press = function(key)
@@ -359,16 +396,14 @@ function Studio.bridge(options: Options): Smoke.Bridge
 			tool("character_navigation", { datamodel_type = "Client", x = position.x, y = position.y, z = position.z })
 		end,
 
-		insertAsset = function(assetId)
+		insertAsset = function(assetId, parentPath)
 			local result = serde.decode(
 				"json",
-				tool("insert_asset", { assetId = assetId, assetType = "Model", parentPath = "game.ServerStorage" })
+				tool("insert_asset", { assetId = assetId, assetType = "Model", parentPath = parentPath })
 			)
-			local inserted = result.insertedInstances and result.insertedInstances[1]
-			if result.status ~= "success" or not inserted then
+			if result.status ~= "success" then
 				error(`Studio did not insert asset {assetId}: {serde.encode("json", result)}`, 0)
 			end
-			return inserted.fullPath
 		end,
 
 		close = function()

@@ -88,12 +88,17 @@ is the isolation**.
 
 **What a pull request's Luau can do inside Studio.** The smoke job plays
 the place CI built from `main`, so only merged code runs. The playtest
-plays a pull request's place when the owner (or anyone with write access)
-gives it the `needs-playtest` label: that place's scripts run in Studio in
+plays a pull request's place when the owner gives it the
+`needs-playtest` label: that place's scripts run in Studio in
 the guest with everything in the table above. The place does not enable `HttpService`, and a place file
 can enable it for itself, in which case its scripts can make HTTP requests
 to the internet from the guest (not to the home network, under Softnet).
 That is why the label is the owner's to give after reading the diff.
+`playtest-label.yml` dispatches only when the label's sender is the
+repository owner (`github.actor`), so another account with write access
+labels in vain. The check cannot tell the owner from a session acting with
+the owner's own GitHub token, which is how the agent sessions here post
+reviews, so agents never apply the label: it is a rule, not only a check.
 
 **What persists between jobs:** everything in the guest: the runner's
 `_work` directory (checkouts, downloaded place files, screenshots), the
@@ -308,22 +313,44 @@ against a scripted fake client:
   faded in, and each Scene the first time Amy stands in one of its Zones
   with nothing over the view. Screenshots are
   `<out>/<device>/<nn>-<shot|card|scene>-<name>.png`.
-- **Failing** when the Story stops changing for 60 seconds, takes over 10
-  minutes, or a capture is black or nearly white, with what was on
-  screen. A failed device is reported and the next one still plays.
+- **Failing** when the Story stops changing for 60 seconds (Amy moving or
+  a Line still being written counts as change), takes over 10 minutes,
+  reaches a Quest kind it cannot play (only reach and talk today), or a
+  capture is black or nearly white, with what was on screen. A failed
+  device is reported and the next one still plays, with two exceptions:
+  when the Story does not end on `pc` the rest are skipped (it will not
+  end on a phone either), and when Stop Play fails the rest are skipped
+  (they would play in a session still in Play).
+- **Checking the device.** After setting the simulator the bridge reads
+  it back (`Studio.deviceScript`), and a device, orientation or scaling
+  that did not take fails that device before Play; with no device active
+  Studio names the device `"default"`. Once playing, the client's viewport
+  must match the simulated device's size in points (within 2% on its
+  short side). At the end the simulator is stopped again, and the smoke
+  run checks no device is simulated before it plays.
+- **Within the job's time.** The run has a 45-minute budget, Studio's
+  start included, inside the job's 60 minutes: no device starts with
+  under 5 minutes of it left (those are reported as skipped), and a
+  device's 10 minutes shrink to what is left. `report.json` is written
+  after every device with `"finished": false`, so a job cut short still
+  uploads what it played, and the summary says it stopped before the end.
 
 The devices, one Play each, in order: `pc` (no simulation),
 `phone-landscape` and `phone-portrait` (Studio's `iphone_16` preset, 852
 x 393 units, the 6-inch phone of `feel.md`), `tablet-landscape` and
 `tablet-portrait` (`ipad_10th_generation`, 1180 x 820). `report.json`
-holds, per device, pass or fail, the seconds, the viewport and orientation
-the client actually played in, each Quest as it became active and each
-capture with its luminance; and the Studio version against
-`studio-version.txt`.
+holds, per device, pass, fail or skipped, the seconds, what the simulator
+reported (preset, orientation, scaling, size), the viewport and
+orientation the client actually played in, any warning (portrait played
+as landscape), each Quest as it became active and each capture with its
+luminance and pixel size; and the Studio version against
+`studio-version.txt`. The job summary shows the same, warnings included.
 
 Run in the VM on 2026-10-15 (Studio 0.743.0.7431133), the place built from
 `main` at 3debd6b plus this branch: every device passed, 13 Quests and 22
-screenshots each, 936 s in all.
+screenshots each, 936 s in all. After the review's fixes (the device read
+back and checked, the budget), `pc`, `phone-portrait` and
+`tablet-landscape` passed again in 521 s, 170 s each.
 
 | Device | Seconds | The client played at |
 |---|---|---|
@@ -351,6 +378,16 @@ Limits today:
   rule) and the baseline diffs are not part of it yet;
   `tests/studio/CameraRule.client.luau` and `DeviceLayout.client.luau` are
   the assertions to run inside it next.
+- A Shot is captured 0.8 s after it was framed, not when the camera has
+  settled, so a Shot queued behind another in the same step, or one that
+  eases for longer, can be captured early, without failing. The recorder
+  could log when the camera settles a Shot and the capture wait on that.
+- A Chapter card shows for 2.4 s and a capture or a walk can cover it;
+  nothing checks every Chapter's card was taken. A Scene entry is Amy
+  standing in one of the Scene's Zones, so a Scene without Zones (Village,
+  Paradise) is never captured. A count against the Story's Chapters and a
+  signal from the Scene change itself would close both.
+- Phone runs press E like a PC, so touch input is not exercised yet.
 
 ## Device emulation: scripted (spike, mac-002)
 
@@ -407,9 +444,14 @@ lune run tools/studio-playtest/fetch-model --asset 12549617200 --name prop:low_p
 
 `fetch-model.luau` runs on the Mac (in the guest, or on any Mac with Studio
 signed in and its MCP server enabled). It refuses a model that is not free
-or that carries any script (free models' scripts are the usual way malware
-reaches a game), saves the `.rbxm` and prints the manifest entry
-(`docs/ASSETS.md`). The `.rbxm` holds the parts; a MeshPart's mesh stays on
+(off sale counts as not free) or that carries any script, the model's own
+root included (free models' scripts are the usual way malware reaches a
+game; anything that `IsA("LuaSourceContainer")` counts), saves the
+`.rbxm` and prints the manifest entry (`docs/ASSETS.md`). The model's
+name is its creator's choice, so it never becomes Luau: the tool inserts
+into a folder in ServerStorage that it names itself, and its scripts find
+the model as that folder's one child. Fetching the tree again this way on
+2026-10-15 gave the same parts and size as the committed file. The `.rbxm` holds the parts; a MeshPart's mesh stays on
 Roblox under the creator's asset id (the tree references 12545269850 and
 12545267056), so the model works in any game but its meshes are not ours
 to re-upload. `prop:low_poly_tree` is in the manifest from this spike and

@@ -66,7 +66,7 @@ local function fakeMac(machine: { [string]: any }?)
 								0
 							)
 						end
-						return "true"
+						return if m.answer then m.answer(arguments.code) else "true"
 					end
 					return ""
 				end,
@@ -120,6 +120,27 @@ return function(t: any)
 			t.expectError(function()
 				bridge.open("build/Place.rbxl")
 			end, "Studio did not open the place: execute_luau: Target is not reachable")
+		end)
+
+		t.it("reads the device simulator back after setting or stopping it", function()
+			local bridge = fakeMac({
+				answer = function(code: string)
+					return if string.find(code, "SetDeviceAsync", 1, true)
+						then '{"device":"iphone_16","orientation":"LandscapeRight","scaling":"FitToWindow","width":852,"height":393}'
+						elseif string.find(code, "StopSimulationAsync", 1, true) then "null"
+						else "true"
+				end,
+			})
+			bridge.open("build/Place.rbxl")
+			local simulation = bridge.setDevice({ simulator = "iphone_16", orientation = "Landscape" })
+			t.expect(simulation).toEqual({
+				device = "iphone_16",
+				orientation = "LandscapeRight",
+				scaling = "FitToWindow",
+				width = 852,
+				height = 393,
+			})
+			t.expect(bridge.setDevice(nil)).toBeNil()
 		end)
 
 		t.it("ends only the Studio it launched", function()

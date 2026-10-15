@@ -38,6 +38,9 @@ Cli.main(function(ctx)
 		outDir = out,
 		devices = devices,
 		pinnedStudioVersion = Studio.pinnedVersion(),
+		progress = function(sofar)
+			Studio.writeReport(ctx, out, sofar)
+		end,
 		clock = os.clock,
 		sleep = ctx.sleep,
 		log = ctx.log,

@@ -30,17 +30,7 @@ Cli.main(function(ctx)
 	local bridge = Studio.bridge({ ctx = ctx })
 	local ok, err = pcall(function()
 		bridge.open(values.place or "build/AmyAndTheRainforest.rbxl")
-		local path = bridge.insertAsset(assetId)
-		-- A path with spaces in a name: index it as a string.
-		local parent, leaf = string.match(path, "^(.*)%.([^%.]+)$")
-		local expression = `{parent}[{string.format("%q", leaf :: string)}]`
-		local described: Fetch.Described =
-			serde.decode("json", bridge.run("Edit", Fetch.describeScript(expression, assetId)))
-		local refusal = Fetch.refusal(described)
-		if refusal then
-			error(refusal, 0)
-		end
-		local bytes = Fetch.base64Decode(bridge.run("Edit", Fetch.serialiseScript(expression)))
+		local described, bytes = Fetch.fetch(bridge, assetId, Fetch.folderName(assetId, os.time()))
 		ctx.writeFile(out, bytes)
 		ctx.log(`saved {out} ({#bytes} bytes): {described.name} by {described.creator}`)
 		local entry = Fetch.entry(name, out, assetId, described, os.date("!%Y-%m-%d") :: string)
