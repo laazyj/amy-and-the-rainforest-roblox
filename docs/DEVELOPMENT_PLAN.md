@@ -487,9 +487,11 @@ Design notes:
   (2.3). `docs/OPEN_CLOUD.md` states the exact guarantee and the key
   permission the cleanup needs.
 - **Tier 3 is never on the critical path for PRs**, but it is for releases.
-  On PRs the Studio job uses `continue-on-error`, a 30-minute queue timeout,
-  and reports "skipped: runner offline". The release workflow refuses to
-  promote a build that has no tier 3 result.
+  On a PR the Studio job runs only when the PR is labelled
+  `needs-playtest`, as a separate dispatched run that uses
+  `continue-on-error` and never gates the PR; while the Mac is asleep it
+  waits in GitHub's queue (up to 24 hours) rather than skipping. The
+  release workflow refuses to promote a build that has no tier 3 result.
 - **Screenshots are review material and agent feedback.** Tier 3 uploads a
   contact sheet to the PR. For perceptual tasks the agent reads it and
   iterates against the per-scene checklist in `docs/design/feel.md`.
@@ -544,7 +546,11 @@ Design notes:
   Images come from macOS `screencapture`.
 - Studio auto-updates weekly and can break automation. The Mac job pins
   and reports the Studio version; "Studio version drift" is a tracked risk.
-- When the Mac is closed or off, PR jobs queue up to 30 minutes then skip.
+- When the Mac is closed or off, a dispatched Mac job waits in GitHub's
+  queue for up to 24 hours. The `needs-playtest` label reaches the Mac
+  through `playtest-label.yml`, which runs on GitHub's runners and
+  dispatches `studio-playtest.yml` on `main` with the PR's number, so the
+  Mac runs only `main`'s workflow files (brief mac-002).
 
 ### Autonomous visual testing on the Mac
 
@@ -610,11 +616,13 @@ repeats, and you see the result once.
 - Capture uses macOS `screencapture` of the Studio viewport rectangle
   driven through the Studio MCP server; in-engine `CaptureService` is
   not relied on because it is unreliable in Studio.
-- Device classes are emulated with Studio's device emulation; whether it
-  can be switched from a script is a Phase 1 spike. The fallback is
-  resizing the Studio window to each device's aspect ratio by AppleScript,
-  which tests layout but not DPI; DPI-dependent text checks then use the
-  emulated scale factor from `feel.md`.
+- Device classes are emulated with Studio's device simulator, switched
+  from a script (decided by brief mac-002's spike: the MCP server reaches
+  `StudioDeviceSimulatorService` in Edit, so each device and orientation
+  is set before its own Play; the evidence is in `docs/MAC_RUNNER.md`,
+  "Device emulation"). The simulator emulates the device's resolution and
+  density, so DPI-dependent checks use the device's own units and no
+  AppleScript window resizing is needed.
 - A full visual pass takes 5 to 10 minutes, so the agent batches scene
   changes and runs it per batch, not per edit.
 - Baselines change deliberately: a PR that changes a baseline shows the
@@ -703,13 +711,19 @@ choice.
 
 ### 5.5 Sourcing free Creator Store assets from Linux
 
-There is no Open Cloud endpoint to download a Creator Store model. Phase 0
-spikes two paths and records the winner here:
+There is no Open Cloud endpoint to download a Creator Store model. Two
+paths were spiked (brief mac-002, 2026-10-14); **(b) won**:
 
 - (a) A Luau Execution task calls `InsertService:LoadAsset(id)`, serialises
   the result with `SerializationService`, and returns it for CI to write to
-  `assets/meshes/`, chunked if the return-size limit requires it.
-- (b) The Mac runner's Studio MCP `insert_model` plus save-to-`.rbxm`.
+  `assets/meshes/`. **Fails:** "User is not authorized to access Asset"; a
+  game server loads only assets its owner owns.
+- (b) Studio on the Mac: the MCP server's `insert_asset`, then
+  `SerializationService` to a binary `.rbxm`. **Works**, in about a second;
+  `tools/studio-playtest/fetch-model.luau` does it, refuses a model that
+  carries scripts or is not free, and prints the manifest entry. A
+  MeshPart's mesh stays on Roblox under its creator's asset id. Evidence
+  in `docs/MAC_RUNNER.md`, "Fetching Creator Store models".
 
 Either way the manifest records asset id, creator, licence and moderation
 status, and tier 0 fails on any `rbxassetid://` not in the manifest.

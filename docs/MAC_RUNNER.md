@@ -21,8 +21,10 @@ screen saver and lock settings are never touched, by script or by hand.
 | `tools/mac/setup.sh` | in the guest | `studio` installs Roblox Studio; `runner` installs the pinned runner (SHA-256 checked), registers it and installs its launchd agent. Refuses to run as root, and refuses to run outside a virtual machine. |
 | `tools/mac/check-repo.sh` | on the host, as the owner | Fails unless fork pull requests need approval for all external contributors, the `studio` environment allows `main` only, and no workflow with a job on a self-hosted runner starts from a pull request. |
 | `tools/lib/mac-workflows.luau` | in tier 0 (`tools/check.sh`), on every PR | The workflow half of that check: a job on anything but a GitHub-hosted runner must use `environment: studio`, and its workflow may start only from `workflow_dispatch`, `schedule` or a `push` to `main`. |
-| `tools/studio-playtest/` | in the guest, by the job | The wrapper: opens a place file in Studio, starts Play, runs a script, captures the Studio window, stops Play, quits Studio, writes `viewport.png` and `report.json`. |
-| `.github/workflows/studio-smoke.yml` | started by hand | The proof that all of the above works from the cloud. |
+| `tools/studio-playtest/` | in the guest, by the job | The bridge to Studio and what runs on it: `run.luau`, the smoke run (open a place, Play, run a script, capture, quit); `play.luau`, the playthrough (the Story from a fresh Save to the end card per device, a screenshot at every Shot, Chapter card and Scene entry); `fetch-model.luau`, a free Creator Store model saved as `.rbxm`. |
+| `.github/workflows/studio-smoke.yml` | started by hand | The proof that the runner and the bridge work, from the cloud. |
+| `.github/workflows/studio-playtest.yml` | started by hand, or by the `needs-playtest` label | The tier 3 playthrough of `main`'s place, or of a pull request's CI-built place. |
+| `.github/workflows/playtest-label.yml` | on GitHub's runners, when a pull request gets `needs-playtest` | Dispatches `studio-playtest.yml` on `main` with the pull request's number. Never runs on the Mac. |
 
 ## The rules for every job on the Mac
 
@@ -33,8 +35,11 @@ The repository is public, so these hold for every workflow that targets
   `needs-playtest` label. Never from a plain pull request event.
   Tier 0 and `tools/mac/check-repo.sh` fail on any other trigger,
   `pull_request`, `pull_request_target` and `workflow_call` among them,
-  and on a `push` to any branch but `main`; the label trigger will need
-  the rule widened, deliberately, in mac-002.
+  and on a `push` to any branch but `main`. The label needs no exception:
+  a label event runs the pull request's own copy of a workflow, so
+  `playtest-label.yml` runs on GitHub's runners and only dispatches
+  `studio-playtest.yml` on `main` with the pull request's number, and the
+  Mac runs `main`'s file on CI's build of the pull request.
 - Every Mac job has `environment: studio`, and the `studio` environment
   allows deployments from `main` only (Settings → Environments → studio →
   Deployment branches and tags → Selected branches and tags → `main`; no
@@ -44,6 +49,22 @@ The repository is public, so these hold for every workflow that targets
   the job before a step runs ("Branch … is not allowed to deploy to
   studio"). Tier 0 requires the environment on every self-hosted job;
   `check-repo.sh` checks the environment's policy.
+- The `studio` environment has the owner as its required reviewer, with
+  self-review allowed (Settings → Environments → studio → Required
+  reviewers; "Prevent self-review" off). Every Mac job waits, before its
+  runner is even assigned, until the owner approves it under the run's
+  "Review deployments". Why: the playtest runs a pull request's place,
+  whose scripts run in Studio in the guest, and nothing else stops
+  someone with write access dispatching it for any pull request, nor an
+  agent session, which acts with the owner's own GitHub account. The
+  approval is the moment the owner has read the diff. Self-review is
+  allowed because the owner is the only reviewer: with it prevented,
+  GitHub refuses the owner's approval of the runs the owner starts (a
+  manual dispatch, the push of a merge to `main`), and they never run.
+  It costs a click per job, the smoke run after each merge included. A
+  session holding the owner's token can approve through GitHub's API as
+  the owner can, so agents never approve a deployment to `studio`, just
+  as they never merge (brief mac-001a, decision 3).
 - The environment only gates jobs that declare it, and tier 0 runs after
   the fact, so the runner enforces the rule itself: its job-started hook
   (`~/actions-runner-studio/job-started.sh` in the guest, installed by
@@ -52,7 +73,8 @@ The repository is public, so these hold for every workflow that targets
   not `workflow_dispatch`, `push` or `schedule`, before any step runs.
   Tested live with a throwaway branch whose workflow targeted the runner
   without the environment: "this runner runs only workflow files from
-  main". mac-002's label trigger needs this hook widened too.
+  main". The label route above passes it unchanged: the Mac job it
+  starts is a `workflow_dispatch` on `main`.
 - It checks out the tools from `main` (`ref: main`) and acts on the built
   `place` artifact. It never checks out or runs a pull request's source.
 - `permissions: contents: read, actions: read`, no secrets, a
@@ -80,14 +102,21 @@ is the isolation**.
 | An Open Cloud key | **No.** There is none in the guest. Studio only opens local place files; saves stay a tier 2 concern. |
 | A GitHub token | The job's own short-lived token, read-only, for the length of the job. The guest's `gh` is not logged in. |
 
-**What a pull request's Luau can do inside Studio.** Today the smoke job
-plays the place CI built from `main`, so only merged code runs. When a job
-plays a pull request's place (mac-002, on the owner's `needs-playtest`
-label), that place's scripts run in Studio in the guest with everything in
-the table above. The place does not enable `HttpService`, and a place file
+**What a pull request's Luau can do inside Studio.** The smoke job plays
+the place CI built from `main`, so only merged code runs. The playtest
+plays a pull request's place when the owner gives it the
+`needs-playtest` label: that place's scripts run in Studio in
+the guest with everything in the table above. The place does not enable `HttpService`, and a place file
 can enable it for itself, in which case its scripts can make HTTP requests
 to the internet from the guest (not to the home network, under Softnet).
 That is why the label is the owner's to give after reading the diff.
+`playtest-label.yml` dispatches only when the label's sender is the
+repository owner (`github.actor`), so another account with write access
+labels in vain. The check cannot tell the owner from a session acting with
+the owner's own GitHub token, which is how the agent sessions here post
+reviews, so agents never apply the label. The gate is the `studio`
+environment's required reviewer (see the rules above): however the
+playtest was started, it waits for the owner's approval.
 
 **What persists between jobs:** everything in the guest: the runner's
 `_work` directory (checkouts, downloaded place files, screenshots), the
@@ -245,7 +274,8 @@ luminance of the middle of the screenshot. A run fails when that luminance
 is under 0.03: Studio ran and rendered nothing. Only a black viewport is
 caught: a light panel over the viewport (Studio's start page, an update
 dialog) passes the floor, so read the screenshot when a run looks wrong.
-mac-002 adds a second check. Every command the bridge runs (`plutil`,
+The playthrough also fails a capture that is nearly white there (over
+0.85). Every command the bridge runs (`plutil`,
 `osascript`, `screencapture`, `sips`) is killed after 30 seconds.
 
 It fails within seconds, with the reason, when:
@@ -271,6 +301,182 @@ Two things about Studio that the wrapper works around:
 
 It only ever ends the Studio it launched, so it is safe on a Mac where
 another Studio is open.
+
+## The playthrough
+
+```sh
+lune run tools/studio-playtest/play --file build/AmyAndTheRainforest.rbxl --out build/studio-playtest [--devices pc,phone-portrait]
+```
+
+It plays the Story on a real client in Studio, from a fresh Save (Studio
+has no DataStores, so every Play is a new player) to the end card, as a
+player would. `playthrough.luau` is the sequence, pure and unit-tested
+against a scripted fake client:
+
+- **Looking.** At every step a script on the client (`Playthrough.observeScript`)
+  reports what is on screen: a Dialogue, a Chapter card and whether it
+  has faded in, the Objective, Amy's position, and the Shots framed so
+  far, which a recorder installed at the start of Play
+  (`INSTALL_SCRIPT`) collects from `FrameShot`. The active Quest is the
+  one whose Objective is on screen; its Zone or Character comes from the
+  place's own content, so a pull request's Story is played as that pull
+  request has it.
+- **Acting,** through the input a player has: **E** advances a Dialogue
+  and presses a talk prompt (Studio's MCP `user_keyboard_input`), and the
+  Player Character walks to a Quest's Zone, or to beside its Character,
+  with Studio's MCP `character_navigation`. A card is left to hold and
+  fade, and a talk prompt that is not offered yet is waited for.
+- **Capturing,** before anything moves on: each Shot once it has eased
+  in (0.8 s after it was framed), each Chapter card and the end card once
+  faded in, and each Scene the first time Amy stands in one of its Zones
+  with nothing over the view. Screenshots are
+  `<out>/<device>/<nn>-<shot|card|scene>-<name>.png`.
+- **Failing** when the Story stops changing for 60 seconds (Amy moving or
+  a Line still being written counts as change), takes over 10 minutes,
+  reaches a Quest kind it cannot play (only reach and talk today), or a
+  capture is black or nearly white, with what was on screen. A failed
+  device is reported and the next one still plays, with two exceptions:
+  when the Story does not end on `pc` the rest are skipped (it will not
+  end on a phone either), and when Stop Play fails the rest are skipped
+  (they would play in a session still in Play).
+- **Checking the device.** After setting the simulator the bridge reads
+  it back (`Studio.deviceScript`), and a device, orientation or scaling
+  that did not take fails that device before Play; with no device active
+  Studio names the device `"default"`. Once playing, the client's viewport
+  must match the simulated device's size in points (within 2% on its
+  short side). At the end the simulator is stopped again, and the smoke
+  run checks no device is simulated before it plays.
+- **Within the job's time.** The run has a 45-minute budget, Studio's
+  start included, inside the job's 60 minutes: no device starts with
+  under 7 minutes of it left (those are reported as skipped), and a
+  device's 10 minutes shrink to what is left less a 3-minute teardown
+  reserve, for the step in progress, Stop Play and stopping the simulator
+  when Studio is slow. A report that cannot be written is logged and the
+  run still stops Play and quits Studio. `report.json` is written
+  after every device with `"finished": false`, so a job cut short still
+  uploads what it played, and the summary says it stopped before the end.
+
+The devices, one Play each, in order: `pc` (no simulation),
+`phone-landscape` and `phone-portrait` (Studio's `iphone_16` preset, 852
+x 393 units, the 6-inch phone of `feel.md`), `tablet-landscape` and
+`tablet-portrait` (`ipad_10th_generation`, 1180 x 820). `report.json`
+holds, per device, pass, fail or skipped, the seconds, what the simulator
+reported (preset, orientation, scaling, size), the viewport and
+orientation the client actually played in, any warning (portrait played
+as landscape), each Quest as it became active and each capture with its
+luminance and pixel size; and the Studio version against
+`studio-version.txt`. The job summary shows the same, warnings included.
+
+Run in the VM on 2026-10-15 (Studio 0.743.0.7431133), the place built from
+`main` at 3debd6b plus this branch: every device passed, 13 Quests and 22
+screenshots each, 936 s in all. After the review's fixes (the device read
+back and checked, the budget), `pc`, `phone-portrait` and
+`tablet-landscape` passed again in 521 s, 170 s each.
+
+| Device | Seconds | The client played at |
+|---|---|---|
+| `pc` | 231 | 541 x 414 (Studio's viewport) |
+| `phone-landscape` | 189 | 733 x 392, landscape |
+| `phone-portrait` | 168 | 733 x 392, landscape (see "Device emulation") |
+| `tablet-landscape` | 169 | 1178 x 819, landscape |
+| `tablet-portrait` | 170 | 1178 x 819, landscape |
+
+Studio updated itself in the guest overnight, from 0.742.0.7421053 to
+0.743.0.7431133, between two runs: the first launch after it failed at
+once with "Studio exited while starting", the installer took about 15
+minutes in the guest, and the bridge then passed unchanged, so
+`studio-version.txt` moved to 0.743.0.7431133 and the VM was sealed again.
+
+Limits today:
+
+- Studio's window in the guest is about 1024 x 680 points with its panels
+  open, so the game's viewport is about half of each screenshot (on a
+  simulated device, smaller again). A larger guest display, or the panels
+  closed, is the next improvement.
+- Roblox's own player name panel (`roblox_ci1234`) sits in the top right of
+  the viewport in every frame.
+- Level 1 assertions (plan section 4: text fits, safe areas, the camera
+  rule) and the baseline diffs are not part of it yet;
+  `tests/studio/CameraRule.client.luau` and `DeviceLayout.client.luau` are
+  the assertions to run inside it next.
+- A Shot is captured 0.8 s after it was framed, not when the camera has
+  settled, so a Shot queued behind another in the same step, or one that
+  eases for longer, can be captured early, without failing. The recorder
+  could log when the camera settles a Shot and the capture wait on that.
+- A Chapter card shows for 2.4 s and a capture or a walk can cover it;
+  nothing checks every Chapter's card was taken. A Scene entry is Amy
+  standing in one of the Scene's Zones, so a Scene without Zones (Village,
+  Paradise) is never captured. A count against the Story's Chapters and a
+  signal from the Scene change itself would close both.
+- Phone runs press E like a PC, so touch input is not exercised yet.
+
+## Device emulation: scripted (spike, mac-002)
+
+**Decided: Studio's device simulator can be switched from a script.** The
+MCP server's `execute_luau` reaches `StudioDeviceSimulatorService` in the
+Edit DataModel: `GetDeviceListAsync` lists Studio's presets (phones such
+as `iphone_16`, tablets such as `ipad_10th_generation`), `SetDeviceAsync`
+and `SetOrientationAsync` choose one, and `StopSimulationAsync` returns to
+a PC. Set before Play, the client starts as that device: on `iphone_16`
+it reported touch input and Studio's device frame showed in the capture.
+The bridge sets the scaling mode to `FitToWindow`: at Studio's default,
+`ScaleToPhysicalSize`, a tablet is larger than the guest's viewport and
+only part of its screen is captured.
+The setting can only change in Edit ("Edit datamodel is not available in
+Play mode"), so each device and orientation is its own Play. The older
+`StudioDeviceEmulatorService` is not reachable from the MCP server.
+
+**Portrait does not play today, because the game holds itself to
+landscape.** The place's `StarterGui.ScreenOrientation` is Roblox's
+default, `LandscapeSensor`, and the simulator honours it as a real phone
+would: asked for a portrait `iphone_16`, the client plays
+`LandscapeRight`. So the `phone-portrait` and `tablet-portrait` runs play
+landscape, and `report.json` records each device's actual viewport and
+orientation, with a warning when portrait was asked for. `feel.md` says
+the phone and tablet work in portrait too; making the game allow it
+(`StarterGui.ScreenOrientation` set to `Sensor`) is a game change for a
+later brief, after which these runs test portrait with no change here.
+
+So no AppleScript window resizing is needed, and DPI-dependent checks can
+use the simulated device's own units: the simulator emulates the device's
+resolution and density, and `feel.md`'s physical sizes apply to it as
+written. The real phone and tablet check (release checklist) still
+confirms them.
+
+## Fetching Creator Store models: Studio wins (spike, mac-002)
+
+There is no Open Cloud endpoint to download a Creator Store model (plan
+section 5.5). Both paths were tried on 2026-10-14 with the same free model,
+"Low Poly Tree" (asset 12549617200, by Remadex Development):
+
+- **(a) Luau Execution:** a task calling `InsertService:LoadAsset` in CI's
+  engine-tests job (with the Dev key; draft PR #50's temporary test)
+  failed with "User is not authorized to access Asset". A game server may
+  load only assets its owner owns, so this path cannot fetch other
+  creators' free models.
+- **(b) Studio on the Mac:** the MCP server's `insert_asset` inserted it in
+  about a second, `SerializationService:SerializeInstancesAsync` turned it
+  into a 14,562-byte binary `.rbxm`, and Lune reads the file back. **This
+  is the path.**
+
+```sh
+lune run tools/studio-playtest/fetch-model --asset 12549617200 --name prop:low_poly_tree --out assets/meshes/low-poly-tree.rbxm
+```
+
+`fetch-model.luau` runs on the Mac (in the guest, or on any Mac with Studio
+signed in and its MCP server enabled). It refuses a model that is not free
+(off sale counts as not free) or that carries any script, the model's own
+root included (free models' scripts are the usual way malware reaches a
+game; anything that `IsA("LuaSourceContainer")` counts), saves the
+`.rbxm` and prints the manifest entry (`docs/ASSETS.md`). The model's
+name is its creator's choice, so it never becomes Luau: the tool inserts
+into a folder in ServerStorage that it names itself, and its scripts find
+the model as that folder's one child. Fetching the tree again this way on
+2026-10-15 gave the same parts and size as the committed file. The `.rbxm` holds the parts; a MeshPart's mesh stays on
+Roblox under the creator's asset id (the tree references 12545269850 and
+12545267056), so the model works in any game but its meshes are not ours
+to re-upload. `prop:low_poly_tree` is in the manifest from this spike and
+not yet used by the game.
 
 ## The spike: does Studio run and render inside the VM?
 

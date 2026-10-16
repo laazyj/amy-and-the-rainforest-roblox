@@ -206,24 +206,45 @@ says so plainly.
    under the test prefix). The plan's "Studio DataStore access on Dev" is
    for the owner's own playtests in the owner's account and now says so.
    mac-002's Creator Store insertion uses the runner's account too.
-3. **No per-run approval gate, but a `studio` environment limited to
-   `main`** (amended in the review of PR #47). Isolation comes from
-   structure, not a click: Must 7. Fork workflow runs need approval for
-   all outside collaborators, and a job never runs pull-request code. The
-   amendment: `workflow_dispatch` runs the workflow file of the branch it
-   is dispatched on, and a `push` runs the pushed commit's file, so any
-   session with write access could run a changed copy of a Mac workflow
-   from its own branch; `ref: main` on the checkout does not help, since
-   the steps come from the branch. So every Mac job uses
+3. **A `studio` environment limited to `main`, with the owner as its
+   required reviewer and self-review allowed** (amended in the review of
+   PR #47, and again on 2026-10-16 in the review of PR #50). Isolation
+   comes from structure first: Must 7. Fork workflow runs need approval
+   for all outside collaborators, and a job never runs pull-request code.
+   The first amendment: `workflow_dispatch` runs the workflow file of the
+   branch it is dispatched on, and a `push` runs the pushed commit's file,
+   so any session with write access could run a changed copy of a Mac
+   workflow from its own branch; `ref: main` on the checkout does not
+   help, since the steps come from the branch. So every Mac job uses
    `environment: studio`, and the owner creates that environment with
-   deployment branches limited to `main` (no secrets in it; a required
-   reviewer stays optional). GitHub then refuses a job from any other
-   branch before a step runs. Tier 0 requires the environment on every
-   self-hosted job and `check-repo.sh` checks the environment's policy.
-   Because the environment gates only jobs that declare it, the runner
-   also refuses, in a job-started hook, any job whose workflow file is not
-   on `main` or whose event is not `workflow_dispatch`, `push` or
-   `schedule`.
+   deployment branches limited to `main` (no secrets in it). GitHub then
+   refuses a job from any other branch before a step runs. Tier 0
+   requires the environment on every self-hosted job and `check-repo.sh`
+   checks the environment's policy. Because the environment gates only
+   jobs that declare it, the runner also refuses, in a job-started hook,
+   any job whose workflow file is not on `main` or whose event is not
+   `workflow_dispatch`, `push` or `schedule`.
+   The second amendment, a per-run approval after all: mac-002's playtest
+   plays a pull request's CI-built place, whose scripts run in Studio in
+   the guest, and the rule that only the owner sends a pull request there
+   could not be enforced. Anyone with write access can dispatch
+   `studio-playtest.yml` on `main` with any pull request's number, and
+   the agent sessions act with the owner's own GitHub account, so
+   `playtest-label.yml`'s check that the owner applied the label stops
+   other accounts but not an agent. So the `studio` environment has the
+   owner as its required reviewer: every Mac job waits until the owner
+   approves it in GitHub's interface, which makes "after reading the
+   diff" a gate rather than a rule. It costs one click per job, the smoke
+   run after each merge to `main` included, and a job nobody approves
+   waits (GitHub gives up after 30 days). Self-review is allowed because
+   the owner is the only reviewer: with "Prevent self-review" on, GitHub
+   would refuse the owner's approval of any run the owner started (a
+   manual dispatch, the push of a merge), and those jobs could never run.
+   What the approval cannot stop: a session holding the owner's token
+   can approve a waiting job through GitHub's API exactly as the owner
+   can, so agents never approve a deployment to `studio`, as they never
+   merge.
+
 4. **This brief replaces mac-001.** mac-001 stays in the repository marked
    superseded; its row is gone from the table; mac-002 follows mac-001a.
    The working code on the local branch `mac-001-runner-bootstrap` (the

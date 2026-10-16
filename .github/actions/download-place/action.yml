@@ -1,0 +1,45 @@
+# Downloads the `place` artifact of CI's latest successful run, for main or
+# for one pull request, into build/place. The Mac jobs play this file and
+# never build or check out a pull request's code (docs/MAC_RUNNER.md).
+name: Download the place
+description: Download CI's place artifact for main or a pull request into build/place.
+
+inputs:
+  pr:
+    description: "A pull request number; empty for main."
+    required: false
+    default: ""
+  token:
+    description: "A token with actions: read."
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Download the place artifact
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        PR: ${{ inputs.pr }}
+      run: |
+        if [ -z "$PR" ]; then
+          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --event push \
+            --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          source="main"
+        else
+          case "$PR" in
+          *[!0-9]*) echo "::error::pr must be a pull request number, not '$PR'"; exit 1 ;;
+          esac
+          # CI's latest successful run for the pull request (a fork's runs
+          # carry no pull request, and forks never reach the Mac).
+          run_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?event=pull_request&status=success&per_page=100" \
+            --jq "[.workflow_runs[] | select(any(.pull_requests[]; .number == $PR))][0].id")
+          source="pull request #$PR"
+        fi
+        if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
+          echo "::error::no successful CI run for $source to take the place artifact from"
+          exit 1
+        fi
+        rm -rf build/place
+        gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name place --dir build/place
+        echo "Place file from CI run $run_id ($source)" >> "$GITHUB_STEP_SUMMARY"

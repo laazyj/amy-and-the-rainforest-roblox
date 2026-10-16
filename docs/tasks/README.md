@@ -42,4 +42,4 @@ Rules every build session follows, regardless of brief:
 | 019 Title lettering: Dancing Script through the manifest | Phase 1 | done (#46); the owner confirms the look on Dev, phone included |
 | mac-001 Runner bootstrap | Phase 1 | superseded by mac-001a |
 | mac-001a Runner in an isolated virtual machine | Phase 1 | done (#47) |
-| mac-002 Studio bridge, emulation and asset spikes | Phase 1 | ready: run on the MacBook |
+| mac-002 Studio bridge, emulation and asset spikes | Phase 1 | done (#50) |
