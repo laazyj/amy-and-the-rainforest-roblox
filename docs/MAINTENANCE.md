@@ -63,9 +63,15 @@ start CI by closing and reopening it. The `upload-assets` workflow opens its
   ever running. The local `$/.github/actions/setup-tools` is exempt: it is
   this repository at the commit being run.
 - **Make CI a required status check on `main`**: Settings → Rules →
-  Rulesets → the `main` ruleset → require the `Check, test, build` and
-  `Core changes come with test changes` checks. Leave **"Require branches
-  to be up to date before merging" off**: DependaBuddy enables auto-merge
+  Rulesets → the `main` ruleset → require the `Check, test, build`,
+  `Core changes come with test changes`, `Check for the Dev key and a code
+  change` and `Publish a Saved version and run the engine tests` checks
+  (the engine-tests workflow runs on every PR; its gate skips the test job
+  for docs-only and keyless runs, and a skipped job satisfies a required
+  check; requiring the gate too means a gate that fails, say on the API
+  call that lists the PR's files, still blocks the merge). Leave
+  **"Require branches to be up to date before merging" off**: DependaBuddy
+  enables auto-merge
   on a Dependabot PR, Dependabot rebases only on a conflict, so with the
   rule on every bump would wait behind `main` and be raised as stuck. The
   cost is that a PR can merge with CI that ran against an older `main`;

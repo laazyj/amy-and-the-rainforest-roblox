@@ -4,15 +4,17 @@
 # (test-<RUN_ID>-*) through the Open Cloud DataStore API and list them
 # again to show they are empty. See docs/OPEN_CLOUD.md.
 #
-# Without ROBLOX_DEV_API_KEY (before setup, or on a PR from a fork, which
-# gets no secrets) the job skips cleanly with a notice instead of failing.
+# The workflow runs on every pull request, so the job can be a required
+# status check (a path-filtered workflow that never runs would leave the
+# check "Expected" forever). The gate skips the test job, which then reports
+# as skipped and satisfies the check, for a docs-only PR (every changed file
+# is under docs/ or is a .md file) and when ROBLOX_DEV_API_KEY is missing
+# (before setup, or on a PR from a fork, which gets no secrets), with a
+# notice instead of a failure.
 name: Engine tests
 
 on:
   pull_request:
-    paths-ignore:
-      - "docs/**"
-      - "**/*.md"
 
 permissions:
   contents: read
@@ -22,31 +24,47 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # A job-level `if:` cannot read secrets, so a tiny job checks for the key.
+  # A job-level `if:` cannot read secrets or the changed files, so a tiny
+  # job decides whether the test job runs.
   gate:
-    name: Check for the Dev key
+    name: Check for the Dev key and a code change
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: read # list the PR's changed files
     outputs:
       run: ${{ steps.gate.outputs.run }}
     steps:
+      # File names stay in a variable and a pipe, never in a command line.
       - id: gate
         env:
           HAS_KEY: ${{ secrets.ROBLOX_DEV_API_KEY != '' }}
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
         run: |
-          if [ "$HAS_KEY" = "true" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice title=Engine tests skipped, no key::ROBLOX_DEV_API_KEY is not available to this run (not set up yet, or a PR from a fork). Nothing was published or run."
-            echo "Engine tests skipped, no key: ROBLOX_DEV_API_KEY is not available to this run (not set up yet, or a PR from a fork). Nothing was published or run." >> "$GITHUB_STEP_SUMMARY"
+          skip() {
+            echo "::notice title=Engine tests skipped, $1::$2 Nothing was published or run."
+            echo "Engine tests skipped, $1: $2 Nothing was published or run." >> "$GITHUB_STEP_SUMMARY"
             echo "run=false" >> "$GITHUB_OUTPUT"
+          }
+          if [ "$HAS_KEY" != "true" ]; then
+            skip "no key" "ROBLOX_DEV_API_KEY is not available to this run (not set up yet, or a PR from a fork)."
+            exit 0
+          fi
+          # Docs only: every changed file is under docs/ or is a .md file.
+          # An empty list is not docs only. A failed API call fails the step.
+          files=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate --jq '.[].filename')
+          other=$(printf '%s\n' "$files" | grep -c -v -E '^(docs/|$)|\.md$' || true)
+          if [ -n "$files" ] && [ "$other" -eq 0 ]; then
+            skip "docs only" "every file this PR changes is under docs/ or is a .md file."
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
           fi
 
   engine-tests:
     name: Publish a Saved version and run the engine tests
     needs: gate
-    if: needs.gate.outputs.run == 'true'
+    if: always() && needs.gate.outputs.run == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
