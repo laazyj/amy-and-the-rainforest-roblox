@@ -257,11 +257,14 @@ CI cancels superseded runs on `main`, so an older commit cannot be published
 after a newer one. (GitHub reads `workflow_run` triggers from the default
 branch only.)
 
-**Owner setup for `main`'s branch protection** (Settings → Branches, or a
-ruleset): make the CI check (`Check, test, build`) a required status
-check, and enable "Require branches to be up to date before merging". Then
-what CI tests on a PR is what lands on `main`, and what lands is what Dev
-gets.
+**Owner setup for `main`'s ruleset** (Settings → Rules → Rulesets): make
+the CI check (`Check, test, build`) a required status check. "Require
+branches to be up to date before merging" is off, so DependaBuddy's
+auto-merged Dependabot bumps do not wait behind `main`
+([`MAINTENANCE.md`](MAINTENANCE.md#repository-settings-one-time-owner));
+what lands on `main` is therefore tested by CI's run on that push, and
+the Dev publish waits for that run to be green, so what Dev gets is
+always a `main` that CI has passed.
 
 Until the key exists, a small `gate` job posts a notice ("skipped, no key")
 and the real job is skipped, so nothing fails. PRs from forks get no secrets
