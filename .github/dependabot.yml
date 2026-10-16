@@ -1,5 +1,7 @@
 # Keeps every `uses:` in the workflows and the composite action current, as
-# one grouped weekly PR; CI proves each bump. Nothing merges automatically.
+# one grouped weekly PR; CI proves each bump. DependaBuddy (laazyj/buddies),
+# the owner's own automation, merges a patch or minor bump once CI is green
+# and leaves a major one for the owner (docs/MAINTENANCE.md).
 # rokit.toml and wally.toml are covered by .github/workflows/toolchain-check.yml.
 # See docs/MAINTENANCE.md.
 version: 2

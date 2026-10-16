@@ -6,9 +6,15 @@ needs the owner, and when. The Open Cloud side is in
 
 ## Automated
 
-Both jobs open a pull request and nothing else. CI runs the full check,
-test and build against the new versions; nothing merges automatically, and
-the owner reviews and merges as for any other PR.
+Both jobs open a pull request and nothing else, and CI runs the full check,
+test and build against the new versions. Dependabot's PRs are merged by
+**DependaBuddy** ([laazyj/buddies](https://github.com/laazyj/buddies)),
+the owner's own automation: a patch or minor action bump merges once the
+required checks are green, a major one is escalated to the owner with an
+impact summary. The "Toolchain updates" PR is not Dependabot's, so the
+owner reviews and merges it as any other PR. DependaBuddy merges nothing
+else, and the `main` ruleset gates its merges like anyone's (the App is
+never a bypass actor), so a bump still has to pass every tier 0 guard.
 
 | What | Kept current by | When | PR |
 |---|---|---|---|
@@ -56,11 +62,18 @@ start CI by closing and reopening it. The `upload-assets` workflow opens its
   which Dependabot keeps current); the setting stops an unpinned one from
   ever running. The local `$/.github/actions/setup-tools` is exempt: it is
   this repository at the commit being run.
-- **Make CI a required status check on `main`**: Settings → Branches (or a
-  ruleset) → require the `Check, test, build` check, and enable "Require
-  branches to be up to date before merging". See also
-  [`OPEN_CLOUD.md`](OPEN_CLOUD.md#ci), which relies on it for the Dev
-  publish.
+- **Make CI a required status check on `main`**: Settings → Rules →
+  Rulesets → the `main` ruleset → require the `Check, test, build` and
+  `Core changes come with test changes` checks. Leave **"Require branches
+  to be up to date before merging" off**: DependaBuddy enables auto-merge
+  on a Dependabot PR, Dependabot rebases only on a conflict, so with the
+  rule on every bump would wait behind `main` and be raised as stuck. The
+  cost is that a PR can merge with CI that ran against an older `main`;
+  CI runs again on the push to `main`, and the Dev publish starts only
+  after that run is green ([`OPEN_CLOUD.md`](OPEN_CLOUD.md#ci)), so a bad
+  combination leaves `main` red and never reaches Dev. **A red `main` is
+  fixed or reverted before anything else merges.** The "Update branch"
+  button stays; use it on a PR that has fallen behind.
 
 ## Coverage guards and the mutation check
 
