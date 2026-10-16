@@ -74,6 +74,8 @@ local player = game:GetService("Players").LocalPlayer
 if player:FindFirstChild("PlaytestLog") then
 	return "already installed"
 end
+-- Roblox's player list would put the runner's account name in every frame.
+game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
 local http = game:GetService("HttpService")
 local log = Instance.new("Folder")
 log.Name = "PlaytestLog"

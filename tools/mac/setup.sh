@@ -94,6 +94,10 @@ install_studio() {
 		echo "installed Roblox Studio $(studio_version)"
 	fi
 	[ -x "$STUDIO_APP/Contents/MacOS/StudioMCP" ] || fail "this Studio has no built-in MCP server (Contents/MacOS/StudioMCP)"
+	# The Dock hidden, so Studio's maximized window, and so each capture, has
+	# the screen's full height.
+	defaults write com.apple.dock autohide -bool true
+	killall Dock 2>/dev/null || true
 	# The smoke job downloads the place with it; the Tart image has it.
 	command -v gh >/dev/null || fail "the GitHub CLI is missing: brew install gh"
 
