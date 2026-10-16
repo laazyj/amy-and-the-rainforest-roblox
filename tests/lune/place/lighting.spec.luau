@@ -1,8 +1,9 @@
 --[[
-	Lighting.Technology is place-level: only default.project.json can set it,
-	and engine tests cannot check it, because Luau Execution scripts lack the
-	capability to read it. So this spec builds the place with Rojo and reads the
-	property back from the built file, which is what Studio and players load.
+	Lighting.Technology and StarterGui.ScreenOrientation are place-level: only
+	default.project.json can set them, and engine tests cannot check them,
+	because Luau Execution scripts lack the capability to read them. So this
+	spec builds the place with Rojo and reads the properties back from the
+	built file, which is what Studio and players load.
 ]]
 
 local Built = require("./built")
@@ -15,6 +16,11 @@ return function(t: any)
 		it("uses the ShadowMap lighting technology set in default.project.json", function()
 			local lighting = Built.place():GetService("Lighting")
 			expect(lighting.Technology).toBe(roblox.Enum.Technology.ShadowMap)
+		end)
+
+		it("allows portrait and landscape: StarterGui.ScreenOrientation is Sensor", function()
+			local starterGui = Built.place():GetService("StarterGui")
+			expect(starterGui.ScreenOrientation).toBe(roblox.Enum.ScreenOrientation.Sensor)
 		end)
 	end)
 end

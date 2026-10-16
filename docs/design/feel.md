@@ -47,6 +47,10 @@ viewport size changes (rotation, window resize):
 | **Phone** | Touch, and the viewport's shorter side is under 600 units | 6-inch phone, about 844 × 390 units | 30 cm | landscape and portrait |
 | **Tablet** | Touch, and the shorter side is 600 units or more | 11- to 13-inch tablet, up to about 1376 × 1032 units | 40 cm | landscape first; portrait works |
 
+The place allows both orientations: `StarterGui.ScreenOrientation` is
+`Sensor` (set in `default.project.json`), so a phone or tablet, and Studio's
+device simulator, rotates between landscape and portrait with the device.
+
 Gamepad is later; when it arrives it uses the PC layout with on-screen
 button glyphs.
 
