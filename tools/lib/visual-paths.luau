@@ -3,7 +3,7 @@
 	The paths whose change alters what is on screen (brief mac-003, Must
 	A4). A pull request that changes one gets CI's prompt: "This pull
 	request changes what is on screen. The owner's `needs-playtest` label
-	brings screenshots here." (ci.yml, the visual-prompt job; the paths
+	brings screenshots here." (ci.yml, the screen-prompt job; the paths
 	come from tools/visual-paths.luau, which reads CHANGED_FILES as
 	tools/guard test-change does.)
 

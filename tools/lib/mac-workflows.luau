@@ -93,7 +93,8 @@ end
 -- Whether `value`, or any string inside it, names a secret.
 local function namesSecret(value: any): boolean
 	if type(value) == "string" then
-		return string.find(value, "secrets%.") ~= nil
+		-- `secrets.KEY`, `secrets['KEY']`, `toJSON(secrets)`
+		return string.find(value, "%f[%w_]secrets%f[^%w_]") ~= nil
 	elseif type(value) == "table" then
 		for key, each in value do
 			if namesSecret(key) or namesSecret(each) then

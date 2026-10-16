@@ -79,7 +79,7 @@ export type Page = {
 	artifactUrl: string?,
 }
 
-local FILE = "^([a-z0-9%-]+)/%d%d%-([a-z]+)%-([a-z0-9%-]*)%.png$"
+local FILE = "^([a-z0-9%-]+)/%d%d+%-([a-z]+)%-([a-z0-9%-]*)%.png$"
 
 -- The capture a file name is, or nil when it is not one.
 function Screens.parse(file: string): Capture?

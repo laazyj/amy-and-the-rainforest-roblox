@@ -74,6 +74,8 @@ return function(t: any)
 				name = "amy-at-the-gate",
 			})
 			expect(capture("pc/12-title-title.png").kind).toBe(Screens.TITLE_KIND)
+			-- the playthrough numbers with %02d, so the 100th capture has three digits
+			expect(capture("pc/100-shot-late.png").name).toBe("late")
 		end)
 
 		for _, file in
@@ -340,7 +342,14 @@ return function(t: any)
 		end)
 	end)
 
-	local magick = process.exec("sh", { "-c", "command -v montage && command -v compare && command -v convert" }).ok
+	local magick = process.exec(
+		"sh",
+		{ "-c", "command -v montage && command -v compare && command -v convert && command -v identify" }
+	).ok
+	-- Skipped on a machine without ImageMagick, never in CI, which installs it.
+	if not magick and process.env.CI then
+		error("ImageMagick is not installed: CI installs it so tools/screens is proven end to end", 0)
+	end
 	describe(
 		`tools/screens end to end {if magick then "through ImageMagick" else "(skipped: no ImageMagick here)"}`,
 		function()

@@ -98,6 +98,13 @@ return function(t: any)
 				.. JOB
 				.. "    steps:\n      - run: x\n        env:\n          KEY: ${{ secrets.KEY }}\n"
 			t.expect(check(yaml)).toEqual({ "w.yml: job 'play' runs on the Mac and names a secret" })
+			for _, named in { "${{ toJSON(secrets) }}", "${{ secrets['KEY'] }}" } do
+				t.expect(check(`on:\n  workflow_dispatch:\n{JOB}    steps:\n      - run: echo "{named}"\n`)).toEqual({
+					"w.yml: job 'play' runs on the Mac and names a secret",
+				})
+			end
+			t.expect(check(`on:\n  workflow_dispatch:\n{JOB}    steps:\n      - run: echo mysecrets_list\n`))
+				.toEqual({})
 		end)
 
 		t.it("lets a GitHub-hosted job beside a Mac job write and use secrets", function()

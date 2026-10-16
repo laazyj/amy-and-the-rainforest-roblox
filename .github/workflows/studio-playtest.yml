@@ -109,7 +109,9 @@ jobs:
     needs: playtest
     # Whenever the Mac job uploaded its artifact, whatever the playtest's result.
     if: ${{ always() && needs.playtest.outputs.artifact-id != '' }}
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: tools/screens needs ImageMagick 6's
+    # programs (docs/MAINTENANCE.md).
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     timeout-minutes: 15
@@ -120,6 +122,10 @@ jobs:
         with:
           ref: main # the tools and the baselines from main
           persist-credentials: false
+
+      # Ubuntu 24.04's runner image has no ImageMagick (22.04's had it).
+      - name: Install ImageMagick
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends imagemagick
 
       - name: Install the pinned toolchain
         uses: $/.github/actions/setup-tools
@@ -162,7 +168,10 @@ jobs:
   publish:
     name: Put the screenshots on the pull request
     needs: [playtest, sheets]
-    runs-on: ubuntu-latest
+    # Also after a failed playtest (a run of main fails its playtest job):
+    # whenever sheets made the images.
+    if: ${{ always() && needs.sheets.result == 'success' }}
+    runs-on: ubuntu-24.04
     permissions:
       contents: write # force-push playtest/pr-<N> or playtest/main
       pull-requests: write # the one comment on pull request N
@@ -189,10 +198,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ needs.sheets.outputs.branch }}
         run: |
-          case "$BRANCH" in
-          playtest/main | playtest/pr-[0-9]*) ;;
-          *) echo "::error::not a playtest branch: $BRANCH"; exit 1 ;;
-          esac
+          if ! printf '%s' "$BRANCH" | grep -Eqx 'playtest/(main|pr-[0-9]+)'; then
+            echo "::error::not a playtest branch: $BRANCH"
+            exit 1
+          fi
           cd "$RUNNER_TEMP/screens/files"
           git init -q
           git add -A
@@ -214,8 +223,9 @@ jobs:
       # On the commit the place was built from, not the pull request's head
       # now: a push during the run never gets a status for a place it was
       # not built from (brief mac-003, A6). A run of main sets none.
+      # Also when the push or the comment failed, so the status never stays pending.
       - name: Set the playtest's commit status
-        if: inputs.pr != ''
+        if: always() && inputs.pr != ''
         env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ needs.playtest.outputs.head-sha }}

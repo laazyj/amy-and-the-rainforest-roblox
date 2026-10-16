@@ -449,8 +449,8 @@ request is skipped: its token cannot comment, and it is never played.
 | Job | Runs on | Token | Does |
 |---|---|---|---|
 | `playtest` | the Mac | `contents: read`, `actions: read` | Plays the place, uploads the `studio-playtest` artifact (`report.json` and the Captures) and gives its id and link as outputs. Its permissions are as before mac-003. |
-| `sheets` | GitHub's runners | `contents: read` | Whenever the artifact was uploaded, whatever the playtest's result: `lune run tools/screens sheets` on the artifact and `main`'s `docs/screens/`. Makes `sheets/<device>.png` (ImageMagick `montage`, each Capture labelled with its name), `sheets/title.png` (the Title screen's Capture across devices), and, for each Capture that differs from its Baseline, `before/` and `diff/` (ImageMagick `compare`), and writes the comment. Uploads them as `studio-playtest-screens`. |
-| `publish` | GitHub's runners | `contents: write`, `pull-requests: write` | Runs nothing from the artifact, and of this repository only `main`'s `.github/actions/post-comment`: commits the images as one commit with no parent, force-pushes it to the branch `sheets` named, `playtest/pr-<N>` (`playtest/main` for a run of `main`), and posts the comment on pull request N, or updates the one already there (found by the marker `<!-- studio-playtest-screens -->`). A run of `main` writes the comment to its job summary instead. |
+| `sheets` | GitHub's runners (`ubuntu-24.04`, ImageMagick installed by the job) | `contents: read` | Whenever the artifact was uploaded, whatever the playtest's result: `lune run tools/screens sheets` on the artifact and `main`'s `docs/screens/`. Makes `sheets/<device>.png` (ImageMagick `montage`, each Capture labelled with its name), `sheets/title.png` (the Title screen's Capture across devices), and, for each Capture that differs from its Baseline, `before/` and `diff/` (ImageMagick `compare`), and writes the comment. Uploads them as `studio-playtest-screens`. |
+| `publish` | GitHub's runners | `contents: write`, `pull-requests: write`, `statuses: write` | Runs nothing from the artifact, and of this repository only `main`'s `.github/actions/post-comment`: commits the images as one commit with no parent, force-pushes it to the branch `sheets` named, `playtest/pr-<N>` (`playtest/main` for a run of `main`), and posts the comment on pull request N, or updates the one already there (found by the marker `<!-- studio-playtest-screens -->`). A run of `main` writes the comment to its job summary instead. |
 
 The artifact holds what a pull request's place did in Studio, so it is
 read only where there is no write token, and nothing in it is trusted: a
@@ -469,7 +469,9 @@ links to the run and the artifact. Its images are raw file links into the
 run's images are never an old one's from a cache. The branch is
 force-pushed as one commit, so it never grows, and
 `playtest-cleanup.yml` deletes it when the pull request closes; the
-comment's images go with it.
+comment's images go with it. A run that finishes after the pull request
+closed pushes `playtest/pr-<N>` again after the cleanup; delete it by hand
+or leave it for the next close.
 
 **Changed** means more than 1% of the Capture's pixels moved by more than
 10% (ImageMagick's `-fuzz`), or its size changed. Plan section 4 asks for
@@ -491,12 +493,19 @@ pull request's commit; this status does. `playtest-label.yml` sets it to
 ("Asked the Mac to play this pull request", linking the workflow's runs,
 since the run's id is not known then). `publish` sets it to `success` or
 `failure` when the run ends ("5 devices, 111 screenshots, 2 changed", or
-"playthrough failed on phone-portrait"), linking the run, on the commit the
-place was built from, the one `download-place` resolved, not the pull
-request's head at that moment: a push during the run never gets a status
-for a place it was not built from. A run of `main`'s place sets none, and
-a run that uploaded no artifact leaves it `pending`. Each job that sets it
-has `statuses: write` and no other job does; the Mac job gains nothing.
+"playthrough failed on phone-portrait"), linking the run, on the commit
+the place was built from, the one `download-place` resolved, not the
+pull request's head at that moment: a push during the run never gets a
+status for a place it was not built from. A run of `main`'s place sets
+none. `publish` runs whenever `sheets` succeeded, the playtest's result
+aside, and sets the status even when its push or comment failed. Nothing
+clears a `pending` status when: a queued run is cancelled by the
+`studio` concurrency group (three labels in a row: the middle one is
+replaced); the label is given before CI is green on the pull request's
+new head (the playtest plays the older CI build, and its result lands on
+that older commit, by design); or the Mac job uploaded no artifact, or
+`sheets` failed. Label again to play. Each job that sets it has
+`statuses: write` and no other job does; the Mac job gains nothing.
 **The status is never a required check in the ruleset**: it exists only
 on labelled pull requests, so requiring it would block every other pull
 request; the owner reads it in the merge box. A status belongs to one
