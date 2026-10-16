@@ -62,7 +62,8 @@ return function(t: any)
 		end)
 
 		it("reads an enumeration with no table as empty", function()
-			expect(glossary.entries("Cues")).toEqual({})
+			local empty = string.gsub(GLOSSARY, "\n| Cue | Kind | Plays |.-\n\n", "\n\n", 1)
+			expect(Glossary.parse(empty).entries("Cues")).toEqual({})
 		end)
 
 		it("raises on a column the table does not have, naming it", function()
@@ -107,13 +108,15 @@ return function(t: any)
 		it("give each World command in use its arguments", function()
 			expect(schema.commands.MoveCharacter).toEqual({ character = true, spot = true })
 			expect(schema.commands.SetObjective).toEqual({ text = true })
-			expect(schema.commands.PlayCue).toBeNil()
+			expect(schema.commands.PlayCue).toEqual({ cue = true })
 			expect(schema.commands.FrameShot).toEqual({ shot = true, character = true })
 		end)
 
-		it("have Shots and no Cues yet", function()
+		it("have Shots, and the Cues by their full ids, sounds and music apart", function()
 			expect(schema.shots.ForestWallReveal).toBe(true)
-			expect(schema.cues).toEqual({})
+			expect(schema.sounds["cue:sam_bark"]).toBe(true)
+			expect(schema.sounds["music:home"]).toBeNil()
+			expect(schema.music["music:home"]).toBe(true)
 		end)
 	end)
 
@@ -163,17 +166,25 @@ return function(t: any)
 			})
 		end)
 
-		it("fails: a *later* World command, a Prop state and a Character the glossary does not have", function()
+		it("fails: a World command the glossary does not have, a Prop state, a Character and a Cue", function()
 			local machineStops: { any } = {
 				{ kind = "SetPropState", prop = "Machine", state = "exploded" },
-				{ kind = "PlayCue", cue = "machine_stop" },
+				{ kind = "SpinBlade", cue = "machine_stop" },
 				{ kind = "MoveCharacter", character = "Owl", spot = "Farm" },
 			}
 			local beats = { machine_stops = machineStops }
 			expect(Schema.check(schema, "chapters/4/hooks.luau", beats)).toEqual({
 				'src/content/chapters/4/hooks.luau: machine_stops[1].state "exploded" is not a state of prop:Machine in docs/GLOSSARY.md',
-				'src/content/chapters/4/hooks.luau: machine_stops[2].kind "PlayCue" is not a World command in docs/GLOSSARY.md',
+				'src/content/chapters/4/hooks.luau: machine_stops[2].kind "SpinBlade" is not a World command in docs/GLOSSARY.md',
 				'src/content/chapters/4/hooks.luau: machine_stops[3].character "Owl" is not a Character in docs/GLOSSARY.md',
+			})
+			local cues: { any } = {
+				{ kind = "PlayCue", cue = "machine_stop" },
+				{ kind = "PlayCue", cue = "music:home" },
+			}
+			expect(Schema.check(schema, "chapters/4/hooks.luau", { machine_stops = cues })).toEqual({
+				'src/content/chapters/4/hooks.luau: machine_stops[1].cue "machine_stop" is not a sound Cue (cue:) in docs/GLOSSARY.md',
+				'src/content/chapters/4/hooks.luau: machine_stops[2].cue "music:home" is not a sound Cue (cue:) in docs/GLOSSARY.md',
 			})
 		end)
 
@@ -206,6 +217,34 @@ return function(t: any)
 			})
 			expect(Schema.check(Schema.fromGlossary(without("onboarding:walk")), "hints.luau", content["hints.luau"])).toEqual({
 				'src/content/hints.luau: steps.walk "walk" is not a Onboarding step in docs/GLOSSARY.md',
+			})
+		end)
+	end)
+
+	describe("a Scene's sound", function()
+		it("fails: a Scene without its music, or with music for its ambience, or no bounds", function()
+			local garden = copy(content["scenes/Garden.luau"])
+			garden.music = nil
+			garden.ambience = "music:home"
+			garden.bounds = nil
+			expect(Schema.check(schema, "scenes/Garden.luau", garden)).toEqual({
+				'src/content/scenes/Garden.luau: ambience "music:home" is not a sound Cue (cue:) in docs/GLOSSARY.md',
+				"src/content/scenes/Garden.luau: bounds must be a table",
+				"src/content/scenes/Garden.luau: music nil is not a music Cue (music:) in docs/GLOSSARY.md",
+			})
+		end)
+	end)
+
+	describe("the Narration table", function()
+		it("fails: a file that is not narration:<chapter id>, and a part without its times", function()
+			local narration = {
+				["narration:ending"] = { { text = "The end", from = 0, to = 1 } },
+				["narration:chapter1"] = { { text = "x" } },
+			}
+			expect(Schema.check(schema, "narration.luau", narration)).toEqual({
+				"src/content/narration.luau: narration:chapter1[1].from must be a number, got nil",
+				"src/content/narration.luau: narration:chapter1[1].to must be a number, got nil",
+				'src/content/narration.luau: narration:ending must read narration:<chapter id>, got "narration:ending"',
 			})
 		end)
 	end)

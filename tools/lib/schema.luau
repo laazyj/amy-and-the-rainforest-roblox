@@ -42,7 +42,9 @@ export type Schema = {
 	-- Prop -> its states in order
 	props: { [string]: { string } },
 	lighting: Set,
-	cues: Set,
+	-- Cues by their full id: sounds (`cue:`) and music (`music:`) apart
+	sounds: Set,
+	music: Set,
 	shots: Set,
 	onboardingSteps: Set,
 	-- World command -> the arguments the glossary gives it
@@ -80,7 +82,8 @@ function Schema.fromGlossary(text: string): Schema
 		scenes = glossary.names("Scenes"),
 		props = {},
 		lighting = glossary.names("Lighting presets"),
-		cues = glossary.names("Cues"),
+		sounds = {},
+		music = {},
 		shots = glossary.names("Shots"),
 		onboardingSteps = glossary.names("Onboarding steps"),
 		commands = {},
@@ -93,6 +96,10 @@ function Schema.fromGlossary(text: string): Schema
 				home = first(entry.cells["Home Spot"]),
 			}
 		end
+	end
+	for _, entry in glossary.inUse("Cues") do
+		local set = if string.match(entry.id, "^music:") then schema.music else schema.sounds
+		set[entry.id] = true
 	end
 	for _, entry in glossary.inUse("Props") do
 		schema.props[entry.name] = Glossary.values(entry.cells["States, in order"])
@@ -214,6 +221,7 @@ local function ignore() end
 
 local vec3 = record({ x = number, y = number, z = number })
 local rgb = record({ r = channel, g = channel, b = channel })
+local box = record({ centre = vec3, size = vec3 })
 
 -- Every value under `value` is plain: no engine datatypes, and positions and
 -- colours shaped as Vec3 and RGB tables.
@@ -252,7 +260,7 @@ local function command(schema: Schema): Check
 		pickup = oneOf(schema.spots, "Spot"),
 		prop = oneOf(schema.props, "Prop"),
 		preset = oneOf(schema.lighting, "Lighting preset"),
-		cue = oneOf(schema.cues, "Cue"),
+		cue = oneOf(schema.sounds, "sound Cue (cue:)"),
 		shot = oneOf(schema.shots, "Shot"),
 	}
 	local byKind: { [string]: Check } = {}
@@ -366,8 +374,11 @@ local function scene(schema: Schema, file: string): Check
 			end
 		end,
 		spots = map(inScene(schema.spots, "Spot"), record({ at = vec3, facing = vec3 })),
-		zones = map(inScene(schema.zones, "Zone"), record({ centre = vec3, size = vec3 })),
+		zones = map(inScene(schema.zones, "Zone"), box),
 		props = map(oneOf(schema.props, "Prop"), propStates),
+		music = oneOf(schema.music, "music Cue (music:)"),
+		ambience = oneOf(schema.sounds, "sound Cue (cue:)"),
+		bounds = box,
 	}, true) -- the rest is the layout SceneBuilder builds from
 end
 
@@ -436,6 +447,17 @@ local function title(): Check
 	return record({ heading = lettering, pill = lettering })
 end
 
+-- The Narration table: each Chapter's narration file and its Lines' parts.
+-- Which Lines, and in what order, is src/core/Narration's check.
+local function narration(): Check
+	local file = function(value: any, where: string, report: Report)
+		if type(value) ~= "string" or not string.match(value, "^narration:chapter%d+$") then
+			report(where, `must read narration:<chapter id>, got {show(value)}`)
+		end
+	end
+	return map(file, list(record({ text = text, from = number, to = number })))
+end
+
 local function helpers(): Check
 	return ignore
 end
@@ -453,6 +475,7 @@ local ROLES: { [string]: Role } = {
 	["ending.luau"] = { shape = ending, plain = true },
 	["hints.luau"] = { shape = hints, plain = true },
 	["title.luau"] = { shape = title, plain = true },
+	["narration.luau"] = { shape = narration, plain = true },
 	-- what content writes positions, colours, Spots and Zones with
 	["layout.luau"] = { shape = helpers, plain = true },
 	["palette.luau"] = { shape = helpers, plain = true },

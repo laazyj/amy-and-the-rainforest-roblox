@@ -18,6 +18,10 @@ return {
 	spots = spots,
 	zones = {},
 	props = {},
+	music = "music:home",
+	ambience = "cue:ambience_home",
+	-- behind the garden's front fence, the garden too (it has its own bounds)
+	bounds = layout.zone(at(0, 40, -45), at(190, 100, 60)),
 	houses = {
 		{ at = at(-44, 0, -50), walls = rgb(222, 196, 150), roof = colours.deep, scale = 0.9 },
 		{ at = at(44, 0, -44), walls = rgb(196, 176, 208), roof = colours.bark, scale = 0.85 },

@@ -38,6 +38,7 @@ export type WorldCommand =
 	| { kind: "TeleportPlayer", spot: string }
 	| { kind: "SetPropState", prop: string, state: string }
 	| { kind: "SetLighting", preset: string }
+	| { kind: "PlayCue", cue: string }
 	| { kind: "FrameShot", shot: string, character: string? }
 	| { kind: "SpawnPickups", quest: string }
 	| { kind: "RemovePickup", pickup: string }
@@ -78,6 +79,7 @@ Events.WORLD_COMMANDS = table.freeze({
 	TeleportPlayer = { spot = "string" },
 	SetPropState = { prop = "string", state = "string" },
 	SetLighting = { preset = "string" },
+	PlayCue = { cue = "string" },
 	FrameShot = { shot = "string", character = "string?" },
 	SpawnPickups = { quest = "string" },
 	RemovePickup = { pickup = "string" },

@@ -51,8 +51,8 @@ function WorldState.initial(story: Story.Story): WorldState
 	return state
 end
 
--- Applies `command` to `state` in place. Commands that only show something
--- (dialogue, chapter cards) or pass time leave it as it is.
+-- Applies `command` to `state` in place. Commands that only show or play
+-- something (dialogue, chapter cards, Cues) or pass time leave it as it is.
 function WorldState.apply(story: Story.Story, state: WorldState, command: WorldCommand)
 	if command.kind == "MoveCharacter" then
 		state.characters[command.character] = command.spot

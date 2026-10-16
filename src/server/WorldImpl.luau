@@ -1,9 +1,10 @@
 --!strict
 --[[
 	WorldImpl: the World interface (src/core/World) for one player, over the
-	engine adapters. Commands that reach the client go through `toClient`,
-	which carries them over Net; the rest move Characters, Props, Lighting,
-	Pickups and the Player Character in the world. A Wait counts down only
+	engine adapters. Commands that reach the client (Dialogues, the Objective,
+	cards, Shots and Cues) go through `toClient`, which carries them over Net;
+	the rest move Characters, Props, Lighting, Pickups and the Player
+	Character in the world. A Wait counts down only
 	while `held()` is false (World.waitLeft).
 ]]
 
@@ -51,6 +52,9 @@ function WorldImpl.new(
 		end,
 		setPropState = PropHost.setState,
 		setLighting = LightingHost.set,
+		playCue = function(cue)
+			toClient({ kind = "PlayCue", cue = cue })
+		end,
 		frameShot = function(shot, character)
 			toClient({ kind = "FrameShot", shot = shot, character = character })
 		end,

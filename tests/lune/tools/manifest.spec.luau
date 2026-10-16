@@ -88,6 +88,19 @@ return function(t: any)
 			end)
 		end
 
+		it("accepts a library-audio track: an id with no file, never uploaded", function()
+			expect(Manifest.validate(manifest(entry(M.LIBRARY_AUDIO)), readFile)).toEqual({})
+		end)
+
+		it("holds a library-audio track to a font's rules", function()
+			local problems =
+				Manifest.validate(manifest(entry(M.LIBRARY_AUDIO, { path = M.PNG_PATH, upload = true })), readFile)
+			expect(problems).toEqual({
+				"music:paradise: a library-audio track has no path, sha256 or amy: it is referenced, not uploaded",
+				'music:paradise: a library-audio track has upload false and moderation "approved"',
+			})
+		end)
+
 		it("rejects a name listed twice", function()
 			local problems = Manifest.validate(manifest(entry(), entry()), readFile)
 			expect(problems).toEqual({ "card:chapter2: is listed twice" })
@@ -212,6 +225,13 @@ return function(t: any)
 		it("fails when AssetIds.luau was edited by hand", function()
 			local mock = repo(manifest(entry()), { [Manifest.ASSET_IDS_PATH] = "return {}" })
 			expect(Manifest.check(mock.ctx)[1]).toContain("does not match assets/manifest.json")
+		end)
+
+		it("writes AssetIds.luau from the manifest first when asked, for an id typed in", function()
+			local mock =
+				repo(manifest(entry(UPLOADED), entry(M.LIBRARY_AUDIO)), { [Manifest.ASSET_IDS_PATH] = "return {}" })
+			expect(Manifest.check(mock.ctx, true)).toEqual({})
+			expect(mock.files[Manifest.ASSET_IDS_PATH]).toContain('["music:paradise"] = "rbxassetid://1234567890"')
 		end)
 
 		it("fails on an invalid manifest before scanning", function()
