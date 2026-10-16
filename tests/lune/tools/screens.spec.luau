@@ -165,10 +165,9 @@ return function(t: any)
 
 	describe("Screens.changed", function()
 		it("counts a capture as changed over the level 2 tolerance, or when its size changed", function()
-			expect(Screens.changed(100, 100 / Screens.SHARE, false)).toBe(false)
-			expect(Screens.changed(101, 100 / Screens.SHARE, false)).toBe(true)
-			expect(Screens.changed(0, 100, true)).toBe(true)
-			expect(Screens.changed(0, 0, false)).toBe(true)
+			expect(Screens.changed(Screens.SHARE, false)).toBe(false)
+			expect(Screens.changed(Screens.SHARE * 1.01, false)).toBe(true)
+			expect(Screens.changed(0, true)).toBe(true)
 		end)
 	end)
 
@@ -288,6 +287,18 @@ return function(t: any)
 				expect(reason).toContain(case[3])
 			end)
 		end
+	end)
+
+	describe("the Baselines workflow", function()
+		it("finds runs of main by the name studio-playtest.yml gives them", function()
+			local playtest = bootstrap.readSource(".github/workflows/studio-playtest.yml")
+			local baselines = bootstrap.readSource(".github/workflows/baselines.yml")
+			expect(playtest).toContain(
+				"run-name: Studio playtest of ${{ inputs.pr && format('#{0}', inputs.pr) || 'main' }}"
+			)
+			expect(baselines).toContain('select(.displayTitle == "Studio playtest of main")')
+			expect(baselines).toContain('"Studio playtest / main / Studio playtest of main / success"')
+		end)
 	end)
 
 	local magick = process.exec("sh", { "-c", "command -v montage && command -v compare && command -v convert" }).ok

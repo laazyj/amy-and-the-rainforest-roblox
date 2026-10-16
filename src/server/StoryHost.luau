@@ -215,6 +215,13 @@ local function startStory(engine: StoryEngine.Engine)
 	return events, commands
 end
 
+-- Offers `player` the Title screen's choices for `save`: the Story waits
+-- (run handles no Player event) until their Title choice.
+local function showTitle(session: Session, save: Save.Save, offer: TitleScreen.Offer)
+	session.offered = save
+	message(session.player, "ShowTitle", table.pack(offer.chapter, offer.canContinue))
+end
+
 -- The client has loaded, and the Title screen shows. Once the player's Save
 -- is loaded: a player who has not started gets the Story's first Chapter
 -- card at once, as always; a returning player is offered the Title
@@ -229,8 +236,7 @@ function StoryHost.onClientReady(player: any)
 		local offer = save and TitleScreen.offer(story, save)
 		local session = sessions[player]
 		if offer and session and not StoryEngine.started(session.engine.progress) then
-			session.offered = save
-			message(player, "ShowTitle", table.pack(offer.chapter, offer.canContinue))
+			showTitle(session, save, offer)
 		else
 			run(player, startStory)
 		end
@@ -270,9 +276,8 @@ function StoryHost.offerTitle(player: any): (string?, string?)
 	local save = Save.record(story, Persist.await(player) or Save.new(), progress)
 	local offer = TitleScreen.offer(story, save) :: TitleScreen.Offer
 	newSession(player, progress)
-	sessions[player].offered = save
 	Persist.record(player, progress)
-	message(player, "ShowTitle", table.pack(offer.chapter, offer.canContinue))
+	showTitle(sessions[player], save, offer)
 	return offer.chapter, nil
 end
 

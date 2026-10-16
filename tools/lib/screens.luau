@@ -101,6 +101,11 @@ function Screens.code(text: any, limit: number?): string
 	return "`" .. line .. "`"
 end
 
+-- The devices a report lists; none when it is missing or broken.
+local function devicesOf(report: any): { any }
+	return if type(report) == "table" and type(report.devices) == "table" then report.devices else {}
+end
+
 -- A device of the report: its name, result and captures.
 export type Played = { name: string, result: string, captures: { Capture } }
 
@@ -110,8 +115,7 @@ function Screens.captures(report: any, exists: (file: string) -> boolean): ({ Pl
 	local played: { Played } = {}
 	local seen: { [string]: true } = {}
 	local rejected: { string } = {}
-	local devices = if type(report) == "table" and type(report.devices) == "table" then report.devices else {}
-	for _, device in devices do
+	for _, device in devicesOf(report) do
 		local name = type(device) == "table" and device.name
 		if type(name) ~= "string" or not string.match(name, "^[a-z0-9%-]+$") or seen[name] then
 			table.insert(rejected, `device {Screens.code(name)}`)
@@ -166,20 +170,20 @@ function Screens.pair(captures: { Capture }, baselines: { string }): ({ Compared
 	return compared, gone
 end
 
--- Whether a comparison counts as changed: `changed` of `total` pixels
--- moved by more than FUZZ, or the size changed.
-function Screens.changed(changed: number, total: number, resized: boolean): boolean
-	return resized or total <= 0 or changed / total > Screens.SHARE
+-- Whether a comparison counts as changed: a `share` of its pixels moved by
+-- more than FUZZ, or the size changed.
+function Screens.changed(share: number, resized: boolean): boolean
+	return resized or share > Screens.SHARE
 end
 
-local function count(device: Device, status: Status): number
-	local n = 0
+-- A device's comparisons by status.
+type Split = { same: { Compared }, changed: { Compared }, new: { Compared } }
+local function byStatus(device: Device): Split
+	local split: Split = { same = {}, changed = {}, new = {} }
 	for _, each in device.compared do
-		if each.status == status then
-			n += 1
-		end
+		table.insert((split :: any)[each.status], each)
 	end
-	return n
+	return split
 end
 
 local function image(url: string, alt: string, width: number?): string
@@ -214,24 +218,24 @@ function Screens.comment(page: Page): string
 		add("| Device | Result | Captures | Changed | New | Baselines gone |")
 		add("|---|---|---|---|---|---|")
 		for _, device in page.devices do
+			local split = byStatus(device)
 			add(
-				`| {device.name} | {Screens.code(device.result, 20)} | {#device.compared} | {count(device, "changed")} | {count(
-					device,
-					"new"
-				)} | {#device.gone} |`
+				`| {device.name} | {Screens.code(device.result, 20)} | {#device.compared} | {#split.changed} | {#split.new} | {#device.gone} |`
 			)
 		end
 		add("")
 	end
 
-	local devices = if type(report) == "table" and type(report.devices) == "table" then report.devices else {}
-	for _, device in devices do
-		if type(device) == "table" and type(device.warnings) == "table" then
+	for _, device in devicesOf(report) do
+		if type(device) ~= "table" then
+			continue
+		end
+		if type(device.warnings) == "table" then
 			for _, warning in device.warnings do
 				add(`> Warning, {Screens.code(device.name, 40)}: {Screens.code(warning)}`)
 			end
 		end
-		if type(device) == "table" and device.failure ~= nil then
+		if device.failure ~= nil then
 			add(`> Failure, {Screens.code(device.name, 40)}: {Screens.code(device.failure)}`)
 		end
 	end
@@ -262,12 +266,8 @@ function Screens.comment(page: Page): string
 			add("")
 			add(`No baselines in \`docs/screens/{device.name}/\` yet: every capture is new.`)
 		end
-		local changed = {}
-		for _, each in device.compared do
-			if each.status == "changed" then
-				table.insert(changed, each)
-			end
-		end
+		local split = byStatus(device)
+		local changed = split.changed
 		if #changed > 0 then
 			add("")
 			add("| Changed | Before | After | Difference |")
@@ -293,12 +293,11 @@ function Screens.comment(page: Page): string
 			end
 		end
 		local new = {}
-		for _, each in device.compared do
-			if each.status == "new" and device.baselines > 0 then
-				table.insert(new, `\`{each.capture.file}\``)
-			end
+		for _, each in split.new do
+			table.insert(new, `\`{each.capture.file}\``)
 		end
-		if #new > 0 then
+		-- with no baselines at all, every capture is new and said so above
+		if #new > 0 and device.baselines > 0 then
 			add("")
 			add(`New, no baseline: {table.concat(new, ", ")}`)
 		end

@@ -58,7 +58,7 @@ end
 
 local function copy(from: string, to: string)
 	makeParent(to)
-	fs.writeFile(to, fs.readFile(from))
+	fs.copy(from, to, true)
 end
 
 local function readReport(artifact: string): any?
@@ -77,35 +77,38 @@ local function baselinesOf(dir: string, device: string): { string }
 	return files
 end
 
--- Compares a capture with its baseline, writing the difference to diff/
--- and the baseline to before/ when it has changed.
+-- Compares a capture with its baseline; when it has changed, writes the
+-- difference to diff/ and the baseline to before/.
 local function compare(each: Screens.Compared, artifact: string, baselines: string, files: string)
 	local after = `{artifact}/{each.capture.file}`
 	local before = `{baselines}/{each.baseline}`
 	local afterSize, beforeSize = size(after), size(before)
 	local diff = `{files}/diff/{each.capture.file}`
 	makeParent(diff)
+	local stretched = nil
 	if beforeSize ~= afterSize then
 		-- the difference of the baseline stretched to the capture's size
-		local stretched = `{diff}.before.png`
+		stretched = `{diff}.before.png`
 		magick("convert", { before, "-resize", `{afterSize}!`, stretched })
-		before = stretched
 		each.resized = `{beforeSize} to {afterSize}`
 	end
-	local result = magick("compare", { "-metric", "AE", "-fuzz", Screens.FUZZ, before, after, diff }, { 0, 1 })
+	local function differ(out: string): process.ExecResult
+		return magick("compare", { "-metric", "AE", "-fuzz", Screens.FUZZ, stretched or before, after, out }, { 0, 1 })
+	end
+	-- measured first with no image written: most captures are the same
 	local width, height = string.match(afterSize, "^(%d+)x(%d+)$")
 	local total = (tonumber(width) or 0) * (tonumber(height) or 0)
-	local changed = tonumber(string.match(result.stderr, "^%s*(%S+)")) or total
-	each.share = if total > 0 then changed / total else 1
-	if fs.isFile(`{diff}.before.png`) then
-		fs.removeFile(`{diff}.before.png`)
-	end
-	if Screens.changed(changed, total, each.resized ~= nil) then
+	local changed = tonumber(string.match(differ("null:").stderr, "^%s*(%S+)"))
+	each.share = if total > 0 and changed then changed / total else 1
+	if Screens.changed(each.share :: number, each.resized ~= nil) then
 		each.status = "changed"
-		copy(`{baselines}/{each.baseline}`, `{files}/before/{each.baseline}`)
+		differ(diff)
+		copy(before, `{files}/before/{each.baseline}`)
 	else
 		each.status = "same"
-		fs.removeFile(diff)
+	end
+	if stretched then
+		fs.removeFile(stretched)
 	end
 end
 
@@ -143,7 +146,7 @@ local function sheets(values: { [string]: string })
 		local known = baselinesOf(baselines, device.name)
 		local compared, gone = Screens.pair(device.captures, known)
 		local labelled = { "-label", "%t" }
-		local title: string? = nil
+		local titled = false
 		for _, each in compared do
 			local file = `{artifact}/{each.capture.file}`
 			copy(file, `{files}/captures/{each.capture.file}`)
@@ -151,8 +154,8 @@ local function sheets(values: { [string]: string })
 			if each.baseline then
 				compare(each, artifact, baselines, files)
 			end
-			if each.capture.kind == Screens.TITLE_KIND and not title then
-				title = file
+			if each.capture.kind == Screens.TITLE_KIND and not titled then
+				titled = true
 				table.move({ "-label", device.name, file }, 1, 3, #titles + 1, titles)
 			end
 		end

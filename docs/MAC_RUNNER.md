@@ -438,7 +438,9 @@ in `tools/lib/visual-paths.luau` (`src/client/`, `ScreenLayout.luau`,
 gets one comment from CI's `screen-prompt` job, updated in place: "This
 pull request changes what is on screen. The owner's `needs-playtest` label
 brings screenshots here." CI's own job finds the paths and holds no write
-token; `screen-prompt` runs nothing from the pull request. A fork's pull
+token; `screen-prompt` runs only `.github/actions/post-comment`, which
+posts the comment or updates the one found by its first line, as
+`publish` does. A fork's pull
 request is skipped: its token cannot comment, and it is never played.
 
 **The three jobs of `studio-playtest.yml`.**
@@ -447,7 +449,7 @@ request is skipped: its token cannot comment, and it is never played.
 |---|---|---|---|
 | `playtest` | the Mac | `contents: read`, `actions: read` | Plays the place, uploads the `studio-playtest` artifact (`report.json` and the Captures) and gives its id and link as outputs. Its permissions are as before mac-003. |
 | `sheets` | GitHub's runners | `contents: read` | Whenever the artifact was uploaded, whatever the playtest's result: `lune run tools/screens sheets` on the artifact and `main`'s `docs/screens/`. Makes `sheets/<device>.png` (ImageMagick `montage`, each Capture labelled with its name), `sheets/title.png` (the Title screen's Capture across devices), and, for each Capture that differs from its Baseline, `before/` and `diff/` (ImageMagick `compare`), and writes the comment. Uploads them as `studio-playtest-screens`. |
-| `publish` | GitHub's runners | `contents: write`, `pull-requests: write` | Runs no tool of this repository and nothing from the artifact: commits the images as one commit with no parent, force-pushes it to `playtest/pr-<N>` (`playtest/main` for a run of `main`), and posts the comment on pull request N, or updates the one already there (found by the marker `<!-- studio-playtest-screens -->`). A run of `main` writes the comment to its job summary instead. |
+| `publish` | GitHub's runners | `contents: write`, `pull-requests: write` | Runs nothing from the artifact, and of this repository only `main`'s `.github/actions/post-comment`: commits the images as one commit with no parent, force-pushes it to the branch `sheets` named, `playtest/pr-<N>` (`playtest/main` for a run of `main`), and posts the comment on pull request N, or updates the one already there (found by the marker `<!-- studio-playtest-screens -->`). A run of `main` writes the comment to its job summary instead. |
 
 The artifact holds what a pull request's place did in Studio, so it is
 read only where there is no write token, and nothing in it is trusted: a

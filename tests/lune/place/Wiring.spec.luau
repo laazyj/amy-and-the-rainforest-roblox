@@ -89,7 +89,12 @@ local WIRING: { { file: string, label: string, code: string } } = {
 	{
 		file = "StoryHost.luau",
 		label = "/title ends the session where it is and offers the Title screen at its Progress",
-		code = 'newSession(player, progress)\n\tsessions[player].offered = save\n\tPersist.record(player, progress)\n\tmessage(player, "ShowTitle", table.pack(offer.chapter, offer.canContinue))',
+		code = "newSession(player, progress)\n\tPersist.record(player, progress)\n\tshowTitle(sessions[player], save, offer)",
+	},
+	{
+		file = "StoryHost.luau",
+		label = "offering the Title screen holds the Story and sends ShowTitle",
+		code = 'session.offered = save\n\tmessage(session.player, "ShowTitle", table.pack(offer.chapter, offer.canContinue))',
 	},
 	{
 		file = "Dev/DevShortcuts.luau",
