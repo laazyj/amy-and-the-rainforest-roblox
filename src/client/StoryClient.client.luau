@@ -671,7 +671,7 @@ local function renderDialogue()
 		bodyLabel.Text = view.text
 	end
 	bodyLabel.MaxVisibleGraphemes = view.visibleGraphemes
-	audio.narrate(Narration.reading(narration, view))
+	audio.narrate(Narration.reading(narration, view, card ~= nil or titleScreen.Visible))
 end
 
 local function advance()
@@ -955,7 +955,7 @@ local function renderSound(seconds: number, paused: boolean)
 		audio.play(Cues.FOOTSTEP)
 	end
 	audio.render(Soundscape.view(soundscape))
-	audio.tick()
+	audio.hold(paused)
 end
 
 ----------------------------------------------------------------

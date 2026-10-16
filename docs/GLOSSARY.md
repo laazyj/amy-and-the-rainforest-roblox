@@ -366,7 +366,7 @@ for music), a synthesised placeholder until the owner's pick replaces it
 Tier 1 holds every Cue named in content and `src/core/Cues.luau` to this
 table and to the Manifest.
 
-| Cue | Kind | Plays |
+| Cue | Layer | Plays |
 |---|---|---|
 | `music:theme` | music | While the Title screen, a Chapter card or the end card shows |
 | `music:home` | music | `scene:Garden`, `scene:Village` |

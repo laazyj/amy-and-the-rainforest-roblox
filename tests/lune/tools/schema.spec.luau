@@ -62,7 +62,7 @@ return function(t: any)
 		end)
 
 		it("reads an enumeration with no table as empty", function()
-			local empty = string.gsub(GLOSSARY, "\n| Cue | Kind | Plays |.-\n\n", "\n\n", 1)
+			local empty = string.gsub(GLOSSARY, "\n| Cue | Layer | Plays |.-\n\n", "\n\n", 1)
 			expect(Glossary.parse(empty).entries("Cues")).toEqual({})
 		end)
 

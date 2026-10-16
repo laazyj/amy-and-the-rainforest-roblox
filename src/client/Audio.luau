@@ -12,7 +12,10 @@
 	  render(view)     the Soundscape's music and ambience, each change
 	                   crossfaded over Soundscape.CROSSFADE_SECONDS
 	  narrate(reading) a Line's part of its narration file, or none; the
-	                   part stops at its end (tick) or at the next Line
+	                   part stops at its end or at the next Line
+	  hold(paused)     each frame: the reading pauses while the Pause
+	                   screen is open and resumes when it closes; its end
+	                   is checked only while it plays
 
 	A ModuleScript, so the engine tests (tests/engine/audio.luau) can
 	require it where the client binder does not run.
@@ -30,7 +33,7 @@ export type Audio = {
 	play: (cue: string) -> (),
 	render: (view: Soundscape.View) -> (),
 	narrate: (reading: Narration.Reading?) -> (),
-	tick: () -> (),
+	hold: (paused: boolean) -> (),
 }
 
 -- A looping layer: the Cue it plays and its Sound, if the Cue resolves.
@@ -87,6 +90,7 @@ function Audio.new(group: SoundGroup): Audio
 	-- the reading last asked for, and its Sound until its part ends
 	local asked: Narration.Reading? = nil
 	local voice: Sound? = nil
+	local held = false
 
 	local function stopNarration()
 		if voice then
@@ -119,10 +123,21 @@ function Audio.new(group: SoundGroup): Audio
 				voice = sound
 				sound.TimePosition = next.from
 				sound:Play()
+				if held then
+					sound:Pause()
+				end
 			end
 		end,
-		tick = function()
-			if voice and asked and not Narration.reads(asked, voice.TimePosition) then
+		hold = function(paused)
+			if voice and paused ~= held then
+				if paused then
+					voice:Pause()
+				else
+					voice:Resume()
+				end
+			end
+			held = paused
+			if voice and asked and not held and not Narration.reads(asked, voice.TimePosition) then
 				stopNarration()
 			end
 		end,

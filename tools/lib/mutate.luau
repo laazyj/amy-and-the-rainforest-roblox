@@ -136,6 +136,16 @@ Mutate.FAULTS = {
 		},
 	},
 	{
+		name = "narration reads under a Chapter card (the cover is ignored)",
+		file = "src/core/Narration.luau",
+		edits = {
+			{
+				from = "return if view.open and not covered then index[view.text] else nil",
+				to = "return if view.open then index[view.text] else nil",
+			},
+		},
+	},
+	{
 		name = "drop the dialogue column's cap (wider than 30 x the text size on a tablet)",
 		file = "src/core/ScreenLayout.luau",
 		edits = {

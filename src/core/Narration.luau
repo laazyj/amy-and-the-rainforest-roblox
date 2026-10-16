@@ -8,9 +8,10 @@
 
 	The client plays a Line's part of its file while the dialogue
 	view-model shows that Line, and stops it when the part ends or the
-	player advances. A Line with no part, or whose file has no asset id
-	yet, is shown as text only: that is the fallback, and every Line is
-	always shown as text. Narration never advances a Dialogue (no timed
+	player advances. Nothing is read under a Chapter card or the Title
+	screen, and a reading pauses with the Pause screen. A Line with no
+	part, or whose file has no asset id yet, is shown as text only: that is
+	the fallback, and every Line is always shown as text. Narration never advances a Dialogue (no timed
 	reading).
 ]]
 
@@ -40,9 +41,11 @@ function Narration.index(narration: Table): { [string]: Reading }
 end
 
 -- Where the Line the view-model shows is read, or nil when the dialogue
--- box is closed or the Line has no part.
-function Narration.reading(index: { [string]: Reading }, view: DialogueViewModel.View): Reading?
-	return if view.open then index[view.text] else nil
+-- box is closed, the Line has no part, or the box is `covered` (a Chapter
+-- card or the Title screen over it): the reading starts, from its part's
+-- start, once the cover lifts.
+function Narration.reading(index: { [string]: Reading }, view: DialogueViewModel.View, covered: boolean?): Reading?
+	return if view.open and not covered then index[view.text] else nil
 end
 
 -- Whether a reading `position` seconds into its file is still in its part.

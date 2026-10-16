@@ -91,6 +91,19 @@ return function(t: any)
 			expect(Narration.reading(index, DialogueViewModel.view(vm))).toBe(reading)
 		end)
 
+		it("waits under a Chapter card or the Title screen, and is the Line's part once the cover lifts", function()
+			local vm = DialogueViewModel.new()
+			DialogueViewModel.enqueue(vm, { { speaker = "Narrator", text = text } })
+			expect(Narration.reading(index, DialogueViewModel.view(vm), true)).toBeNil()
+			DialogueViewModel.tick(vm, 2.4)
+			expect(Narration.reading(index, DialogueViewModel.view(vm), true)).toBeNil()
+			expect(Narration.reading(index, DialogueViewModel.view(vm), false)).toEqual({
+				asset = last,
+				from = 0,
+				to = 0.9,
+			})
+		end)
+
 		it("is none for a Line with no part, and none once the box closes", function()
 			local vm = DialogueViewModel.new()
 			DialogueViewModel.enqueue(
