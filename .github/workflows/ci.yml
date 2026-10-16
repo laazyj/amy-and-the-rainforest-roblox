@@ -26,7 +26,7 @@ jobs:
 
       - name: Install the pinned toolchain
         id: tools
-        uses: ./.github/actions/setup-tools
+        uses: $/.github/actions/setup-tools
 
       - name: Static checks
         env:

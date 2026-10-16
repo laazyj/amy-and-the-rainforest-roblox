@@ -211,13 +211,14 @@ scene of the forest wall:
 - then "Amy", and below it "& the Rain Forest", in Dancing Script Bold
   (`src/content/title.luau` names the Asset `font:dancing_script`);
 - the words are white, except "Rain Forest", which is gold; each line has
-  the website's two shadows, so it reads over the canopy.
+  the website's hard deep-green shadow, so it reads over the canopy.
 
 What shipped (brief 019): the family is the manifest's `font:dancing_script`,
-the heading lines Bold and the pill SemiBold, the pill tilted −2°. Roblox
-has no text blur, so the two shadows are offset copies of the line: a hard
-one at (0, 3) in deep green, opaque, over a soft black one at (4, 8), 60%
-transparent, standing in for the blur.
+the heading lines Bold and the pill SemiBold, the pill tilted −2°, and one
+shadow per line: an opaque deep-green copy at (0, 3), the website's hard
+edge. The website's soft blurred shadow is left out: Roblox cannot blur
+text, and an offset copy standing in for it read as a misprint on a phone
+(the owner's Dev screenshots of 2026-10-14).
 
 The words are game-rendered text, never part of the image.
 
@@ -227,7 +228,7 @@ the nearest built-in:
 
 | Element | Family and weight | Colour | Other |
 |---|---|---|---|
-| "Amy" / "& the Rain Forest" | **Dancing Script**, weight 700 (Google Fonts, Open Font Licence) | white; "Rain Forest" gold `#e7b53a` | shadow in two layers: a hard `0 3px` in deep green `#23401d`, then a soft `4px 8px` blur at 40% black; line height 1.02 |
+| "Amy" / "& the Rain Forest" | **Dancing Script**, weight 700 (Google Fonts, Open Font Licence) | white; "Rain Forest" gold `#e7b53a` | shadow in two layers: a hard `0 3px` in deep green `#23401d`, then a soft `4px 8px` blur at 40% black (the game ships the hard layer only; see "What shipped"); line height 1.02 |
 | "a little tale of the wild" pill | Dancing Script, weight 600 | text deep green `#23401d` on white at 73% opacity | padding 2 × 18, fully rounded corners, rotated **−2°** |
 | UI text elsewhere on the site | Fredoka (the game's FredokaOne is its bold) | | |
 | Hand-written notes on the site | Caveat, weight 500 | | |

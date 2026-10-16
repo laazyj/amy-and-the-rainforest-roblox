@@ -54,10 +54,10 @@ jobs:
           persist-credentials: false
 
       - name: Install the pinned toolchain
-        uses: ./.github/actions/setup-tools
+        uses: $/.github/actions/setup-tools
 
       - name: Download the place artifact
-        uses: ./.github/actions/download-place
+        uses: $/.github/actions/download-place
         with:
           pr: ${{ inputs.pr }}
           token: ${{ github.token }}

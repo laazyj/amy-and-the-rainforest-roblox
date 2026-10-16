@@ -87,7 +87,7 @@ jobs:
         run: mkdir -p "$RUNNER_TEMP/assets"
 
       - name: Install the pinned toolchain
-        uses: ./.github/actions/setup-tools
+        uses: $/.github/actions/setup-tools
 
       - name: Upload
         env:

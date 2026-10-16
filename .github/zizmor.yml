@@ -14,20 +14,6 @@ rules:
     ignore:
       - action.yml
 
-  # The suggested `uses: $/.github/actions/setup-tools` is rejected by
-  # actionlint 1.7.12; `./` refers to the same checked-out commit.
-  self-repository:
-    ignore:
-      - ci.yml
-      - engine-tests.yml
-      - mutation.yml
-      - publish-dev.yml
-      - studio-playtest.yml
-      - studio-smoke.yml
-      - test-change.yml
-      - toolchain-check.yml
-      - upload-assets.yml
-
   # Named by the brief; replacing it with gh calls means hand-rolled push and
   # PR-update logic holding a write token. SHA-pinned, kept current by Dependabot.
   # upload-assets.yml opens its id PR the same way.
