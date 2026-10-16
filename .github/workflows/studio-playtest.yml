@@ -58,6 +58,7 @@ jobs:
     outputs:
       artifact-id: ${{ steps.upload.outputs.artifact-id }}
       artifact-url: ${{ steps.upload.outputs.artifact-url }}
+      head-sha: ${{ steps.place.outputs.head-sha }} # the commit the place was built from
     # A playtest of a pull request reports; it never fails the pull request
     # (plan section 4: tier 3 is not on a PR's critical path).
     continue-on-error: ${{ inputs.pr != '' }}
@@ -71,6 +72,7 @@ jobs:
         uses: $/.github/actions/setup-tools
 
       - name: Download the place artifact
+        id: place
         uses: $/.github/actions/download-place
         with:
           pr: ${{ inputs.pr }}
@@ -143,6 +145,7 @@ jobs:
           esac
           lune run tools/screens sheets --artifact "$RUNNER_TEMP/playtest" --baselines docs/screens \
             --files "$RUNNER_TEMP/screens/files/run-$GITHUB_RUN_ID" --comment "$RUNNER_TEMP/screens/comment.md" \
+            --status "$RUNNER_TEMP/screens/status.json" \
             --base-url "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/refs/heads/$branch/run-$GITHUB_RUN_ID" \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
             --artifact-url "$ARTIFACT_URL"
@@ -158,11 +161,12 @@ jobs:
 
   publish:
     name: Put the screenshots on the pull request
-    needs: sheets
+    needs: [playtest, sheets]
     runs-on: ubuntu-latest
     permissions:
       contents: write # force-push playtest/pr-<N> or playtest/main
       pull-requests: write # the one comment on pull request N
+      statuses: write # the "Studio playtest" commit status on the commit played
     timeout-minutes: 10
     steps:
       # Only for the post-comment action, from main.
@@ -206,6 +210,30 @@ jobs:
           pr: ${{ inputs.pr }}
           body-file: ${{ runner.temp }}/screens/comment.md
           token: ${{ github.token }}
+
+      # On the commit the place was built from, not the pull request's head
+      # now: a push during the run never gets a status for a place it was
+      # not built from (brief mac-003, A6). A run of main sets none.
+      - name: Set the playtest's commit status
+        if: inputs.pr != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.playtest.outputs.head-sha }}
+          CONTEXT: Studio playtest
+        run: |
+          if ! printf '%s' "$SHA" | grep -Eqx '[0-9a-f]{40}'; then
+            echo "::warning::no commit to set the Studio playtest status on: '$SHA'"
+            exit 0
+          fi
+          STATE=$(jq -r '.state' "$RUNNER_TEMP/screens/status.json")
+          DESCRIPTION=$(jq -r '.description' "$RUNNER_TEMP/screens/status.json")
+          case "$STATE" in
+          success | failure) ;;
+          *) echo "::error::not a status state: $STATE"; exit 1 ;;
+          esac
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" -f state="$STATE" -f context="$CONTEXT" \
+            -f description="${DESCRIPTION:0:140}" \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > /dev/null
 
       - name: Write the screenshots to the summary of a run of main
         if: inputs.pr == ''

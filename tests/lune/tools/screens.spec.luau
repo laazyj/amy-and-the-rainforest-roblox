@@ -261,6 +261,45 @@ return function(t: any)
 		end)
 	end)
 
+	describe("Screens.status", function()
+		local function played(name: string, result: string, statuses: { Screens.Status }): Screens.Device
+			local compared: { Screens.Compared } = {}
+			for i, status in statuses do
+				local each: Screens.Compared =
+					{ capture = capture(string.format("%s/%02d-shot-s.png", name, i)), status = status :: any }
+				table.insert(compared, each)
+			end
+			return { name = name, result = result, compared = compared, gone = {}, baselines = 1 }
+		end
+
+		it("passes with the devices, the screenshots and how many changed", function()
+			expect({
+				Screens.status(report({}), {
+					played("pc", "pass", { "same", "changed", "new" }),
+					played("phone", "pass", { "changed" }),
+				}),
+			}).toEqual({ "success", "2 devices, 4 screenshots, 2 changed" })
+		end)
+
+		it("fails naming the first device that failed", function()
+			expect({
+				Screens.status(report({}, { result = "fail" }), {
+					played("pc", "pass", {}),
+					played("phone-portrait", "fail", {}),
+				}),
+			}).toEqual({ "failure", "playthrough failed on phone-portrait" })
+		end)
+
+		it("fails a run cut short, a failed run and a run with no report", function()
+			expect({ Screens.status(report({}, { finished = false }), {}) }).toEqual({
+				"failure",
+				"playthrough stopped before the end",
+			})
+			expect({ Screens.status(report({}, { result = "fail" }), {}) }).toEqual({ "failure", "playthrough failed" })
+			expect({ Screens.status(nil, {}) }).toEqual({ "failure", "no report: the playthrough did not start" })
+		end)
+	end)
+
 	describe("Screens.baselines", function()
 		local files = { "pc/01-card-one.png", "pc/02-title-title.png" }
 
@@ -351,6 +390,8 @@ return function(t: any)
 					`{dir}/out/files`,
 					"--comment",
 					`{dir}/out/comment.md`,
+					"--status",
+					`{dir}/out/status.json`,
 					"--base-url",
 					"https://raw.example/run-1",
 					"--run-url",
@@ -377,6 +418,10 @@ return function(t: any)
 				expect(comment).toContain("| pc | `pass` | 2 | 1 | 0 | 0 |")
 				expect(comment).toContain("| phone | `pass` | 1 | 0 | 1 | 0 |")
 				expect(comment).toContain("`pc/02-title-title.png`<br>")
+				expect(serde.decode("json", fs.readFile(`{dir}/out/status.json`))).toEqual({
+					state = "success",
+					description = "2 devices, 3 screenshots, 1 changed",
+				})
 			end)
 
 			it("copies a passing run's captures of every device for a Baselines pull request", function()

@@ -236,7 +236,7 @@ function StoryHost.onClientReady(player: any)
 		local offer = save and TitleScreen.offer(story, save)
 		local session = sessions[player]
 		if offer and session and not StoryEngine.started(session.engine.progress) then
-			showTitle(session, save, offer)
+			showTitle(session, save :: Save.Save, offer)
 		else
 			run(player, startStory)
 		end

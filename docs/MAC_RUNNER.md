@@ -27,7 +27,8 @@ screen saver and lock settings are never touched, by script or by hand.
 | `tools/screens.luau` | on GitHub's runners, by the `sheets` job and `baselines.yml` | The contact sheets and the comparison with `docs/screens/` through ImageMagick; the logic, and the comment, in `tools/lib/screens.luau`. |
 | `.github/workflows/playtest-cleanup.yml` | on GitHub's runners, when a pull request closes | Deletes its `playtest/pr-<N>` branch. |
 | `.github/workflows/baselines.yml` | started by hand, on GitHub's runners | Opens the "Baselines" pull request from a passing playtest of `main` ([`screens/README.md`](screens/README.md)). |
-| `.github/workflows/playtest-label.yml` | on GitHub's runners, when a pull request gets `needs-playtest` | Dispatches `studio-playtest.yml` on `main` with the pull request's number. Never runs on the Mac. |
+| `.github/workflows/playtest-label.yml` | on GitHub's runners, when a pull request gets `needs-playtest` | Dispatches `studio-playtest.yml` on `main` with the pull request's number, and sets the commit status "Studio playtest" to `pending` on the pull request's head commit. Never runs on the Mac. |
+| The commit status "Studio playtest" | set by `playtest-label.yml` and the playtest's `publish` job | Ties a playtest, which runs on `main`, to the pull request's commit: `pending` when asked, then `success` or `failure` with the outcome in a few words and a link to the run. Never a required check (see "Screenshots on a pull request"). |
 
 ## The rules for every job on the Mac
 
@@ -482,6 +483,26 @@ number ignored, so a Capture added early does not unpair the rest.
 device; the owner accepts them by merging it
 ([`screens/README.md`](screens/README.md)). Until the first one merges,
 every Capture shows as new.
+
+**The commit status "Studio playtest"** (brief mac-003, A6). The
+playtest runs on `main` from a dispatch, so GitHub never ties it to the
+pull request's commit; this status does. `playtest-label.yml` sets it to
+`pending` on the pull request's head commit as soon as it dispatches
+("Asked the Mac to play this pull request", linking the workflow's runs,
+since the run's id is not known then). `publish` sets it to `success` or
+`failure` when the run ends ("5 devices, 111 screenshots, 2 changed", or
+"playthrough failed on phone-portrait"), linking the run, on the commit the
+place was built from, the one `download-place` resolved, not the pull
+request's head at that moment: a push during the run never gets a status
+for a place it was not built from. A run of `main`'s place sets none, and
+a run that uploaded no artifact leaves it `pending`. Each job that sets it
+has `statuses: write` and no other job does; the Mac job gains nothing.
+**The status is never a required check in the ruleset**: it exists only
+on labelled pull requests, so requiring it would block every other pull
+request; the owner reads it in the merge box. A status belongs to one
+commit: after a new push the pull request shows no playtest result until
+the owner labels it again (the label event fires only on labelling, so
+remove and re-add `needs-playtest` to play the new commit).
 
 What only a real run proves (brief mac-003, Must B8): that
 `raw.githubusercontent.com` serves the branch's images inline in the

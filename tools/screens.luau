@@ -6,14 +6,15 @@
 	GitHub's ubuntu-latest runners.
 
 	  lune run tools/screens sheets --artifact <dir> --baselines docs/screens \
-	    --files <dir> --comment <file> --base-url <url> --run-url <url> [--artifact-url <url>]
+	    --files <dir> --comment <file> --status <file> --base-url <url> --run-url <url> [--artifact-url <url>]
 
 	    From the playtest's artifact (report.json and the captures), writes
 	    under --files: sheets/<device>.png, a contact sheet per device;
 	    sheets/title.png, the title screen across devices; captures/, every
 	    capture; and for each capture that differs from its baseline,
 	    before/ (the baseline) and diff/ (the difference). Writes the comment
-	    to --comment, its images linked under --base-url.
+	    to --comment, its images linked under --base-url, and the commit
+	    status's state and description to --status as JSON.
 
 	  lune run tools/screens baselines --artifact <dir> --out <dir>
 
@@ -32,7 +33,7 @@ local Screens = require("./lib/screens")
 local Playthrough = require("./studio-playtest/playthrough")
 
 local USAGE =
-	[[usage: lune run tools/screens sheets --artifact <dir> --baselines <dir> --files <dir> --comment <file> --base-url <url> --run-url <url> [--artifact-url <url>]
+	[[usage: lune run tools/screens sheets --artifact <dir> --baselines <dir> --files <dir> --comment <file> --status <file> --base-url <url> --run-url <url> [--artifact-url <url>]
        lune run tools/screens baselines --artifact <dir> --out <dir>]]
 
 -- Runs an ImageMagick program; its result, failing on anything but the
@@ -182,6 +183,8 @@ local function sheets(values: { [string]: string })
 	local path = Cli.required(values, "comment")
 	makeParent(path)
 	fs.writeFile(path, comment)
+	local state, description = Screens.status(report, devices)
+	fs.writeFile(Cli.required(values, "status"), serde.encode("json", { state = state, description = description }))
 end
 
 local function baselines(values: { [string]: string })
@@ -212,7 +215,7 @@ Cli.main(function(ctx)
 				Cli.options(
 					args,
 					USAGE,
-					{ "artifact", "baselines", "files", "comment", "base-url", "run-url", "artifact-url" }
+					{ "artifact", "baselines", "files", "comment", "status", "base-url", "run-url", "artifact-url" }
 				)
 			)
 		)

@@ -31,6 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       actions: write # to dispatch studio-playtest.yml
+      statuses: write # the "Studio playtest" commit status, pending
     timeout-minutes: 5
     steps:
       - name: Dispatch the playtest on main
@@ -43,3 +44,19 @@ jobs:
             echo "Asked the Mac to play pull request #$PR."
             echo "The run is under Actions -> Studio playtest; it waits while the Mac is asleep."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Ties the playtest, which runs on main, to the pull request's head
+      # commit (brief mac-003, A6). The run's id is not known yet, so the
+      # link is the workflow's runs; the publish job sets the result. Never
+      # a required check: it exists only on labelled pull requests.
+      - name: Mark the playtest pending on the pull request's head commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          STATE: pending
+          CONTEXT: Studio playtest
+          DESCRIPTION: Asked the Mac to play this pull request
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" -f state="$STATE" -f context="$CONTEXT" \
+            -f description="$DESCRIPTION" \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/studio-playtest.yml" > /dev/null

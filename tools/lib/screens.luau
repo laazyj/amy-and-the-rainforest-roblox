@@ -321,13 +321,40 @@ function Screens.comment(page: Page): string
 	return table.concat(lines, "\n") .. "\n"
 end
 
+-- Whether a report is of a playtest that passed to the end.
+local function passed(report: any): boolean
+	return type(report) == "table" and report.finished == true and report.result == "pass"
+end
+
+-- The commit status "Studio playtest" (brief mac-003, A6) of a run: its
+-- state, and its outcome in a few words for the pull request's merge box.
+function Screens.status(report: any, devices: { Device }): (string, string)
+	if type(report) ~= "table" then
+		return "failure", "no report: the playthrough did not start"
+	end
+	for _, device in devices do
+		if device.result == "fail" then
+			return "failure", `playthrough failed on {device.name}`
+		end
+	end
+	if not passed(report) then
+		return "failure", if report.finished ~= true then "playthrough stopped before the end" else "playthrough failed"
+	end
+	local captures, changed = 0, 0
+	for _, device in devices do
+		captures += #device.compared
+		changed += #byStatus(device).changed
+	end
+	return "success", `{#devices} devices, {captures} screenshots, {changed} changed`
+end
+
 -- The files a Baselines pull request takes from a run of main: every
 -- capture of a finished, passing report that played every device in
 -- `devices`. Nil and why not otherwise.
 function Screens.baselines(report: any, exists: (file: string) -> boolean, devices: { string }): ({ Capture }?, string?)
 	if type(report) ~= "table" then
 		return nil, "there is no report.json"
-	elseif report.finished ~= true or report.result ~= "pass" then
+	elseif not passed(report) then
 		return nil, `the playtest did not pass to the end (result {Screens.code(report.result)})`
 	end
 	local played, rejected = Screens.captures(report, exists)
