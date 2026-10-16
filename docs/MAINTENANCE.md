@@ -57,7 +57,10 @@ start CI by closing and reopening it. The `upload-assets` workflow opens its
   ever running. The local `$/.github/actions/setup-tools` is exempt: it is
   this repository at the commit being run.
 - **Make CI a required status check on `main`**: Settings → Branches (or a
-  ruleset) → require the `Check, test, build` check, and enable "Require
+  ruleset) → require the `Check, test, build` and `Publish a Saved version and
+  run the engine tests` checks (the engine-tests workflow runs on every PR and
+  its gate skips the test job for docs-only and keyless runs, so the check
+  reports as skipped instead of waiting forever), and enable "Require
   branches to be up to date before merging". See also
   [`OPEN_CLOUD.md`](OPEN_CLOUD.md#ci), which relies on it for the Dev
   publish.

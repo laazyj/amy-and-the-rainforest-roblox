@@ -240,8 +240,9 @@ module that opens a store must take its name from `Config` the same way.
 Both workflows read the repository secret `ROBLOX_DEV_API_KEY` and the
 repository variables `DEV_UNIVERSE_ID`, `DEV_PLACE_ID`,
 `RELEASE_UNIVERSE_ID` and `RELEASE_PLACE_ID`. The last two arm the Release
-refusal. Docs-only PRs (`docs/**`, `**/*.md`) skip the engine-tests
-workflow. `upload-assets.yml` also reads the repository variable
+refusal. The engine-tests workflow runs on every PR so its job can be
+a required check; for a docs-only PR (every changed file matches `docs/**`
+or `**/*.md`) the gate skips the test job, which reports as skipped. `upload-assets.yml` also reads the repository variable
 `ROBLOX_CREATOR_USER_ID`, the owner's Roblox user id, which the assets are
 created under.
 
