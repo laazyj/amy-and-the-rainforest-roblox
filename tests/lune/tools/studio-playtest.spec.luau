@@ -33,11 +33,18 @@ local function fakeStudio(overrides: { [string]: any }?): (Smoke.Bridge, { strin
 		end,
 		capture = function(path)
 			table.insert(calls, `capture {path}`)
-			return 0.4321
+			return { luminance = 0.4321, pixels = "1029x761" }
 		end,
 		close = function()
 			table.insert(calls, "close")
 		end,
+		setDevice = function(device)
+			table.insert(calls, `device {if device then device.simulator else "none"}`)
+			return nil
+		end,
+		press = function() end,
+		walkTo = function() end,
+		insertAsset = function() end,
 	}
 	for name, fn in overrides or {} :: { [string]: any } do
 		bridge[name] = fn
@@ -66,6 +73,7 @@ return function(t: any)
 			local report = run(bridge)
 			t.expect(calls).toEqual({
 				"open build/Place.rbxl",
+				"device none",
 				"run Edit",
 				"startPlay",
 				"run Server",
@@ -82,6 +90,7 @@ return function(t: any)
 			t.expect(report.viewport).toBe("1029x719")
 			t.expect(report.frameMilliseconds).toBe(16.6)
 			t.expect(report.screenshotLuminance).toBe(0.432)
+			t.expect(report.screenshotPixels).toBe("1029x761")
 			t.expect(report.screenshot).toBe("out/viewport.png")
 			t.expect(report.studioVersion).toBe("0.742.0.7421053")
 			t.expect(report.studioVersionDrift).toBe(false)
@@ -105,6 +114,24 @@ return function(t: any)
 			local report = run(bridge)
 			t.expect(report.result).toBe("fail")
 			t.expect(report.failure).toContain("Open the place in Studio: Studio has 'Other.rbxl' open")
+			t.expect(calls).toEqual({ "open build/Place.rbxl", "device none", "close" })
+		end)
+
+		t.it("fails before Play when Studio still simulates a device", function()
+			local bridge, calls = fakeStudio({
+				setDevice = function()
+					return {
+						device = "iphone_16",
+						orientation = "LandscapeRight",
+						scaling = "FitToWindow",
+						width = 852,
+						height = 393,
+					}
+				end,
+			})
+			local report = run(bridge)
+			t.expect(report.failure)
+				.toBe("Open the place in Studio: Studio still simulates iphone_16 after the simulator was stopped")
 			t.expect(calls).toEqual({ "open build/Place.rbxl", "close" })
 		end)
 
@@ -137,7 +164,7 @@ return function(t: any)
 		t.it("fails when the screenshot is black where the viewport should be", function()
 			local bridge = fakeStudio({
 				capture = function()
-					return 0.001
+					return { luminance = 0.001, pixels = "1029x761" }
 				end,
 			})
 			local report = run(bridge)
@@ -153,7 +180,7 @@ return function(t: any)
 				end,
 			})
 			t.expect(run(bridge).failure).toBe("Start Play: Studio did not start Play")
-			t.expect(calls).toEqual({ "open build/Place.rbxl", "run Edit", "stopPlay", "close" })
+			t.expect(calls).toEqual({ "open build/Place.rbxl", "device none", "run Edit", "stopPlay", "close" })
 		end)
 
 		t.it("fails when the console does not show the printed line", function()
