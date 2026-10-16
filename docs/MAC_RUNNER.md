@@ -49,6 +49,22 @@ The repository is public, so these hold for every workflow that targets
   the job before a step runs ("Branch … is not allowed to deploy to
   studio"). Tier 0 requires the environment on every self-hosted job;
   `check-repo.sh` checks the environment's policy.
+- The `studio` environment has the owner as its required reviewer, with
+  self-review allowed (Settings → Environments → studio → Required
+  reviewers; "Prevent self-review" off). Every Mac job waits, before its
+  runner is even assigned, until the owner approves it under the run's
+  "Review deployments". Why: the playtest runs a pull request's place,
+  whose scripts run in Studio in the guest, and nothing else stops
+  someone with write access dispatching it for any pull request, nor an
+  agent session, which acts with the owner's own GitHub account. The
+  approval is the moment the owner has read the diff. Self-review is
+  allowed because the owner is the only reviewer: with it prevented,
+  GitHub refuses the owner's approval of the runs the owner starts (a
+  manual dispatch, the push of a merge to `main`), and they never run.
+  It costs a click per job, the smoke run after each merge included. A
+  session holding the owner's token can approve through GitHub's API as
+  the owner can, so agents never approve a deployment to `studio`, just
+  as they never merge (brief mac-001a, decision 3).
 - The environment only gates jobs that declare it, and tier 0 runs after
   the fact, so the runner enforces the rule itself: its job-started hook
   (`~/actions-runner-studio/job-started.sh` in the guest, installed by
@@ -98,7 +114,9 @@ That is why the label is the owner's to give after reading the diff.
 repository owner (`github.actor`), so another account with write access
 labels in vain. The check cannot tell the owner from a session acting with
 the owner's own GitHub token, which is how the agent sessions here post
-reviews, so agents never apply the label: it is a rule, not only a check.
+reviews, so agents never apply the label. The gate is the `studio`
+environment's required reviewer (see the rules above): however the
+playtest was started, it waits for the owner's approval.
 
 **What persists between jobs:** everything in the guest: the runner's
 `_work` directory (checkouts, downloaded place files, screenshots), the
