@@ -349,6 +349,15 @@ viewport most of each capture (brief mac-003, Must 7):
 lune run tools/studio-playtest/play --file build/AmyAndTheRainforest.rbxl --out build/studio-playtest [--devices pc,phone-portrait]
 ```
 
+**Before any manual run in the VM** (`vm.sh exec`), check that no Studio
+job is running or queued: `gh run list --workflow studio-playtest.yml`
+and `--workflow studio-smoke.yml` show none in progress, queued or
+waiting, and `pgrep -lf RobloxStudio` in the guest shows no Studio from
+`actions-runner-studio/_work`. The runner and a manual run share one
+guest, one screen and one MCP server, and `concurrency: studio` knows
+nothing of a manual run: on 2026-10-16 one cost an approved playtest
+(run 38925724410) its `pc` result.
+
 It plays the Story on a real client in Studio, from a fresh Save (Studio
 has no DataStores, so every Play is a new player) to the end card, as a
 player would. `playthrough.luau` is the sequence, pure and unit-tested
