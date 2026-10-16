@@ -12,7 +12,17 @@
 # runs this file as it is on main, as the rules for every Mac job require
 # (docs/MAC_RUNNER.md): the tools come from main, the place is CI's artifact,
 # read-only permissions, no secrets, a timeout and one Studio at a time.
+#
+# Then, on GitHub's runners (brief mac-003; docs/MAC_RUNNER.md, "Screenshots
+# on a pull request"): `sheets`, read-only, makes a contact sheet per device
+# and compares every capture with its baseline in docs/screens/
+# (tools/screens.luau); `publish`, the only job with a write token, runs no
+# tools of this repository and nothing from the artifact: it force-pushes
+# the images to playtest/pr-<N> (playtest/main for a run of main) as one
+# commit and posts or updates the one comment on pull request N, or writes
+# the job summary for a run of main.
 name: Studio playtest
+run-name: Studio playtest of ${{ inputs.pr && format('#{0}', inputs.pr) || 'main' }}
 
 on:
   workflow_dispatch:
@@ -44,6 +54,9 @@ jobs:
       contents: read
       actions: read # to find and download CI's place artifact
     timeout-minutes: 60
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+      artifact-url: ${{ steps.upload.outputs.artifact-url }}
     # A playtest of a pull request reports; it never fails the pull request
     # (plan section 4: tier 3 is not on a PR's critical path).
     continue-on-error: ${{ inputs.pr != '' }}
@@ -78,9 +91,120 @@ jobs:
         run: lune run tools/studio-playtest/summary build/studio-playtest/report.json >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the screenshots and the report
+        id: upload
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: studio-playtest
           path: build/studio-playtest
           if-no-files-found: error
+
+  # The artifact holds what a pull request's place did in Studio, so it is
+  # read here, with a read-only token, and nowhere near the write token.
+  sheets:
+    name: Make the contact sheets and compare with the baselines
+    needs: playtest
+    # Whenever the Mac job uploaded its artifact, whatever the playtest's result.
+    if: ${{ always() && needs.playtest.outputs.artifact-id != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main # the tools and the baselines from main
+          persist-credentials: false
+
+      - name: Install the pinned toolchain
+        uses: $/.github/actions/setup-tools
+
+      - name: Download the screenshots and the report
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: studio-playtest
+          path: ${{ runner.temp }}/playtest
+
+      - name: Make the contact sheets, the differences and the comment
+        env:
+          PR: ${{ inputs.pr }}
+          ARTIFACT_URL: ${{ needs.playtest.outputs.artifact-url }}
+        run: |
+          case "$PR" in
+          "") branch=playtest/main ;;
+          *[!0-9]*) echo "::error::pr must be a pull request number"; exit 1 ;;
+          *) branch="playtest/pr-$PR" ;;
+          esac
+          lune run tools/screens sheets --artifact "$RUNNER_TEMP/playtest" --baselines docs/screens \
+            --files "$RUNNER_TEMP/screens/files/run-$GITHUB_RUN_ID" --comment "$RUNNER_TEMP/screens/comment.md" \
+            --base-url "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/refs/heads/$branch/run-$GITHUB_RUN_ID" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --artifact-url "$ARTIFACT_URL"
+
+      - name: Upload the images and the comment
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: studio-playtest-screens
+          path: ${{ runner.temp }}/screens
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Put the screenshots on the pull request
+    needs: sheets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # force-push playtest/pr-<N> or playtest/main
+      pull-requests: write # the one comment on pull request N
+    timeout-minutes: 10
+    steps:
+      - name: Download the images and the comment
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: studio-playtest-screens
+          path: ${{ runner.temp }}/screens
+
+      # One commit with no parent, force-pushed, so the branch never grows.
+      # The token goes in a header, never in a remote URL.
+      - name: Push the images to the playtest branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ inputs.pr }}
+        run: |
+          case "$PR" in
+          "") branch=playtest/main ;;
+          *[!0-9]*) echo "::error::pr must be a pull request number"; exit 1 ;;
+          *) branch="playtest/pr-$PR" ;;
+          esac
+          cd "$RUNNER_TEMP/screens/files"
+          git init -q
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q --allow-empty -m "Screenshots of Studio playtest run $GITHUB_RUN_ID"
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          git -c http.extraheader="AUTHORIZATION: basic $auth" push -q --force \
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" "HEAD:refs/heads/$branch"
+
+      - name: Post or update the comment on the pull request
+        if: inputs.pr != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ inputs.pr }}
+          MARKER: "<!-- studio-playtest-screens -->"
+        run: |
+          ids=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith(env.MARKER))) | .id')
+          comment=${ids%%[!0-9]*}
+          jq -n --rawfile body "$RUNNER_TEMP/screens/comment.md" '{body: $body}' > "$RUNNER_TEMP/comment.json"
+          if [ -n "$comment" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment" --input "$RUNNER_TEMP/comment.json" > /dev/null
+            echo "Updated the screenshots comment on #$PR." >> "$GITHUB_STEP_SUMMARY"
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --input "$RUNNER_TEMP/comment.json" > /dev/null
+            echo "Posted the screenshots comment on #$PR." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Write the screenshots to the summary of a run of main
+        if: inputs.pr == ''
+        run: cat "$RUNNER_TEMP/screens/comment.md" >> "$GITHUB_STEP_SUMMARY"

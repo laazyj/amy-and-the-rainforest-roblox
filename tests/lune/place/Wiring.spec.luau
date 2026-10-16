@@ -82,6 +82,21 @@ local WIRING: { { file: string, label: string, code: string } } = {
 		code = "Analytics.left(player)",
 	},
 	{
+		file = "StoryHost.luau",
+		label = "the Story waits while the Title screen is offered: no Player event is handled",
+		code = "if not session or session.busy or session.offered then\n\t\treturn",
+	},
+	{
+		file = "StoryHost.luau",
+		label = "/title ends the session where it is and offers the Title screen at its Progress",
+		code = 'newSession(player, progress)\n\tsessions[player].offered = save\n\tPersist.record(player, progress)\n\tmessage(player, "ShowTitle", table.pack(offer.chapter, offer.canContinue))',
+	},
+	{
+		file = "Dev/DevShortcuts.luau",
+		label = "the Dev shortcut /title reaches StoryHost.offerTitle",
+		code = 'elseif shortcut.kind == "title" then\n\t\treturn StoryHost.offerTitle(player)',
+	},
+	{
 		file = "FaultLog.luau",
 		label = "every Fault is logged to analytics",
 		code = "warn(Fault.line(name, playerId, why))\n\tAnalytics.fault(name, player)",

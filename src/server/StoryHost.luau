@@ -28,7 +28,9 @@
 	When their client is ready, a player who has not started begins the
 	Story at once; a returning player is offered the Title screen
 	(ShowTitle) and their Title choice continues, replays the Chapter from
-	its Checkpoint, or starts again. Before either, a player whose Settings
+	its Checkpoint, or starts again. While the Title screen is offered, the
+	Story waits: no Player event is handled until the Title choice. The Dev
+	shortcut /title offers it again mid-Story (offerTitle). Before either, a player whose Settings
 	are not the defaults is sent them (ApplySettings); each change the
 	client sends (ChangeSettings) goes into their Save.
 
@@ -158,7 +160,7 @@ local function run(
 	advance: (engine: StoryEngine.Engine) -> ({ Events.StoryEvent }, { Events.WorldCommand })
 )
 	local session = sessions[player]
-	if not session or session.busy then
+	if not session or session.busy or session.offered then
 		return
 	end
 	session.busy = true
@@ -252,6 +254,26 @@ function StoryHost.onTitleChoice(player: any, choice: string)
 	else
 		StoryHost.resume(player, progress)
 	end
+end
+
+-- The Title screen offered to `player` at their current Progress, as to a
+-- returning player, for the Dev shortcut /title: the session ends where it
+-- is (a Beat or a Dialogue stops), the Save gets that Progress, and the
+-- Story waits for the Title choice. Returns the Chapter offered, or nil and
+-- why not.
+function StoryHost.offerTitle(player: any): (string?, string?)
+	local progress = StoryHost.progress(player)
+	if not progress or not StoryEngine.started(progress) then
+		return nil, "the Story has not started"
+	end
+	-- Studio has no DataStores: without a Save to load, offer one made now
+	local save = Save.record(story, Persist.await(player) or Save.new(), progress)
+	local offer = TitleScreen.offer(story, save) :: TitleScreen.Offer
+	newSession(player, progress)
+	sessions[player].offered = save
+	Persist.record(player, progress)
+	message(player, "ShowTitle", table.pack(offer.chapter, offer.canContinue))
+	return offer.chapter, nil
 end
 
 -- Resume (plan section 2.4): a new session for `player` at `progress`, and

@@ -7,9 +7,14 @@
 	of every Chapter up to it, as if they had played there, so "Continue"
 	on their next visit comes back to it.
 
+	/title offers the Title screen at the current Progress, as to a
+	returning player (StoryHost.offerTitle): the Story waits for the Title
+	choice, and Continue carries on where the player was.
+
 	  jumpTo(player, questId)    the jump-to-Quest entry point
 	  onCommand(player, text)    a chat command, parsed by core/DevShortcut
-	  start()                    makes the chat commands (/chapter, /quest)
+	  start()                    makes the chat commands (/chapter, /quest,
+	                             /title)
 
 	DevServer.server.luau starts it. Both live in ServerScriptService.Dev,
 	which the publish job strips from the Release place (RELEASE_JOB=1,
@@ -34,13 +39,17 @@ function DevShortcuts.jumpTo(player: any, questId: string)
 	StoryHost.resume(player, StoryEngine.progressAt(story, questId))
 end
 
--- Jumps where `text` says; returns the Quest, or nil and why not.
+-- Does what `text` asks; returns the Quest jumped to or the Chapter the
+-- Title screen offers, or nil and why not.
 function DevShortcuts.onCommand(player: any, text: string): (string?, string?)
-	local questId, reason = DevShortcut.parse(story, text)
-	if questId then
-		DevShortcuts.jumpTo(player, questId)
+	local shortcut, reason = DevShortcut.parse(story, text)
+	if not shortcut then
+		return nil, reason
+	elseif shortcut.kind == "title" then
+		return StoryHost.offerTitle(player)
 	end
-	return questId, reason
+	DevShortcuts.jumpTo(player, shortcut.quest)
+	return shortcut.quest, nil
 end
 
 function DevShortcuts.start()
@@ -51,8 +60,8 @@ function DevShortcuts.start()
 		command.Triggered:Connect(function(source: TextSource, text: string)
 			local player = Players:GetPlayerByUserId(source.UserId)
 			if player then
-				local questId, reason = DevShortcuts.onCommand(player, text)
-				print(`[DevShortcuts] {player.Name}: {text} -> {questId or reason}`)
+				local done, reason = DevShortcuts.onCommand(player, text)
+				print(`[DevShortcuts] {player.Name}: {text} -> {done or reason}`)
 			end
 		end)
 		command.Parent = TextChatService

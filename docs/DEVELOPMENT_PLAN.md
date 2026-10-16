@@ -493,7 +493,8 @@ Design notes:
   waits in GitHub's queue (up to 24 hours) rather than skipping. The
   release workflow refuses to promote a build that has no tier 3 result.
 - **Screenshots are review material and agent feedback.** Tier 3 uploads a
-  contact sheet to the PR. For perceptual tasks the agent reads it and
+  contact sheet to the PR (how: `docs/MAC_RUNNER.md`, "Screenshots on a
+  pull request"). For perceptual tasks the agent reads it and
   iterates against the per-scene checklist in `docs/design/feel.md`.
 - **Budgets are tests, measured where they can be.** Tier 2 checks instance
   and part counts, triangle counts from the mesh manifest and server
@@ -626,7 +627,10 @@ repeats, and you see the result once.
 - A full visual pass takes 5 to 10 minutes, so the agent batches scene
   changes and runs it per batch, not per edit.
 - Baselines change deliberately: a PR that changes a baseline shows the
-  before and after in its description and lists the rubric scores.
+  before and after in its description and lists the rubric scores. They
+  change only through a Baselines PR (`docs/screens/README.md`), and every
+  playtest's comment shows each changed Capture's before, after and
+  difference (`docs/MAC_RUNNER.md`, "Screenshots on a pull request").
 - All of it depends on the Mac being awake and on Studio not having
   auto-updated into a breaking change that week. A perceptual brief
   states up front that it needs the Mac on for its duration.

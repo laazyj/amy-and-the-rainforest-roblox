@@ -1,0 +1,38 @@
+# Deletes a closed pull request's screenshots branch, playtest/pr-<N>, which
+# the Studio playtest's publish job force-pushes (brief mac-003; docs/MAC_RUNNER.md,
+# "Screenshots on a pull request"). Runs on GitHub's runners, never on the
+# Mac. A fork's pull request is never played, so it has no branch here and
+# its read-only token is not asked to delete one.
+name: Playtest cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions: {}
+
+concurrency:
+  group: playtest-cleanup-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  delete:
+    name: Delete the pull request's screenshots branch
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # delete the playtest/pr-<N> branch
+    timeout-minutes: 5
+    steps:
+      - name: Delete playtest/pr-<N> if it is there
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          ref="repos/$GITHUB_REPOSITORY/git/refs/heads/playtest/pr-$PR"
+          if gh api "$ref" --silent 2> /dev/null; then
+            gh api -X DELETE "$ref"
+            echo "Deleted playtest/pr-$PR." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No playtest/pr-$PR to delete." >> "$GITHUB_STEP_SUMMARY"
+          fi

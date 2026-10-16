@@ -19,14 +19,31 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 15
+    outputs:
+      visual: ${{ steps.visual.outputs.visual }}
     steps:
+      # On a pull request, its merge commit and the base it merges into.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 2
           persist-credentials: false
 
       - name: Install the pinned toolchain
         id: tools
         uses: $/.github/actions/setup-tools
+
+      # First, so the prompt is posted even when a later step fails.
+      - name: Find the changed paths that alter what is on screen
+        id: visual
+        if: github.event_name == 'pull_request'
+        run: |
+          CHANGED_FILES="$(git diff --no-renames --name-only HEAD^1 HEAD)"
+          export CHANGED_FILES
+          paths="$(lune run tools/visual-paths)"
+          if [ -n "$paths" ]; then
+            printf 'Changes what is on screen:\n%s\n' "$paths"
+            echo "visual=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Static checks
         env:
@@ -65,3 +82,35 @@ jobs:
           name: roblox-std
           path: build/roblox-std/roblox.yml
           if-no-files-found: error
+
+  # A pull request that changes a path in tools/lib/visual-paths.luau gets one
+  # comment, found by its marker and updated in place, asking for the owner's
+  # label (brief mac-003, Must A4). This job runs nothing from the pull
+  # request; the job above, which does, holds no write token. A fork's
+  # token cannot comment, so for a fork this is skipped, not failed.
+  screen-prompt:
+    name: Ask for screenshots of a change to what is on screen
+    needs: ci
+    if: ${{ !cancelled() && needs.ci.outputs.visual == 'true' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write # the one prompt comment
+    timeout-minutes: 5
+    steps:
+      - name: Post or update the prompt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          MARKER: "<!-- screen-prompt -->"
+        run: |
+          ids=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith(env.MARKER))) | .id')
+          comment=${ids%%[!0-9]*}
+          jq -n --arg body "$MARKER
+          This pull request changes what is on screen. The owner's \`needs-playtest\` label brings screenshots here." \
+            '{body: $body}' > "$RUNNER_TEMP/prompt.json"
+          if [ -n "$comment" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment" --input "$RUNNER_TEMP/prompt.json" > /dev/null
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --input "$RUNNER_TEMP/prompt.json" > /dev/null
+          fi
