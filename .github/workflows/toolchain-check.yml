@@ -37,7 +37,7 @@ jobs:
           persist-credentials: false
 
       - name: Install the pinned toolchain
-        uses: ./.github/actions/setup-tools
+        uses: $/.github/actions/setup-tools
 
       - name: Compare the pins and write the patch
         id: check

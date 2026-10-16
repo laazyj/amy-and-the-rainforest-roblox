@@ -4,23 +4,25 @@
 # is already there at its pinned version. Each is pinned by version and by
 # the SHA-256 of its release archive, checked before it is unpacked. Called
 # by tools/bootstrap-agent.sh.
-# To bump: change the version and both checksums together (actionlint
-# publishes a checksums file; zizmor does not, so hash the release assets).
+# actionlint is the kjanat/actionlint fork. To bump: change the version and
+# both checksums together; actionlint's are in actionlint_<version>_checksums.txt
+# on its release page (verify the archives with `gh attestation verify -R
+# kjanat/actionlint`); zizmor publishes none, so hash its release assets.
 set -euo pipefail
 
-ACTIONLINT_VERSION=1.7.12
+ACTIONLINT_VERSION=1.17.0
 ZIZMOR_VERSION=1.30.1
 
 case "$(uname -s)-$(uname -m)" in
 Linux-x86_64)
 	actionlint_asset="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-	actionlint_sha256=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+	actionlint_sha256=620abd485a12b6ab1125b844a876414e1d5bd2af8a3125b27f82b01d0d9d6e5a
 	zizmor_asset=zizmor-x86_64-unknown-linux-gnu.tar.gz
 	zizmor_sha256=e65324f4430c2717591937edcec90ccbefaf14c174f8ec9415e03ca875b46e1a
 	;;
 Darwin-arm64)
 	actionlint_asset="actionlint_${ACTIONLINT_VERSION}_darwin_arm64.tar.gz"
-	actionlint_sha256=aba9ced2dee8d27fecca3dc7feb1a7f9a52caefa1eb46f3271ea66b6e0e6953f
+	actionlint_sha256=f123b7ad57a0fe376dcc85e81b7e04e85eb39219184803fc25f989b255f569b4
 	zizmor_asset=zizmor-aarch64-apple-darwin.tar.gz
 	zizmor_sha256=e28d22b087f9ebb8d99da6e740d348c930f559961c7c3f12badda54f882195a2
 	;;
@@ -54,6 +56,6 @@ install_tool() {
 }
 
 install_tool actionlint "$ACTIONLINT_VERSION" \
-	"https://github.com/rhysd/actionlint/releases/download/v$ACTIONLINT_VERSION/$actionlint_asset" "$actionlint_sha256"
+	"https://github.com/kjanat/actionlint/releases/download/v$ACTIONLINT_VERSION/$actionlint_asset" "$actionlint_sha256"
 install_tool zizmor "$ZIZMOR_VERSION" \
 	"https://github.com/zizmorcore/zizmor/releases/download/v$ZIZMOR_VERSION/$zizmor_asset" "$zizmor_sha256"

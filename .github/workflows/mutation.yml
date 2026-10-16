@@ -30,7 +30,7 @@ jobs:
           persist-credentials: false
 
       - name: Install the pinned toolchain
-        uses: ./.github/actions/setup-tools
+        uses: $/.github/actions/setup-tools
 
       # The report (stdout) goes to the job summary. An explicit
       # `shell: bash` runs with `-eo pipefail`, so the step fails when the
