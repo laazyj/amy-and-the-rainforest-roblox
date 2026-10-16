@@ -37,7 +37,7 @@ jobs:
       # For tools/screens' end-to-end specs, which fail in CI without it
       # (Ubuntu 24.04's runner image has none).
       - name: Install ImageMagick
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends imagemagick
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends imagemagick fonts-dejavu-core
 
       # First, so the prompt is posted even when a later step fails.
       - name: Find the changed paths that alter what is on screen

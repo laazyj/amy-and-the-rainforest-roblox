@@ -39,6 +39,9 @@ Screens.SHARE = 0.01
 -- are in the artifact.
 Screens.MAX_ROWS = 30
 
+-- The labels' font: fonts-dejavu-core, installed with ImageMagick.
+Screens.FONT = "DejaVu-Sans"
+
 -- The contact sheet's tiles.
 Screens.SHEET_COLUMNS = 4
 Screens.TILE_WIDTH = 320

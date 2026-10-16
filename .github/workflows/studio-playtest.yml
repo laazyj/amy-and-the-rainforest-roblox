@@ -125,7 +125,7 @@ jobs:
 
       # Ubuntu 24.04's runner image has no ImageMagick (22.04's had it).
       - name: Install ImageMagick
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends imagemagick
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends imagemagick fonts-dejavu-core
 
       - name: Install the pinned toolchain
         uses: $/.github/actions/setup-tools

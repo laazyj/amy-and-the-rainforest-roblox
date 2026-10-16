@@ -116,6 +116,9 @@ end
 local function montage(args: { string }, out: string)
 	makeParent(out)
 	local all = {
+		-- named, as ImageMagick without its recommended packages has no default font
+		"-font",
+		Screens.FONT,
 		"-background",
 		"#fbf6ea",
 		"-pointsize",
