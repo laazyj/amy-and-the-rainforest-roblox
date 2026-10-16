@@ -52,6 +52,7 @@ start CI by closing and reopening it. The `upload-assets` workflow opens its
 | actionlint and zizmor | `tools/install-workflow-linters.sh` | Pinned by version and checksum per platform; the script's header says how to bump. actionlint is the kjanat/actionlint fork. |
 | A pin in `rokit.toml` changed by hand | `tools/toolchain-checksums.txt` | Change the tool's tag, asset names and SHA-256s with it (the digests are on the release page); `tools/bootstrap-agent.sh` refuses a pin without matching lines. |
 | Roblox Studio on the Mac | The Mac runner's virtual machine ([`MAC_RUNNER.md`](MAC_RUNNER.md)) | Studio auto-updates weekly and can break the tier 3 bridge. The Mac job reports the Studio version with every run. When a tier 3 run fails after a Studio update, compare the reported version with the last green run's, and fix the wrapper in `tools/studio-playtest/` rather than holding Studio back. |
+| Engine test hangs (`INTERNAL_ERROR Task timed out`, `gave up after waiting`) | `tools/lib/engine-tests.luau` | Not a code failure: Roblox accepted the task and never ran it. The runner retries each script once (run id `<RUN_ID>-retry`) and logs `retrying ...`; a script that hangs twice fails. Re-run the job if so; if hangs become routine, see "Retry" in `OPEN_CLOUD.md`. |
 | Roblox engine and Open Cloud API changes | `tools/opencloud.luau` | Tier 2 fails on a changed endpoint. Re-check against the creator-docs OpenAPI specs (see "What was verified" in `OPEN_CLOUD.md`). |
 
 ## Repository settings (one-time, owner)

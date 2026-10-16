@@ -24,6 +24,13 @@ EngineTests.QUEUE_ALLOWANCE = 300
 -- 10 incomplete tasks per place; both answer 429, which is waited out.
 EngineTests.RATE_LIMIT_WAIT = 15
 EngineTests.DEFAULT_PRELUDE = "tests/engine/_prelude.luau"
+-- Appended to the run id of a script's one retry, so the retried task opens
+-- different stores from the first, which may still run later. Clean-up
+-- (tools/clean-test-stores) sweeps by the `test-<RUN_ID>-` prefix, so it
+-- still finds these.
+EngineTests.RETRY_SUFFIX = "-retry"
+-- The start of the error runOne raises when its deadline passes.
+local GAVE_UP = "gave up after waiting"
 
 -- Embedded files: for each of EngineTests.EMBED_FUNCTIONS, repository path ->
 -- the file's text (see collectEmbeds).
@@ -322,12 +329,26 @@ function EngineTests.verdict(taskResource: OpenCloud.Task, logs: { string }): (b
 	return false, `output does not end with {EngineTests.PASS_MARKER}`
 end
 
+-- Roblox accepted the task but never ran it: it ended FAILED with an
+-- INTERNAL_ERROR that says it timed out. Any other FAILED task, a script
+-- error included, is a real result. Returns the reason to log, or nil.
+local function neverRanReason(taskResource: OpenCloud.Task): string?
+	local err = taskResource.error
+	if taskResource.state == "FAILED" and err and err.code == "INTERNAL_ERROR" then
+		local message = err.message or ""
+		if string.find(string.lower(message), "timed out", 1, true) then
+			return `{err.code} {message}`
+		end
+	end
+	return nil
+end
+
 local function runOne(ctx: Cli.Context, target: Cli.Target, createRequest: OpenCloud.Request, timeout: number)
 	local waited = 0
 	local deadline = timeout + EngineTests.QUEUE_ALLOWANCE
 	local function wait(seconds: number)
 		if waited >= deadline then
-			error(`gave up after waiting {waited}s`, 0)
+			error(`{GAVE_UP} {waited}s`, 0)
 		end
 		ctx.sleep(seconds)
 		waited += seconds
@@ -363,11 +384,11 @@ end
 
 -- Wall-clock seconds the whole run may take: each wave of CONCURRENCY scripts
 -- gets its timeout, the queue allowance and the longest "server busy" wait,
--- plus a minute of slack. Guards
+-- twice over (a script is retried once), plus a minute of slack. Guards
 -- against a request that never returns (net.request has no timeout).
 function EngineTests.runBudget(scripts: number, timeout: number): number
 	local waves = math.ceil(scripts / EngineTests.CONCURRENCY)
-	return waves * (timeout + EngineTests.QUEUE_ALLOWANCE + OpenCloud.BUSY_WAIT_TOTAL) + 60
+	return waves * 2 * (timeout + EngineTests.QUEUE_ALLOWANCE + OpenCloud.BUSY_WAIT_TOTAL) + 60
 end
 
 -- Runs `worker` over `items` with at most `limit` running at once and returns
@@ -459,41 +480,56 @@ function EngineTests.main(ctx: Cli.Context)
 	local scripts = loadScripts(ctx, values)
 	-- Every request is built before any is sent, so a script that cannot be
 	-- submitted (too large) stops the run before a task is spent.
-	local requests: { [Script]: OpenCloud.Request } = {}
+	-- Each script has two: its task and the retry's, under RUN_ID .. RETRY_SUFFIX.
+	local requests: { [Script]: { OpenCloud.Request } } = {}
 	for _, script in scripts do
-		local source = EngineTests.wrap(runId, prelude, script)
-		local ok, request = pcall(
-			OpenCloud.createTaskRequest,
-			target.apiKey,
-			target.universeId,
-			target.placeId,
-			versionId,
-			source,
-			timeout
-		)
-		requests[script] = if ok then request else error(`{script.name}: {request}`, 0)
-	end
-	local function createRequest(script: Script): OpenCloud.Request
-		return requests[script]
+		requests[script] = {}
+		for _, id in { runId, runId .. EngineTests.RETRY_SUFFIX } do
+			local source = EngineTests.wrap(id, prelude, script)
+			local ok, request = pcall(
+				OpenCloud.createTaskRequest,
+				target.apiKey,
+				target.universeId,
+				target.placeId,
+				versionId,
+				source,
+				timeout
+			)
+			table.insert(requests[script], if ok then request else error(`{script.name}: {request}`, 0))
+		end
 	end
 
 	ctx.log(`engine tests: {#scripts} script(s), RUN_ID {runId}`)
 	if target.dryRun then
 		for _, script in scripts do
 			ctx.log(`dry run: {script.name} would send`)
-			ctx.log(OpenCloud.describe(createRequest(script)))
+			ctx.log(OpenCloud.describe(requests[script][1]))
 		end
 		ctx.log(OpenCloud.describeTaskPolling())
 		return
 	end
 
+	local retried = 0
+	-- One attempt: the task and its logs, or the error that ended the wait.
+	local function attempt(script: Script, retry: boolean): (boolean, any, { string }?)
+		return pcall(runOne, ctx, target, requests[script][if retry then 2 else 1], timeout)
+	end
+
 	local results = EngineTests.runPool(scripts, EngineTests.CONCURRENCY, function(script: Script): boolean
-		local ok, taskResource, logs = pcall(function()
-			return runOne(ctx, target, createRequest(script), timeout)
-		end)
+		local ok, taskResource, logs = attempt(script, false)
+		-- A task Roblox never ran is submitted once more, as a new task.
+		local neverRan = if ok
+			then neverRanReason(taskResource)
+			elseif string.find(tostring(taskResource), GAVE_UP, 1, true) == 1 then tostring(taskResource)
+			else nil
+		if neverRan then
+			retried += 1
+			ctx.out(`retrying {script.name}: Roblox never ran the task ({neverRan})`)
+			ok, taskResource, logs = attempt(script, true)
+		end
 		local passed: boolean, reason: string? = false, tostring(taskResource)
 		if ok then
-			passed, reason = EngineTests.verdict(taskResource, logs)
+			passed, reason = EngineTests.verdict(taskResource, logs :: { string })
 		end
 		-- Printed as each script finishes; no yield inside, so blocks never interleave.
 		ctx.out(`--- {script.name}`)
@@ -512,7 +548,7 @@ function EngineTests.main(ctx: Cli.Context)
 			failed += 1
 		end
 	end
-	ctx.out(`{#results - failed} passed, {failed} failed`)
+	ctx.out(`{#results - failed} passed, {failed} failed, {retried} retried`)
 	if failed > 0 then
 		error(`{failed} engine test script(s) failed`, 0)
 	end

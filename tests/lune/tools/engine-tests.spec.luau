@@ -7,14 +7,33 @@ local task = require("@lune/task")
 local PRELUDE = "-- prelude\n"
 local PASSING = { "  ok   a test", "1 passed", "ENGINE_TESTS_PASSED" }
 
-type Behaviour = { polls: number?, state: string?, logs: { string }?, logPages: number? }
+type Behaviour = {
+	polls: number?,
+	state: string?,
+	logs: { string }?,
+	logPages: number?,
+	errorCode: string?,
+	errorMessage: string?,
+	-- Behaviour of the 2nd, 3rd... submission of the script; the first is this table.
+	retries: { Behaviour }?,
+}
+
+local TIMED_OUT =
+	{ state = "FAILED", errorCode = "INTERNAL_ERROR", errorMessage = "Task timed out due to an internal error" }
 
 -- A fake Luau Execution service. Each script's behaviour is looked up by its
 -- file name, which tools/run-engine-tests puts on the first line of the task.
 -- `polls` counts GETs of each task, by file name.
 local function fakeServer(behaviours: { [string]: Behaviour })
-	local server = { created = {} :: { any }, polls = {} :: { [string]: number }, inFlight = 0, maxInFlight = 0 }
+	local server = {
+		created = {} :: { any },
+		polls = {} :: { [string]: number },
+		submissions = {} :: { [string]: number },
+		inFlight = 0,
+		maxInFlight = 0,
+	}
 	local nameByPath: { [string]: string } = {}
+	local behaviourByPath: { [string]: Behaviour } = {}
 	local base = "https://apis.roblox.com/cloud/v2/"
 	function server.handler(request: OpenCloud.Request): OpenCloud.Response
 		if request.method == "POST" then
@@ -22,7 +41,14 @@ local function fakeServer(behaviours: { [string]: Behaviour })
 			table.insert(server.created, { url = request.url, body = body })
 			local name = string.match(body.script, "^%-%- %S-([^/%s]+) ") :: string
 			-- Real task ids are UUIDs; derive a stable one from the file name.
-			local id = string.gsub(name, "[^%w]", "-")
+			local count = (server.submissions[name] or 0) + 1
+			server.submissions[name] = count
+			local id = `{(string.gsub(name, "[^%w]", "-"))}-{count}`
+			local own = behaviours[name]
+			behaviourByPath[`universes/{F.DEV}/places/{F.PLACE}/versions/5/luau-execution-sessions/s/tasks/{id}`] = if count
+					== 1
+				then own
+				else (own.retries or {})[count - 1] or own
 			local path = `universes/{F.DEV}/places/{F.PLACE}/versions/5/luau-execution-sessions/s/tasks/{id}`
 			nameByPath[path] = name
 			server.polls[name] = 0
@@ -32,7 +58,7 @@ local function fakeServer(behaviours: { [string]: Behaviour })
 		end
 		local path, isLogs = string.match(request.url, `^{base}(.-)(/logs)%?`)
 		if isLogs then
-			local behaviour = behaviours[nameByPath[path :: string]]
+			local behaviour = behaviourByPath[path :: string]
 			local messages = behaviour.logs or {}
 			local page = tonumber(string.match(request.url, "pageToken=(%d+)")) or 1
 			local pages = behaviour.logPages or 1
@@ -49,7 +75,7 @@ local function fakeServer(behaviours: { [string]: Behaviour })
 		end
 		local taskPath = string.sub(request.url, #base + 1)
 		local name = nameByPath[taskPath]
-		local behaviour = behaviours[name]
+		local behaviour = behaviourByPath[taskPath]
 		server.polls[name] += 1
 		local done = server.polls[name] >= (behaviour.polls or 1)
 		if done then
@@ -58,7 +84,8 @@ local function fakeServer(behaviours: { [string]: Behaviour })
 		local state = if done then behaviour.state or "COMPLETE" else "PROCESSING"
 		local resource: any = { path = taskPath, state = state }
 		if state == "FAILED" then
-			resource.error = { code = "SCRIPT_ERROR", message = "boom" }
+			resource.error =
+				{ code = behaviour.errorCode or "SCRIPT_ERROR", message = behaviour.errorMessage or "boom" }
 		end
 		return F.response(200, serde.encode("json", resource))
 	end
@@ -218,6 +245,123 @@ return function(t: any)
 			local err, m = run({ behaviours = { ["a.luau"] = { state = "FAILED", logs = PASSING } } })
 			expect(err).toContain("1 engine test script(s) failed")
 			expect(m:stdout()).toContain("FAIL engine/a.luau: task FAILED: SCRIPT_ERROR boom")
+		end)
+
+		describe("when Roblox never runs a task", function()
+			local function sleepless()
+				return function() end
+			end
+
+			it("submits the script once more after INTERNAL_ERROR 'timed out', and names the retry", function()
+				local err, m, server = run({
+					behaviours = {
+						["a.luau"] = {
+							state = TIMED_OUT.state,
+							errorCode = TIMED_OUT.errorCode,
+							errorMessage = TIMED_OUT.errorMessage,
+							retries = { { logs = PASSING } },
+						},
+					},
+					sleep = sleepless(),
+				})
+				expect(err).toBeNil()
+				expect(#server.created).toBe(2)
+				expect(m:stdout()).toContain(
+					"retrying engine/a.luau: Roblox never ran the task (INTERNAL_ERROR Task timed out due to an internal error)"
+				)
+				expect(m:stdout()).toContain("PASS engine/a.luau")
+				expect(m:stdout()).toContain("1 passed, 0 failed, 1 retried")
+			end)
+
+			it("gives the retried task a run id that starts with the original", function()
+				local _, _, server = run({
+					behaviours = {
+						["a.luau"] = {
+							state = "FAILED",
+							errorCode = "INTERNAL_ERROR",
+							errorMessage = "timed out",
+							retries = { { logs = PASSING } },
+						},
+					},
+					sleep = sleepless(),
+				})
+				expect(server.created[1].body.script).toContain('RUN_ID = "42-1"')
+				expect(server.created[2].body.script).toContain(`RUN_ID = "42-1{EngineTests.RETRY_SUFFIX}"`)
+				expect(server.created[2].body.script).never.toContain('RUN_ID = "42-1"')
+			end)
+
+			it("fails when the retry times out too, retrying only once", function()
+				local err, m, server = run({
+					behaviours = {
+						["a.luau"] = {
+							state = "FAILED",
+							errorCode = "INTERNAL_ERROR",
+							errorMessage = "Task timed out",
+							retries = {
+								{ state = "FAILED", errorCode = "INTERNAL_ERROR", errorMessage = "Task timed out" },
+							},
+						},
+					},
+					sleep = sleepless(),
+				})
+				expect(err).toContain("1 engine test script(s) failed")
+				expect(#server.created).toBe(2)
+				expect(m:stdout()).toContain("FAIL engine/a.luau: task FAILED: INTERNAL_ERROR Task timed out")
+				expect(m:stdout()).toContain("0 passed, 1 failed, 1 retried")
+			end)
+
+			it("never retries any other failure", function()
+				for label, behaviour in
+					{
+						["a script error"] = { state = "FAILED", logs = PASSING },
+						["INTERNAL_ERROR without a timeout"] = {
+							state = "FAILED",
+							errorCode = "INTERNAL_ERROR",
+							errorMessage = "oops",
+						},
+						["a timeout message under another code"] = {
+							state = "FAILED",
+							errorCode = "DEADLINE_EXCEEDED",
+							errorMessage = "Task timed out",
+						},
+						["a cancelled task"] = { state = "CANCELLED" },
+						["a missing PASS marker"] = { logs = { "no marker" } },
+					} :: { [string]: Behaviour }
+				do
+					behaviour.retries = { { logs = PASSING } }
+					local err, m, server = run({ behaviours = { ["a.luau"] = behaviour }, sleep = sleepless() })
+					assert(err ~= nil and #server.created == 1, `{label} was retried`)
+					expect(m:stdout()).toContain("0 retried")
+				end
+			end)
+
+			it("retries once when the task never reaches a terminal state within the deadline", function()
+				local waited = 0
+				local err, m, server = run({
+					behaviours = { ["a.luau"] = { polls = math.huge, retries = { { logs = PASSING } } } },
+					extra = { "--timeout", "60" },
+					sleep = function(seconds)
+						waited += seconds
+					end,
+				})
+				expect(err).toBeNil()
+				expect(#server.created).toBe(2)
+				expect(m:stdout()).toContain("retrying engine/a.luau: Roblox never ran the task (gave up after waiting")
+				expect(m:stdout()).toContain("1 passed, 0 failed, 1 retried")
+				-- Two deadlines at most: the first wait ran out, the retry started afresh.
+				assert(waited <= 2 * (60 + EngineTests.QUEUE_ALLOWANCE), `waited {waited}s`)
+			end)
+
+			it("fails when the retry gives up waiting too", function()
+				local err, m, server = run({
+					behaviours = { ["a.luau"] = { polls = math.huge } },
+					extra = { "--timeout", "10" },
+					sleep = sleepless(),
+				})
+				expect(err).toContain("1 engine test script(s) failed")
+				expect(#server.created).toBe(2)
+				expect(m:stdout()).toContain("FAIL engine/a.luau: gave up after waiting")
+			end)
 		end)
 
 		it("skips helper files that start with an underscore", function()

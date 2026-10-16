@@ -78,7 +78,7 @@ For each script the tool:
 2. Creates the task, polls it every 3 seconds until it is `COMPLETE`,
    `FAILED` or `CANCELLED`, and reads every page of its logs.
 3. Prints `--- <script>`, the logs, then `PASS <script>` or
-   `FAIL <script>: <reason>`. The run ends with `N passed, M failed`.
+   `FAIL <script>: <reason>`. The run ends with `N passed, M failed, R retried`.
 
 A script passes only if its task is `COMPLETE` **and** the last non-blank
 line it printed is exactly `ENGINE_TESTS_PASSED`. When a test fails,
@@ -93,6 +93,32 @@ the longest "server busy" wait (`OpenCloud.BUSY_WAIT_TOTAL`, safety rule 8), for
 4 scripts, plus a minute. That catches a request that never
 returns, because Lune's HTTP client has no timeout of its own. A script whose
 worker raises counts as failed; it cannot stall the run.
+
+**Retry.** Roblox sometimes accepts a task and never runs it: it ends `FAILED`
+with `INTERNAL_ERROR` and a message saying it timed out (after about 9.5
+minutes), or it never reaches a terminal state before the script's own
+deadline (`gave up after waiting`). Every script finishes in well under
+30 seconds when it does run, so such a task is submitted once more as a new
+task, after logging `retrying <script>: Roblox never ran the task (<reason>)`;
+the summary line counts these as `R retried`. The retried task gets the run id
+`<RUN_ID>-retry`, so it opens different stores from the hung task, which may
+still run later, and `tools/clean-test-stores` (prefix `test-<RUN_ID>-`) still
+sweeps both. A second hang is final. **Nothing else is retried:** a script
+error, a failed assertion, a missing `ENGINE_TESTS_PASSED`, `CANCELLED`, and
+`FAILED` under any other error code (or `INTERNAL_ERROR` without a timeout)
+are real results. Each script now has up to two deadlines, so `runBudget`
+counts each wave twice: with 13 scripts (4 waves of `CONCURRENCY` 4), a 300 s
+timeout and 450 s of busy waits that is 4 × 2 × (300 + 300 + 450) + 60 = 8460 s,
+about 141 minutes (81 minutes without the busy waits). That figure is far
+beyond the workflow's `timeout-minutes: 30`, which is the real cap; the budget
+only has to be no tighter than what a legitimate retry needs. In practice a
+hang costs about 10 minutes of one worker (the walkthrough is 20 s when it
+runs), so one or two hangs fit inside 30 minutes, but several hangs in one run
+can exceed it, and then the job times out and is re-run by hand as before. The run id is at most 32 characters, so with the suffix
+a store name base has `50 - 5 - 38 - 1 = 6` characters in the worst case;
+the workflow's `pr<N>-<run>-<attempt>` ids leave plenty. The API has
+no cancel for a Luau Execution task that `What was verified` covers, so the
+hung task is not cancelled, only isolated.
 
 ## Writing an engine test
 
