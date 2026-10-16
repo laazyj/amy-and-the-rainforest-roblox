@@ -4,7 +4,9 @@
 # Never touches Release: that will be release.yml, behind the gated
 # `release` environment. See docs/OPEN_CLOUD.md.
 #
-# Inert until ROBLOX_DEV_API_KEY exists: without it the job skips with a notice.
+# The Dev key lives in the `dev` GitHub environment (limited to main), so
+# both jobs that read it declare `environment: dev`; a workflow edited on a PR
+# branch cannot reach it. Without the key the job skips with a notice.
 name: Publish to Dev
 
 on:
@@ -26,6 +28,7 @@ jobs:
   gate:
     name: Check for the Dev key
     runs-on: ubuntu-latest
+    environment: dev
     permissions:
       contents: read
     # Only a successful CI run for a push to this repository counts
@@ -55,6 +58,7 @@ jobs:
     needs: gate
     if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-latest
+    environment: dev
     permissions:
       contents: read
     timeout-minutes: 15
@@ -66,13 +70,13 @@ jobs:
       # The commit CI tested; on a manual run, main's head.
       PUBLISH_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           ref: ${{ env.PUBLISH_SHA }}
 
       - name: Install the pinned toolchain
-        uses: ./.github/actions/setup-tools
+        uses: $/.github/actions/setup-tools
 
       - name: Build the place
         run: tools/build.sh

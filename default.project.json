@@ -16,12 +16,23 @@
     },
     "ServerScriptService": {
       "$className": "ServerScriptService",
-      "$path": "src/server"
+      "$path": "src/server",
+      "ServerPackages": {
+        "$path": {
+          "optional": "ServerPackages"
+        }
+      }
     },
     "Lighting": {
       "$className": "Lighting",
       "$properties": {
         "Technology": "ShadowMap"
+      }
+    },
+    "SoundService": {
+      "$className": "SoundService",
+      "Master": {
+        "$className": "SoundGroup"
       }
     },
     "StarterPlayer": {

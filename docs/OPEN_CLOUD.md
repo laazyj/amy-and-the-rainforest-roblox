@@ -12,16 +12,19 @@ a real key are for the owner, when debugging a CI failure. Everyone else uses
 
 | File | What it does |
 |---|---|
-| `tools/opencloud.luau` | Builds every Open Cloud request and parses every response. HTTP is injected, so tests mock it. Retry policy: a transport error is retried once; a 5xx is retried once for GET only, never for a POST (publish, create task) that may already have been accepted; Roblox's "server busy" 409 is retried with backoff (safety rule 8); any other 4xx is never retried. |
+| `tools/opencloud.luau` | Builds every Open Cloud request and parses every response. HTTP is injected, so tests mock it. Retry policy: a transport error is retried once, except for Create Asset (safety rule 7); a 5xx is retried once for GET only, never for a POST (publish, create task) that may already have been accepted; Roblox's "server busy" 409 is retried with backoff (safety rule 8); any other 4xx is never retried. |
 | `tools/publish.luau` | Publishes a `.rbxl` as a `Saved` or `Published` version and prints the version number on stdout. |
+| `tools/upload-assets.luau` | Uploads the pending assets in `assets/manifest.json` through the Assets API and writes their ids back. See [`ASSETS.md`](ASSETS.md). |
 | `tools/run-engine-tests.luau` | Runs engine test scripts as Luau Execution tasks, up to 4 at once, and fails unless every one passes. |
-| `tools/lib/` | Shared argument parsing and the Release guard (`cli.luau`), and the logic behind the two tools. |
+| `tools/clean-test-stores.luau` | Deletes every entry in a run's test stores (`test-<RUN_ID>-*`) through the DataStore API, then lists them again and fails if any entry is left. |
+| `tools/lib/` | Shared argument parsing and the Release guard (`cli.luau`), and the logic behind the tools. |
 | `tests/engine/_prelude.luau` | `describe` / `it` / `expect`, `storeName`, `finish` for engine test scripts. |
 | `tests/engine/*.luau` | Engine tests. Files starting with `_` are helpers and are not run. |
 | `tests/fixtures/` | Files engine tests read through `fixture()`, such as the golden file of the walkthrough. |
 | `tests/lune/tools/` | Unit tests for all of the above, against a mocked HTTP function. |
 | `.github/workflows/publish-dev.yml` | After CI succeeds on a push to `main` (or a manual run from `main`): build the commit CI tested, publish it to Dev as `Published`. |
-| `.github/workflows/engine-tests.yml` | Every PR: build, publish to Dev as `Saved`, run `tests/engine/` against that exact version. |
+| `.github/workflows/upload-assets.yml` | By hand from `main`: upload pending assets with the Dev key and open the "Asset ids" PR. |
+| `.github/workflows/engine-tests.yml` | Every PR: build, publish to Dev as `Saved`, run `tests/engine/` against that exact version, then clean the run's test stores (pass or fail) and list them in the job summary. |
 
 ## Running locally
 
@@ -103,11 +106,15 @@ still run later, and `tools/clean-test-stores` (prefix `test-<RUN_ID>-`) still
 sweeps both. A second hang is final. **Nothing else is retried:** a script
 error, a failed assertion, a missing `ENGINE_TESTS_PASSED`, `CANCELLED`, and
 `FAILED` under any other error code (or `INTERNAL_ERROR` without a timeout)
-are real results. Each script now has up to two deadlines, so the run's
-wall-clock deadline counts each wave twice (about 35 minutes with a 300 s
-timeout and the busy waits, which is only a backstop). In practice one
-hang adds about 10 minutes and two hangs about 20, inside the workflow's
-`timeout-minutes: 30`. The run id is at most 32 characters, so with the suffix
+are real results. Each script now has up to two deadlines, so `runBudget`
+counts each wave twice: with 13 scripts (4 waves of `CONCURRENCY` 4), a 300 s
+timeout and 450 s of busy waits that is 4 × 2 × (300 + 300 + 450) + 60 = 8460 s,
+about 141 minutes (81 minutes without the busy waits). That figure is far
+beyond the workflow's `timeout-minutes: 30`, which is the real cap; the budget
+only has to be no tighter than what a legitimate retry needs. In practice a
+hang costs about 10 minutes of one worker (the walkthrough is 20 s when it
+runs), so one or two hangs fit inside 30 minutes, but several hangs in one run
+can exceed it, and then the job times out and is re-run by hand as before. The run id is at most 32 characters, so with the suffix
 a store name base has `50 - 5 - 38 - 1 = 6` characters in the worst case;
 the workflow's `pr<N>-<run>-<attempt>` ids leave plenty. The API has
 no cancel for a Luau Execution task that `What was verified` covers, so the
@@ -126,12 +133,13 @@ end)
 finish()
 ```
 
-- Per the API spec, physics does not run in a task, and server and client
-  scripts do not start on their own. The DataModel is a fresh copy of the
-  place version, and changes are not saved. So `Touched` never fires, and
-  game code a test needs must be a ModuleScript it can `require` (the
-  StoryServer Script only requires and starts the `StoryHost` module for
-  this reason).
+- Physics does not run in a task (see [Physics in a task](#physics-in-a-task-decided)),
+  and server and client scripts do not start on their own. The DataModel
+  is a fresh copy of the place version, and changes are not saved. So
+  `Touched` never fires, and game code a test needs must be a ModuleScript
+  it can `require` (the StoryServer Script only requires and starts the
+  `StoryHost` module for this reason). `tests/engine/_world.luau` builds
+  the world as the place's Scripts would.
 - A task cannot read the repository. A script names the files it needs with
   string literals, and the runner embeds them in the task
   (`EngineTests.EMBED_FUNCTIONS`):
@@ -161,10 +169,64 @@ finish()
 - **DataStores are live**, as are MemoryStore and Messaging. Always name
   stores with `storeName`, as in
   `game:GetService("DataStoreService"):GetDataStore(storeName("Saves"))`,
-  which opens `test-<RUN_ID>-Saves`. Deleting test keys after a run is not
-  built yet. No engine test opens a store today, so the
-  cleanup step comes with the first test that does, and needs the DataStore
-  permission described under [API key permissions](#api-key-permissions).
+  which opens `test-<RUN_ID>-Saves`. Game code saves through `Persist`,
+  which the harness points at a test store too
+  ([What protects real DataStores](#what-protects-real-datastores-and-what-does-not)),
+  and [the test-store cleanup](#the-test-store-cleanup) empties them after
+  the run.
+
+### The test-store cleanup
+
+```sh
+lune run tools/clean-test-stores --universe <id> --place <id> --run-id <id> [--dry-run]
+```
+
+It lists the data stores whose names start with `test-<RUN_ID>-`, refuses
+any name the listing returns without that prefix, deletes every entry of
+every scope in each, and lists each store's entries again. **The v1
+listing keeps a deleted key** (seen on Dev, PR #33: every key was still
+listed 50 s after its 204), so the check after the deletes lists through
+Open Cloud v2's List Data Store Entries, which leaves out entries marked for
+deletion; it lists again up to 6 times, 10 s apart, until the stores are
+empty. stdout has one line per store (`<store>: deleted N entries; listed
+after: 0 entries`) and a summary; the run fails if any entry is still
+listed. The engine-tests
+workflow runs it after the tests whether they passed or not, and appends
+its output to the job summary. Data stores themselves cannot be deleted
+through the v1 API, so the empty test stores stay listed in the Creator
+Dashboard; they hold nothing. It takes the same Release refusal and
+`--key-env` as every tool.
+
+### Physics in a task (decided)
+
+Brief 007's spike, `tests/engine/physics.luau`, measured on Saved Dev
+version 27 (PR #25) over two seconds:
+
+| What | Seen |
+|---|---|
+| `RunService.Heartbeat` | fires, about 60 times a second (120 in 2 s) |
+| `RunService.Stepped` | never fires |
+| An unanchored part 20 studs above a floor | does not fall (0.00 studs) |
+| `Touched` when it would land | never fires |
+| An R15 rig (`CreateHumanoidModelFromDescriptionAsync`) told to `MoveTo` 10 studs | does not move (0.00 studs); its state reads `Running` |
+| `PathfindingService:ComputeAsync` | works (`tests/engine/reachability.luau`) |
+
+**Decision.** The engine's scheduler runs in a task (Heartbeat, so
+`task.wait`, tweens and the Zone poll work), but physics does not step.
+So tier 2 proves *reachability* with `PathfindingService` and drives the
+Story with the fake player (teleports into Zones, prompt handlers called
+directly); **real traversal, a Humanoid walking a Chapter, is tier 3
+only**. `physics.luau` stays in the suite and asserts this answer, so if
+Roblox starts stepping physics in tasks it fails and the decision is
+revisited.
+
+### Max Players in a task
+
+`Players.MaxPlayers` is readable in a task
+(`tests/engine/maxplayers.luau`), so the single-player check stays in
+tier 2 rather than moving to a tier 1 built-place spec. It reads the Dev
+place's server size, a Creator Dashboard setting that is not part of a
+place version; the Release place's is a line of the release checklist.
 
 ### What protects real DataStores, and what does not
 
@@ -191,18 +253,25 @@ DataStores". The lint and the proxy cover test scripts, and any module that
 reaches these services through the `game` the test hands it. **A module that
 gets the real `DataStoreService` some other way** (its own `game`, which every
 `require`d ModuleScript has, or a reference captured earlier) **is not
-covered.** The rule that closes that gap belongs to Checkpoint B: the
-`Persist` module takes its store prefix from config, as plan 2.3 already
-says, and the engine harness sets that prefix to `test-<RUN_ID>-`. Until
-then, engine tests must not exercise game code that opens stores.
+covered.** Brief 010 closes that gap for the one module that opens stores:
+`src/server/Persist.luau` opens `Config.storePrefix .. "Progress"`, and
+`tests/engine/_world.luau`, the one way engine tests start the server,
+sets `Config.storePrefix` to `storeName("<test>-")` before `StoryHost.start`.
+ProfileStore, which Persist uses, opens only the store Persist names (and,
+in Studio only, `____PS` to probe for API access, never in a task). Any new
+module that opens a store must take its name from `Config` the same way.
 
 ## CI
 
 Both workflows read the repository secret `ROBLOX_DEV_API_KEY` and the
 repository variables `DEV_UNIVERSE_ID`, `DEV_PLACE_ID`,
 `RELEASE_UNIVERSE_ID` and `RELEASE_PLACE_ID`. The last two arm the Release
-refusal. Docs-only PRs (`docs/**`, `**/*.md`) skip the engine-tests
-workflow.
+refusal. The engine-tests workflow runs on every PR so its job can be
+a required check; for a docs-only PR (every changed file matches `docs/**`
+or `**/*.md`) the gate skips the test job, which reports as skipped.
+`upload-assets.yml` also reads the repository variable
+`ROBLOX_CREATOR_USER_ID`, the owner's Roblox user id, which the assets are
+created under.
 
 The toolchain comes from the shared composite action
 `.github/actions/setup-tools` (as in `ci.yml`), which runs
@@ -216,11 +285,14 @@ CI cancels superseded runs on `main`, so an older commit cannot be published
 after a newer one. (GitHub reads `workflow_run` triggers from the default
 branch only.)
 
-**Owner setup for `main`'s branch protection** (Settings → Branches, or a
-ruleset): make the CI check (`Check, test, build`) a required status
-check, and enable "Require branches to be up to date before merging". Then
-what CI tests on a PR is what lands on `main`, and what lands is what Dev
-gets.
+**Owner setup for `main`'s ruleset** (Settings → Rules → Rulesets): make
+the CI check (`Check, test, build`) a required status check. "Require
+branches to be up to date before merging" is off, so DependaBuddy's
+auto-merged Dependabot bumps do not wait behind `main`
+([`MAINTENANCE.md`](MAINTENANCE.md#repository-settings-one-time-owner));
+what lands on `main` is therefore tested by CI's run on that push, and
+the Dev publish waits for that run to be green, so what Dev gets is
+always a `main` that CI has passed.
 
 Until the key exists, a small `gate` job posts a notice ("skipped, no key")
 and the real job is skipped, so nothing fails. PRs from forks get no secrets
@@ -236,20 +308,21 @@ Create keys at create.roblox.com/credentials. Set the IP restriction to
 |---|---|---|---|
 | Dev (`ROBLOX_DEV_API_KEY`) | The Dev experience only | **universe-places**: Write | `universe-places:write` |
 | | | **universe.place.luau-execution-session**: Read, Write | `universe.place.luau-execution-session:read`, `…:write` (create needs write; get and logs accept either) |
+| | | **assets**: Read, Write (for `upload-assets`) | `asset:read`, `asset:write` |
 | | | **universe-datastores** (for the test-store cleanup): list stores, list entries, read, delete | `universe-datastores.control:list`, `universe-datastores.objects:list`, `…:read`, `…:delete` |
 | Release (`ROBLOX_RELEASE_API_KEY`, `release` environment) | The Release experience only | **universe-places**: Write | `universe-places:write` |
 
-Asset upload permissions for the Dev key come with the asset-upload brief.
-The publish and engine-test tools use no DataStore permission.
+The Assets API guide says to add **assets** to the key's access
+permissions with Read and Write for the selected experience; pick the Dev
+experience. Assets are created on the owner's account
+(`ROBLOX_CREATOR_USER_ID`, see [CI](#ci)), not in the experience. Never add asset permissions to the Release key. `publish` and `run-engine-tests` use no DataStore permission.
 
-**Before the test-store cleanup is built, confirm the Dev key can list.** It
-already has DataStore read and delete for the Dev experience; the cleanup must also find
-the `test-<RUN_ID>-*` keys, which needs the two `:list` scopes in the table.
+Without the `:list` scopes the cleanup fails with a 403 naming the request.
 Never add DataStore permissions to the Release key.
 
 ## Safety rules
 
-1. **The Release refusal.** Both tools refuse to run when `--universe`
+1. **The Release refusal.** Every Open Cloud tool refuses to run when `--universe`
    equals `RELEASE_UNIVERSE_ID`, or `--place` equals `RELEASE_PLACE_ID` when
    that is set, unless `RELEASE_JOB=1` is also set. Ids are compared as
    numbers, so `0123` matches `123`. The release workflow (not
@@ -274,7 +347,10 @@ Never add DataStore permissions to the Release key.
    twice or start a duplicate task. Only a transport error is retried once,
    as the plan and brief require. A transport error can, rarely, also follow
    an accepted request. The worst case is one extra Saved version, or one
-   extra task under the same `RUN_ID`.
+   extra task under the same `RUN_ID`. Create Asset is the exception: a
+   transport error there is not retried either, because an extra asset
+   would sit in moderation on the owner's account; the run fails, and the
+   next run uploads the entry again.
 8. **"Server busy" is the one 4xx that is retried.** Roblox sometimes answers
    a publish with HTTP 409 `{"code":"Conflict","message":"Save failed. Server
    is busy ... Please try again in a couple minutes."}`. That is a request to
@@ -284,6 +360,16 @@ Never add DataStore permissions to the Release key.
    request, then reported as a failure. Every
    other 4xx, including any other 409, fails at once. The engine-test run
    deadline allows for this wait.
+
+9. **Release builds have no Dev shortcuts.** With `RELEASE_JOB=1`,
+   `tools/publish` strips `ServerScriptService.Dev` (`src/server/Dev`: the
+   `/chapter` and `/quest` chat commands and the jump-to-Quest entry point,
+   plan section 5.3; `tools/lib/release.luau`) from the place before
+   uploading it, and refuses a place without that folder, so moving it
+   fails the release rather than shipping it. The release job publishes the
+   artifact CI built, so the strip happens at publish, not at build. A
+   tier 1 spec (`tests/lune/tools/release.spec.luau`) builds the place and
+   checks both sides of the flag.
 
 ### What the guard is, and what it is not
 
@@ -329,6 +415,30 @@ Verified:
   (FLAT view, one string per `print`), paginated with `maxPageSize` (up to
   10000), `pageToken` and `nextPageToken`.
 - **Stability.** The spec marks Luau Execution `STABLE` and place publishing `BETA`.
+- **DataStores, for the cleanup** (`content/en-us/reference/cloud/datastores-api/v1.json`,
+  commit `af5f853`, 2026-10-10). Base `https://apis.roblox.com/datastores`.
+  `GET /v1/universes/{u}/standard-datastores?prefix=&limit=&cursor=`
+  (`universe-datastores.control:list`); `GET …/standard-datastores/datastore/entries?datastoreName=&allScopes=true&limit=&cursor=`
+  (`universe-datastores.objects:list`); `DELETE …/datastore/entries/entry?datastoreName=&entryKey=&scope=`
+  (`universe-datastores.objects:delete`, 204). And from `openapi.json`
+  (same commit), `GET /cloud/v2/universes/{u}/data-stores/{store}/entries?maxPageSize=&pageToken=`
+  (`universe-datastores.objects:list`), whose `showDeleted` is false by
+  default; the response is `dataStoreEntries[]` and `nextPageToken`. Pages end when
+  `nextPageCursor` is empty. The schema names the store list `data` and the
+  keys strings; the examples show `datastores` and `{scope, key}` objects.
+  `tools/opencloud.luau` reads both.
+- **Assets** (`content/en-us/reference/cloud/assets/v1.json` and
+  `cloud/guides/usage-assets.md`, commit `9dc22ac`, 2026-10-08).
+  `POST https://apis.roblox.com/assets/v1/assets`, `multipart/form-data`
+  with a JSON `request` part (`assetType`, `displayName`, `description`,
+  `creationContext.creator.userId`) and the file as `fileContent`; the
+  response is an Operation `{path: "operations/{id}", done, response}`,
+  polled with `GET /assets/v1/operations/{id}`. `GET
+  /assets/v1/assets/{id}?readMask=...` reads `moderationResult`. Scopes
+  `asset:read` and `asset:write`. 20 MB per file. Images and audio cannot
+  be updated in place. Marked `BETA`. The schema gives `assetId` as an
+  integer and states as `Approved`; the guide's example shows a string
+  and `MODERATION_STATE_APPROVED`. `tools/opencloud.luau` reads both.
 
 Proven against Dev (brief 004, engine-tests on PR #15):
 
@@ -339,6 +449,11 @@ Proven against Dev (brief 004, engine-tests on PR #15):
   returns "Amy and the Rain Forest (Dev)" for the Dev place.
 
 Not verified:
+
+- **Uploading as `Image`.** The guide's table lists "Decal, Image" and its
+  examples use `Decal`. The uploader sends `assetType: "Image"`, whose id an
+  ImageLabel takes directly. The first real run on Dev proves it; if it is
+  refused, `OpenCloud.ASSET_TYPES.image` is the one line to change.
 
 - **The 429 `Retry-After` header.** Whether Open Cloud sends it is unknown.
   The tool falls back to 15 seconds.

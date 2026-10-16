@@ -2,7 +2,8 @@
 # latest release, regenerates Selene's Roblox standard library (roblox.yml),
 # and opens or updates one "Toolchain updates" PR with the new pins, their
 # checksums and roblox.yml, so CI runs the full check, test and build against
-# them. Nothing merges automatically. Dependabot covers the `uses:` lines (dependabot.yml).
+# them. The owner merges it: DependaBuddy handles only Dependabot's PRs, which
+# cover the `uses:` lines (dependabot.yml).
 # See docs/MAINTENANCE.md.
 #
 # Two jobs, so no write token is ever in a job that runs fetched tools: `check`
@@ -32,12 +33,12 @@ jobs:
     outputs:
       changed: ${{ steps.check.outputs.changed }}
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Install the pinned toolchain
-        uses: ./.github/actions/setup-tools
+        uses: $/.github/actions/setup-tools
 
       - name: Compare the pins and write the patch
         id: check
@@ -84,7 +85,7 @@ jobs:
       contents: write # push the toolchain-updates branch
       pull-requests: write # open or update the PR
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 

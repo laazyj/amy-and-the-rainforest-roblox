@@ -15,6 +15,7 @@ local chapter: Story.ChapterData = {
 			character = "Squirrel",
 			talkLabel = "Say hello",
 			objective = "Say hello to the maroon squirrel",
+			hooks = { onTalkedTo = { "meet_squirrel" } },
 			intro = {
 				{ speaker = "Narrator", text = "Amy discoverd so many animals!", canon = true },
 				{ speaker = "Narrator", text = "Something maroon was hopping between the roots..." },
@@ -41,6 +42,7 @@ local chapter: Story.ChapterData = {
 			character = "Fox",
 			talkLabel = "Say hello",
 			objective = "Find the orange fox",
+			hooks = { onTalkedTo = { "meet_fox" } },
 			dialogue = {
 				{
 					speaker = "Fox",
@@ -62,6 +64,7 @@ local chapter: Story.ChapterData = {
 			character = "Lion",
 			talkLabel = "Say hello (bravely)",
 			objective = "Meet the golden lion in the deep glade",
+			hooks = { onTalkedTo = { "meet_lion" } },
 			dialogue = {
 				{
 					speaker = "Amy",

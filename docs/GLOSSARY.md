@@ -67,15 +67,47 @@ Scene (look + sound)                     Player
 | **Pickup** | A Quest-bound thing to touch, spawned at Spots for a `collect` Quest and removed when touched or when the Quest ends. Its id is the Spot it spawned at. | three glowing flowers |
 | **Collectible** | A persistent discoverable with a Journal entry. Found once, remembered forever. | `collectible:maroon_acorn` |
 | **Journal** | The player's record of Collectibles found and Characters met, with entries in Clara's voice. | |
-| **Cue** | A named sound, music track or effect, resolved to an asset id through `assets/manifest.json`. | `cue:sam_bark`, `music:paradise_theme` |
+| **Cue** | A named sound, music track or effect, resolved to an Asset through the Manifest. | `cue:sam_bark`, `music:paradise_theme` |
+| **Asset** | An image, sound, model or font the game or its store page uses, listed in the Manifest and uploaded to Roblox by CI when the game shows it (a font is a Creator Store family, referenced by its id and never uploaded). Known by its Asset name, an id of the forms in [Ids](#6-ids). See [`ASSETS.md`](ASSETS.md). | `card:chapter2` |
+| **Manifest** | `assets/manifest.json`: every Asset with its file, Roblox asset id, creator, licence, origin and Moderation status. | |
+| **Moderation status** | Where Roblox moderation is with an Asset. See [Lifecycles](#5-lifecycles). | `approved` |
+| **Placeholder** | A plain palette-coloured stand-in with no text for an illustration not drawn yet, until the real piece replaces it. | `card:chapter1` |
 | **Shot** | A named camera framing used by a Beat or a Dialogue. Specified in [`design/feel.md`](design/feel.md). See [enumeration](#shots). | `shot:ForestWallReveal` |
+| **Camera rule** | The camera stays within 60° of directly behind Amy: unit(camera − Amy) · (−facing) ≥ 0.5, at every frame. Specified in [`design/feel.md`](design/feel.md#invariants). | |
+| **Follow camera** | The camera in free play: behind Amy, who turns with the view as with shift-lock. Every Shot takes the camera from it and hands it back. | |
+| **Camera model** | The camera as plain data (`src/core/CameraModel.luau`): a **Rig** is a camera placement relative to Amy (her facing, the camera's angles from directly behind her, its distance, its look-at), and a **Frame** is what one frame renders (camera, look-at, Amy's facing, the Shot). `src/client/Camera.luau` renders it. | `CameraModel.step(camera, seconds, amy, subject)` |
 | **Lighting preset** | A named look for a Scene. See [enumeration](#lighting-presets). | `lighting:paradise` |
-| **Progress** | Where a player is in the Story: current Chapter and Quest, completed Quest ids, the Pickups touched in the current Quest, which Dialogue is showing, and later Collectibles, Bonds, and the Prop states that matter. Saved on every Story event and on leave. | |
-| **Checkpoint** | The Progress snapshot taken at a Chapter start, kept alongside current Progress. "Play this chapter again" restarts from it. | |
+| **Progress** | Where a player is in the Story: current Chapter and Quest, completed Quest ids, the Pickups touched in the current Quest, which Dialogue is showing, and later Collectibles, Bonds, and the Prop states that matter. Kept in the Save. | |
+| **Checkpoint** | The Progress snapshot taken at a Chapter start, kept in the Save alongside current Progress, one per Chapter reached. "Play this chapter again" restarts from it. | the Checkpoint of `chapter2`: every Chapter One Quest completed, `chapter2.walk_to_forest` just started |
+| **Save** | What is kept for a player between visits: their Progress, their Checkpoints and their Settings, under a schema version (`src/core/Save.luau`). One Save per player, keyed by Roblox user id, kept by `src/server/Persist.luau` with ProfileStore and written on every Story event and on leave. | |
+| **Schema version** | The version of a Save's shape. A version only adds fields, so code reads a Save one version newer as its own (Release can roll back one version); a Save two or more versions newer is not read and never written over. | version 3 |
+| **Fault** | Something that went wrong for a player and is worth counting, by a name that reads as an analytics event name. See [enumeration](#faults). | `save_load_timeout` |
+| **Migration** | Turns a Save of one schema version into the next, with a tier 1 test each. | 1 → 2 adds the Checkpoints, 2 → 3 the Settings |
+| **Setting** | One of a player's choices about how the game looks and sounds, kept in their Save and applied by the client binder: the volume, the Text scale, high contrast and the dyslexia-friendly font. Its values are plain data (`src/core/Settings.luau`). The server sends a player's Settings when they join (`ApplySettings`) if they are not the defaults, and the client sends each change (`ChangeSettings`). See [enumeration](#settings). | `highContrast` on |
+| **Pause screen** | What the pause button (top right of the safe area, or P on a PC) opens: Resume, and its Settings page with a row per Setting. While it is open the Story does not advance: the client takes no input to it, and the server, told by `SetPaused`, holds every Wait. Its view-model is `src/core/PauseScreen.luau`. | the Settings page |
+| **Analytics event** | What the server logs to Roblox Analytics: a custom event named after a Story event, a Fault, or `SessionEnded` (a visit's end, its value the seconds played), with the payload as custom fields (`src/core/AnalyticsEvents.luau`, [`ANALYTICS.md`](ANALYTICS.md)). | `QuestCompleted` `chapter3.meet_fox` |
+| **Title screen** | What a player sees first: feel.md's title over `ui:title_screen`, also shown while the client loads. A returning player is offered the Title choices on it; a player with no Save goes straight to the first Chapter card. Its view-model is `src/core/TitleScreen.luau`; its lettering (the font of the title and of the pill label) is in `src/content/title.luau`: Dancing Script, the manifest's `font:dancing_script`. | |
+| **Title choice** | What a returning player picks on the Title screen: `continue` ("Continue", a Resume at the current Quest), `replay` ("Play this chapter again", a Resume at the Chapter's Checkpoint) or `restart` ("Start again", behind a confirmation: a new Save). | `replay` |
 | **Resume** | Rebuilding the world for a returning player from Progress alone: `StoryEngine.resume(progress)` returns the World commands that put every Character, Prop, Lighting preset and Pickup where the current Quest expects them, then shows the Objective. "Continue" on the title screen is a Resume. | |
 | **World state** | What the World looks like to the Story, as plain data: where each Character stands, each Prop's state, the Lighting preset, the Pickups out, the Objective, the offered talk affordances. What the World commands mean without the engine (`src/core/WorldState.luau`); a Resume rebuilds it. | Sam at `spot:Farm`, `lighting:paradise` |
 | **World** | The one interface the core uses to act on the engine. Every Beat is written against it, one method per World command. | `World.moveCharacter(id, spot)` |
-| **Device class** | One of the three first-class targets, each with its own layout and touch rules: `PC`, `Phone`, `Tablet`. Defined in [`design/feel.md`](design/feel.md). | `Tablet` |
+| **Objective tracker** | Where the client shows the active Quest's Objective, under the header "Objective" (on a Phone, collapsed to a gold marker while a Dialogue shows). | "Ask Dad if you can go outside" |
+| **Client binder** | The client script (`src/client`): it builds the UI, renders the view-model and forwards the player's input. It holds no logic. | `StoryClient.client.luau` |
+| **View-model** | The client's logic as plain data in core, which the client binder renders: the Dialogue as it types out and advances (`DialogueViewModel`), the Objective tracker (`ObjectiveText`), how a Chapter card plays over time (`ChapterCardTimeline`), the Title screen (`TitleScreen`), the Onboarding (`Onboarding`), the Talk-and-advance button (`TalkAndAdvance`), the Pause screen (`PauseScreen`) and the Settings page (`Settings`); the Screen layout (`ScreenLayout`) says where they go. Tested in tier 1, no client needed. | `DialogueViewModel.view(vm)` |
+| **Grapheme** | One character as a reader sees it, which may be several code points: "♥️", "👍🏽". Dialogue types out one grapheme at a time. | `DialogueViewModel.graphemes("♥️") == 1` |
+| **Dev shortcut** | A Dev-only way to reach any point of the Story in seconds: the chat commands `/chapter N` and `/quest <id>`, and the jump-to-Quest entry point (`DevShortcuts.jumpTo`). A jump is a Resume at the Progress of a player who has just started the Quest, and is saved: the Save holds that Progress and the Checkpoints of every Chapter up to it. Release builds have none: the release job strips them when it publishes. | `/chapter 3` |
+| **Device class** | One of the three first-class targets, each with its own layout and touch rules: `PC`, `Phone`, `Tablet`. Defined in [`design/feel.md`](design/feel.md). Picked by `src/core/DeviceClass.luau` from the Input kind and the viewport's shorter side (under 600 units is a Phone), again on every viewport change. | `Tablet` |
+| **Input kind** | What the player last used: `pointer` (a keyboard or a mouse), `touch` or `gamepad`. A Device class is picked from it. | `touch` |
+| **Screen layout** | Where everything on screen goes and how big its text is, for one Device class, orientation, safe area and Text scale (`src/core/ScreenLayout.luau`): the dialogue box and its 60-character column, the Objective tracker, the touch control zones, the Chapter card and the Title screen. Tier 1 holds feel.md's rules on it. Not the content's `layout.luau`, which places things in the world. | `ScreenLayout.new(screen)` |
+| **Safe area** | The part of the screen clear of the notch, the home bar, rounded corners and Roblox's top bar. All UI sits inside it. | |
+| **Text scale** | How much larger than its size for the Device class all text is drawn: 1 to 1.5, the Text size Setting, capped on each device at the largest scale at which every Line fits the dialogue box (`ScreenLayout.largestScale`); the Settings page says when the cap applies. Every layout rule holds at every Text scale. | `1.5` |
+| **Touch control zone** | The bottom-left (Roblox's thumbstick's, which stays where Roblox puts it) and bottom-right (the button row's) corners of the screen on a Phone (35% x 40%) or a Tablet (25% x 35%). A drag that starts outside them turns the view. | |
+| **Talk-and-advance button** | The button in the button row on every class: it advances a Dialogue, or else uses the nearest talk prompt (`src/core/TalkAndAdvance.luau`). Its word is "Talk", or "Next" while a Dialogue shows. It shows only while a Dialogue shows or a prompt is within reach; with neither it would do nothing, so it hides. | "Talk", "Next" |
+| **Button row** | The buttons at the bottom right of the screen on every class: the Talk-and-advance button in the corner, and the Onboarding's Skip button beside it while a Hint shows in free play (above it where a row would leave the right touch control zone). | |
+| **Onboarding** | The first minute of a fresh Save, which teaches the three verbs (walk, talk, advance) inside Chapter One, in Onboarding steps with Hints (`src/core/Onboarding.luau`). Never blocks play and can be skipped. A Resume never shows it. | |
+| **Onboarding step** | One step of the Onboarding, with what the player sees, its Hint and when it is done. See [enumeration](#onboarding-steps). | `onboarding:walk` |
+| **Hint** | A short UI Line in Clara's voice that teaches a verb during the Onboarding, shown when needed and gone on success. Hints are kept in `src/content/hints.luau`; they are not canon. | "Drag here to walk" |
+| **Contrast** | How well text stands out from what is behind it: WCAG 2's ratio of their luminances, at least 4.5:1 for all text, and 7:1 in the dialogue box with the high-contrast Setting (`src/core/Contrast.luau`). | name tags at 4.68:1 |
 | **Walkthrough** | A test that plays the Story, or one Chapter, from start to end by driving a player's inputs, and checks what the server sends back. | `tests/engine/walkthrough.luau` |
 | **Fake player** | A stand-in for a Player in a test, where there is no client: a Character to move, plus the identity fields a Player has. | `tests/engine/_fakeplayer.luau` |
 | **Golden file** | The recorded, deterministic output of a Walkthrough: every message the server sends, in order, with the active Quest. A behaviour change shows as a diff to it. | `tests/fixtures/golden/walkthrough.json` |
@@ -139,26 +171,42 @@ of all three lists below are in `src/core/Events.luau`.
 | `SetPropState` | `prop`, `state` | Moves a Prop to one of its declared states |
 | `PlayCue` *later* | `cue` | Plays a Cue |
 | `SetLighting` | `preset` | Applies a Lighting preset |
-| `FrameShot` *later* | `shot` | Frames a Shot; the follow camera returns when the Shot ends |
+| `FrameShot` | `shot`, `character` or none | Frames a Shot, of the Character when the Shot takes one; the follow camera returns when the Shot ends |
 | `OfferTalk` | `character`, `label` | Offers the Character's talk affordance, with its Talk label |
 | `WithdrawTalk` | `character` | Withdraws the Character's talk affordance |
 | `SpawnPickups` | `quest` | Spawns the Quest's Pickups at their Spots |
 | `RemovePickup` | `pickup` | Removes one touched Pickup |
 | `ClearPickups` | `quest` | Removes the Quest's remaining Pickups |
-| `SaveProgress` *later* | none | Writes Progress |
-| `SaveCheckpoint` *later* | `chapter` | Writes the Checkpoint for a Chapter |
+
+Saving is not a World command: the server adapter writes the Save after
+every step that raised Story events, so no Beat can save, skip a save, or
+change what a fresh player is sent.
 
 If a Beat needs something these commands cannot do, the World interface
 grows by one named command, recorded here in the same PR. *Later*:
 reserved, not yet implemented.
 
 **On the wire.** `src/core/Net.luau` is the contract between server and
-client. Three World commands reach the client, over remotes whose names
-predate this glossary and are kept so the golden file still matches:
-`ShowDialogue`, `SetObjective`, and `ShowChapterCard` as `ShowChapter`
-(or `ShowEnding` for the end card). The client sends `DialogueFinished`,
-and `ClientReady` once it has loaded, which starts the Story; that is an
-adapter detail, not a Player event.
+client. Four World commands reach the client: `FrameShot`, and three
+over remotes whose names predate this glossary and are kept so the
+golden file still matches: `ShowDialogue`, `SetObjective`, and
+`ShowChapterCard` as `ShowChapter` (or `ShowEnding` for the end card).
+The client sends `DialogueFinished`, and `ClientReady` once it has
+loaded, which starts the Story; that is an adapter detail, not a Player
+event. The Title screen travels the same way: `ShowTitle` (the Chapter a
+returning player is in, and whether there is a Quest to continue) and
+the client's `TitleChoice`; only a returning player is sent `ShowTitle`,
+so the golden file has none. A player's Settings travel as `ApplySettings`
+(to the client at join, only when they are not the defaults, so the
+golden file has none either) and `ChangeSettings` (to the server, on each
+change), held to every allowed value. The client's `SetPaused` says
+the Pause screen opened or closed; a fresh player never pauses, so the
+golden file has none of these. Both sides hold every payload to the
+contract: the server checks each World command against its schema in
+`src/core/Events.luau` and each message before it sends it, and the
+client binder wraps every remote it receives in `Net.guard`, which drops
+a malformed payload; tier 2 (`tests/engine/contract.luau`) passes every
+payload in the golden file through that guard.
 
 ## 4. Enumerations
 
@@ -200,6 +248,7 @@ Kind column.
 | Hook | Runs when |
 |---|---|
 | `onStart` | The Quest becomes `active`, before its Objective and intro Dialogue are shown |
+| `onTalkedTo` | A `talk` Quest's Character is talked to (`TalkedTo`), before its `dialogue` Dialogue is shown |
 | `onComplete` | The Quest becomes `completed`, after its outro Dialogue has finished |
 
 In a Chapter's `data.luau` a Quest names the Beats each Hook plays,
@@ -212,10 +261,14 @@ its `hooks.luau`.
 |---|---|---|
 | `beat:sam_catches` | `chapter1.sneak_out_1.onComplete`, `chapter1.sneak_out_2.onComplete` | Sam runs to the gate and brings Amy back into the garden |
 | `beat:sam_goes_to_farm` | `chapter2.walk_to_forest.onStart` | Sam leaves for the farm |
+| `beat:forest_wall_reveal` | `chapter2.walk_to_forest.onComplete` | `FrameShot(shot:ForestWallReveal)`: the wall of trees, the gap centred |
 | `beat:paradise_reveal` | `chapter2.enter_forest.onComplete` | `SetLighting(lighting:paradise)` |
+| `beat:meet_squirrel` | `chapter3.meet_squirrel.onTalkedTo` | `FrameShot(shot:MeetCharacter, character:Squirrel)` |
+| `beat:meet_fox` | `chapter3.meet_fox.onTalkedTo` | `FrameShot(shot:MeetCharacter, character:Fox)` |
+| `beat:meet_lion` | `chapter3.meet_lion.onTalkedTo` | `FrameShot(shot:MeetCharacter, character:Lion)` |
 | `beat:ordinary_world` | `chapter3.rush_home.onComplete` | `SetLighting(lighting:ordinary)` |
 | `beat:machine_arrives` | `chapter3.tell_mum.onComplete` | The machine and villagers arrive; Dad, Mum and Sam move to the field |
-| `beat:machine_stops` | `chapter4.explain.onComplete` | The blade stops, sparkles over the crowd, the machine reverses away |
+| `beat:machine_stops` | `chapter4.explain.onComplete` | Framed by `shot:MachineFinale`, which holds through the Ending's Lines: the blade stops, sparkles over the crowd, the machine reverses away |
 
 ### Spots
 
@@ -284,15 +337,56 @@ Framing and where each is used are specified in
 
 | Shot | Argument |
 |---|---|
-| `shot:Dialogue` | none |
+| `shot:Dialogue` | the Dialogue's first Speaker who is a Character in the world; the core frames it before every such Dialogue (`src/core/Shot.luau`) |
 | `shot:ForestWallReveal` | none |
 | `shot:MeetCharacter` | the Character being met |
 | `shot:MachineFinale` | none |
+
+### Onboarding steps
+
+In order; specified in [`design/feel.md`](design/feel.md#6-onboarding-the-first-minute).
+`src/content/hints.luau` gives a Hint only for these steps.
+
+| Step | Shows | Done when |
+|---|---|---|
+| `onboarding:card` | The `chapter1` card; a tap or click skips it | The card is gone |
+| `onboarding:advance` | The first Narrator Line, with its Hint large | `DialogueFinished` |
+| `onboarding:objective` | The first Objective, a marker over Dad; the tracker glows | The Objective is shown |
+| `onboarding:walk` | The walk Hint; on touch a ring on the thumbstick | Amy has moved 4 studs |
+| `onboarding:talk` | The talk Hint once Dad's prompt shows; on touch the Talk-and-advance button pulses | `TalkedTo(Dad)` |
+| `onboarding:listen` | Dad's Dialogue, no Hint | The next Objective (`QuestCompleted(chapter1.ask_dad)`) |
 
 ### Cues
 
 None yet. Cue names (`cue:<name>` for sounds, `music:<name>` for music)
 are added here with their manifest entry.
+
+### Settings
+
+In the order the Settings page lists them; the defaults first in each
+row's values (`src/core/Settings.luau`).
+
+| Setting | Values | Does |
+|---|---|---|
+| `volume` | `1`, `0.75`, `0.5`, `0.25`, `0` | The volume of every sound, through the SoundGroup `SoundService.Master` |
+| `textScale` | `1`, `1.25`, `1.5` | The Text scale, capped per device |
+| `highContrast` | `false`, `true` | The dialogue box opaque and darker, every Line, name and hint on it at 7:1 |
+| `font` | `standard`, `dyslexia` | The dyslexia-friendly font (Comic Neue Angular) on the Lines, the Objective, the Hints and the Pause screen's labels |
+
+### Faults
+
+What can go wrong for a player and is worth counting
+(`src/core/Fault.luau`). The server reports each through
+`src/server/FaultLog.luau`: a warning line, `[Fault] <name> player
+<id>: <why>`, and an Analytics event of the same name.
+
+| Fault | Reported when |
+|---|---|
+| `save_unreadable` | The player's data is no Save of any version: kept aside under `unreadable` in a new Save, and the player starts afresh |
+| `save_too_new` | The player's Save is two or more schema versions newer: never written over, and the player plays without saving |
+| `save_load_timeout` | The player's Save did not load within `Persist.LOAD_TIMEOUT`: the player plays without saving |
+| `save_unavailable` | The server has no ProfileStore package: every player plays without saving |
+| `save_close_unbound` | Persist could not bind its release to BindToClose |
 
 ## 5. Lifecycles
 
@@ -303,6 +397,7 @@ are added here with their manifest entry.
 | Bond | `stranger`, `curious`, `friend`, `companion` |
 | Prop | declared per Prop in [Props](#props) |
 | Collectible (per player) | `hidden`, `found` |
+| Moderation status (per Asset) | `pending`, `reviewing`, then `approved` or `rejected` |
 
 ## 6. Ids
 
@@ -322,6 +417,13 @@ position or raw coordinate.
 | Beat | `beat:<snake_case>` | `beat:sam_catches` |
 | Cue | `cue:<snake_case>`, `music:<snake_case>` | `cue:sam_bark` |
 | Lighting preset | `lighting:<snake_case>` | `lighting:paradise` |
+| Onboarding step | `onboarding:<snake_case>` | `onboarding:walk` |
+| Asset: Chapter card or end card | `card:<chapter id>`, `card:end` | `card:chapter2` |
+| Asset: UI frame, motif or screen | `ui:<snake_case>` | `ui:dialogue_frame`, `ui:title_screen` |
+| Asset: store page art | `store:<snake_case>` | `store:icon`, `store:thumbnail_1` |
+| Asset: reference for building a Character or Prop | `ref:<the Character's or Prop's PascalCase name>` | `ref:Sam`, `ref:Machine` |
+| Asset: a Prop's model or a Cue's sound | the Prop's or Cue's own id | `prop:Machine`, `cue:sam_bark` |
+| Asset: a Creator Store font family | `font:<snake_case>` | `font:dancing_script` |
 | Collectible | `collectible:<snake_case>` | `collectible:maroon_acorn` |
 
 Inside content files the prefix is dropped where the field already says
@@ -338,6 +440,7 @@ PRs, use the prefixed form.
 | Quest | mission |
 | Line | message |
 | Shot | camera angle |
+| Setting | option, preference |
 
 ## Invariants
 
@@ -348,6 +451,7 @@ one is not a valid change.
 |---|---|---|
 | Single player | Max Players = 1; the Story is never shared between players | Tier 2 |
 | Amy's face is never seen | The Player Character is only ever seen from behind: the camera rule in [`design/feel.md`](design/feel.md#invariants), every Shot, and all art | Tier 3; release checklist for art |
+| No timed reading | A Dialogue never moves on by itself: each Line stays until the player advances it, the client binder reaches its advance only from the player's input, and the server waits for every `DialogueFinished`. (A Chapter card, which holds no Line, is timed and can be skipped.) | Tier 1 (`DialogueViewModel.spec`, the Wiring spec) and the mutation check |
 
 ## How to propose a new term
 

@@ -11,6 +11,8 @@
 	an adapter or a test can reject a malformed message by name.
 ]]
 
+local Settings = require("./Settings")
+
 -- A Line as the client shows it: the Speaker's display name and the text.
 export type ShownLine = { speaker: string, text: string }
 
@@ -36,6 +38,7 @@ export type WorldCommand =
 	| { kind: "TeleportPlayer", spot: string }
 	| { kind: "SetPropState", prop: string, state: string }
 	| { kind: "SetLighting", preset: string }
+	| { kind: "FrameShot", shot: string, character: string? }
 	| { kind: "SpawnPickups", quest: string }
 	| { kind: "RemovePickup", pickup: string }
 	| { kind: "ClearPickups", quest: string }
@@ -44,8 +47,9 @@ export type WorldCommand =
 	| { kind: "Wait", seconds: number }
 
 -- A field's type: "string", "number", "boolean", "lines" (a non-empty list
--- of ShownLines), and "string?" for a string that may be absent.
-export type FieldType = "string" | "string?" | "number" | "boolean" | "lines"
+-- of ShownLines), "settings" (a player's Settings, every value allowed:
+-- src/core/Settings) and "string?" for a string that may be absent.
+export type FieldType = "string" | "string?" | "number" | "boolean" | "lines" | "settings"
 export type Schemas = { [string]: { [string]: FieldType } }
 
 local Events = {}
@@ -74,6 +78,7 @@ Events.WORLD_COMMANDS = table.freeze({
 	TeleportPlayer = { spot = "string" },
 	SetPropState = { prop = "string", state = "string" },
 	SetLighting = { preset = "string" },
+	FrameShot = { shot = "string", character = "string?" },
 	SpawnPickups = { quest = "string" },
 	RemovePickup = { pickup = "string" },
 	ClearPickups = { quest = "string" },
@@ -108,6 +113,8 @@ function Events.matches(fieldType: string, value: any): boolean
 			end
 		end
 		return true
+	elseif fieldType == "settings" then
+		return Settings.problem(value) == nil
 	end
 	return type(value) == fieldType
 end

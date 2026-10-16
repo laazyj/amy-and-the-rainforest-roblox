@@ -4,6 +4,7 @@
 ]]
 
 local Net = require("../../../src/core/Net")
+local Settings = require("../../../src/core/Settings")
 
 return function(t: any)
 	local describe, it, expect = t.describe, t.it, t.expect
@@ -19,6 +20,12 @@ return function(t: any)
 			expect(Net.check("ShowEnding", table.pack("The end ♥", "a story by Clara"))).toBe(true)
 			expect(Net.check("DialogueFinished", { n = 0 })).toBe(true)
 			expect(Net.check("ClientReady", { n = 0 })).toBe(true)
+			expect(Net.check("ShowTitle", table.pack("Chapter Two — The Unexplored World", true))).toBe(true)
+			expect(Net.check("TitleChoice", table.pack("continue"))).toBe(true)
+			local settings = Settings.change(Settings.DEFAULTS, "textScale", 1)
+			expect(Net.check("ApplySettings", table.pack(settings))).toBe(true)
+			expect(Net.check("ChangeSettings", table.pack(Settings.DEFAULTS))).toBe(true)
+			expect(Net.check("SetPaused", table.pack(true))).toBe(true)
 		end)
 
 		local malformed: { { any } } = {
@@ -31,6 +38,25 @@ return function(t: any)
 			{ "ShowEnding", table.pack("a", "b", "c"), "takes 2 argument(s), got 3" },
 			{ "DialogueFinished", table.pack("done"), "takes 0 argument(s), got 1" },
 			{ "ClientReady", table.pack(true), "takes 0 argument(s), got 1" },
+			{ "ShowTitle", table.pack("Chapter Two", "yes"), "argument 2 must be boolean" },
+			{ "TitleChoice", table.pack(7), "argument 1 must be string" },
+			{ "FrameShot", table.pack(nil, "Fox"), "argument 1 must be string" },
+			{ "FrameShot", table.pack("MeetCharacter", 7), "argument 2 must be string?" },
+			{ "ApplySettings", table.pack(nil), "argument 1 must be settings" },
+			{ "ApplySettings", table.pack({ volume = 1 }), "argument 1 must be settings" },
+			{ "ChangeSettings", table.pack(Settings.change(Settings.DEFAULTS, "volume", -1), true), "takes 1" },
+			{
+				"ChangeSettings",
+				table.pack({ volume = 11, textScale = 1, highContrast = false, font = "standard" }),
+				"argument 1 must be settings",
+			},
+			{
+				"ChangeSettings",
+				table.pack({ volume = 1, textScale = 1, highContrast = false, font = "standard", admin = true }),
+				"argument 1 must be settings",
+			},
+			{ "SetPaused", table.pack("yes"), "argument 1 must be boolean" },
+			{ "SetPaused", { n = 0 }, "argument 1 must be boolean" },
 		}
 		for _, case in malformed do
 			it(`rejects a malformed {case[1]} payload: {case[3]}`, function()
@@ -39,6 +65,31 @@ return function(t: any)
 				expect(reason).toContain(case[3])
 			end)
 		end
+	end)
+
+	describe("Net.guard", function()
+		it("passes a payload that holds to the handler, nil arguments included", function()
+			local received: any
+			local guarded = Net.guard("SetObjective", function(...)
+				received = table.pack(...)
+			end, error)
+			guarded(nil)
+			expect(received).toEqual({ n = 1 })
+			guarded("Tell Mum")
+			expect(received).toEqual(table.pack("Tell Mum"))
+		end)
+
+		it("drops a malformed payload and says why", function()
+			local handled, reason = false, nil
+			local guarded = Net.guard("ShowChapter", function()
+				handled = true
+			end, function(why)
+				reason = why
+			end)
+			guarded("Chapter One")
+			expect(handled).toBe(false)
+			expect(reason).toBe("dropped a malformed ShowChapter: ShowChapter argument 2 must be string, got nil")
+		end)
 	end)
 
 	describe("Net.message", function()
@@ -58,6 +109,15 @@ return function(t: any)
 			expect(args).toEqual(table.pack("The end ♥", "b"))
 		end)
 
+		it("carries FrameShot to the client with its Character, or nil for none", function()
+			local remote, args = Net.message({ kind = "FrameShot", shot = "MeetCharacter", character = "Lion" })
+			expect(remote).toBe("FrameShot")
+			expect(args).toEqual(table.pack("MeetCharacter", "Lion"))
+			remote, args = Net.message({ kind = "FrameShot", shot = "ForestWallReveal" })
+			expect(remote).toBe("FrameShot")
+			expect(args).toEqual(table.pack("ForestWallReveal", nil))
+		end)
+
 		it("keeps the other World commands on the server", function()
 			expect(Net.message({ kind = "MoveCharacter", character = "Sam", spot = "Farm" })).toBeNil()
 			expect(Net.message({ kind = "Wait", seconds = 3.2 })).toBeNil()
@@ -70,6 +130,8 @@ return function(t: any)
 					{ kind = "SetObjective", text = "x" },
 					{ kind = "ShowChapterCard", title = "a", subtitle = "b", ending = false },
 					{ kind = "ShowChapterCard", title = "a", subtitle = "b", ending = true },
+					{ kind = "FrameShot", shot = "Dialogue", character = "Dad" },
+					{ kind = "FrameShot", shot = "MachineFinale" },
 				} :: { any }
 			do
 				local remote, args = Net.message(command)

@@ -24,7 +24,8 @@ export type Line = { speaker: string, text: string, canon: boolean? }
 export type QuestKind = "talk" | "reach" | "collect"
 
 -- The Beats each Hook plays, by name; the Beats are in the Chapter's hooks.luau.
-export type Hooks = { onStart: { string }?, onComplete: { string }? }
+-- onTalkedTo: a talk Quest's Character is talked to, before its `dialogue`.
+export type Hooks = { onStart: { string }?, onTalkedTo: { string }?, onComplete: { string }? }
 
 export type Quest = {
 	id: string,
@@ -108,6 +109,8 @@ export type Outcome = {
 	collected: { string }?,
 	-- whether the Kind is satisfied and the Quest moves on
 	done: boolean,
+	-- the Hook whose Beats play when it is: talk's onTalkedTo
+	hook: "onTalkedTo"?,
 }
 export type Kind = {
 	-- World commands that make the Quest playable, with the Pickups already
@@ -134,6 +137,25 @@ function Story.quests(story: Story): { Placed }
 		end
 	end
 	return placed
+end
+
+-- The text of every Line of the Story, in order: each Quest's intro,
+-- dialogue and outro, then the Ending's. The first is the Line the
+-- Onboarding's Hint shows under.
+function Story.lineTexts(story: Story): { string }
+	local texts = {}
+	local function add(lines: { Line }?)
+		for _, line in lines or {} :: { Line } do
+			table.insert(texts, line.text)
+		end
+	end
+	for _, placed in Story.quests(story) do
+		add(placed.quest.intro)
+		add(placed.quest.dialogue)
+		add(placed.quest.outro)
+	end
+	add(story.ending.lines)
+	return texts
 end
 
 -- The Quest with `id` and its Chapter, or nil.

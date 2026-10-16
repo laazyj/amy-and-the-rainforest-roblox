@@ -1,21 +1,33 @@
 --[[
 	The Story walked through the core, as tier 1 (plan section 4): every
 	Chapter completable from a fresh start and from a Resume at every Quest,
-	the World a Resume rebuilds equal to the World the walk had there, no
-	dead ends, the Beats' World commands, and every message the client gets,
+	the World a Resume rebuilds equal to the World the walk had there, also
+	from the player's Save as a DataStore keeps it (core/Save through JSON),
+	a Save made at every Story event resumable to the end, no dead ends,
+	the Beats' World commands, and every message the client gets,
 	in order, equal to the golden file the engine walkthrough records
 	(tests/fixtures/golden/walkthrough.json).
 ]]
 
 local Net = require("../../../src/core/Net")
+local Save = require("../../../src/core/Save")
 local StoryEngine = require("../../../src/core/StoryEngine")
 local StoryModule = require("../../../src/core/Story")
 local Story = require("../../../src/content/Story")
 local Golden = require("../../engine/_golden")
 local Walker = require("../core/walker")
 local bootstrap = require("../bootstrap")
+local serde = require("@lune/serde")
 
 local story = Story.story
+
+-- The Progress a returning player resumes from: a Save of `progress`,
+-- stored as a DataStore keeps it (JSON), read back and restored.
+local function throughSave(progress: StoryEngine.Progress): StoryEngine.Progress
+	local stored = serde.decode("json", serde.encode("json", Save.write(Save.record(story, Save.new(), progress))))
+	local save = assert(Save.read(story, stored))
+	return Save.restore(story, save.progress)
+end
 
 local walk = Walker.walk(story)
 
@@ -26,6 +38,7 @@ for _, step in walk.steps do
 	for _, command in step.commands do
 		local remote, args = Net.message(command)
 		if remote and args then
+			assert(Net.check(remote, args))
 			table.insert(sent, Golden.messageLine(remote, step.quest, args))
 		end
 	end
@@ -72,6 +85,36 @@ return function(t: any)
 			expect(world.objective).toBeNil()
 		end)
 
+		it("frames each Shot where feel.md puts it, and no others", function()
+			local shots = {}
+			for _, step in walk.steps do
+				for _, command in step.commands do
+					if command.kind == "FrameShot" then
+						table.insert(shots, `{step.quest or "the Ending"}: {Walker.shot(command)}`)
+					end
+				end
+			end
+			expect(shots).toEqual({
+				-- shot:Dialogue: every Dialogue whose Speaker is a Character in the world
+				"chapter1.ask_dad: Dialogue(Dad)",
+				"chapter1.sneak_out_1: Dialogue(Sam)",
+				"chapter1.sneak_out_2: Dialogue(Sam)",
+				-- chapter2.walk_to_forest.onComplete, as the next Quest starts
+				"chapter2.enter_forest: ForestWallReveal",
+				-- the first TalkedTo of each animal, before its shot:Dialogue
+				"chapter3.meet_squirrel: MeetCharacter(Squirrel)",
+				"chapter3.meet_squirrel: Dialogue(Squirrel)",
+				"chapter3.meet_fox: MeetCharacter(Fox)",
+				"chapter3.meet_fox: Dialogue(Fox)",
+				"chapter3.meet_lion: MeetCharacter(Lion)",
+				"chapter3.meet_lion: Dialogue(Lion)",
+				"chapter3.tell_mum: Dialogue(Mum)",
+				"chapter4.explain: Dialogue(Dad)",
+				-- chapter4.explain.onComplete, held through the Ending's Lines
+				"the Ending: MachineFinale",
+			})
+		end)
+
 		it(`sends the client the {#golden} messages of the golden file, in order`, function()
 			for i = 1, math.max(#golden, #sent) do
 				if golden[i] ~= sent[i] then
@@ -92,11 +135,47 @@ return function(t: any)
 				expect(resumed).toEqual(Walker.withoutPlayer(playable.world))
 			end)
 
+			it("frames no Shot, so none is left on screen after a jump or a Resume", function()
+				expect(table.find(Walker.kinds(StoryEngine.resume(story, playable.progress)), "FrameShot")).toBeNil()
+			end)
+
 			it("completes the Story from there", function()
 				expect(Walker.walk(story, playable.progress, Walker.deepCopy(resumed)).progress.ended).toBe(true)
 			end)
+
+			it("rebuilds the same World from the player's Save", function()
+				local saved = throughSave(playable.progress)
+				expect(saved).toEqual(playable.progress)
+				expect(Walker.rebuild(story, StoryEngine.resume(story, saved))).toEqual(resumed)
+			end)
 		end)
 	end
+
+	describe("a Save made at every Story event", function()
+		it("resumes at the Quest being played, or as ended, and completes the Story from there", function()
+			local saves = 0
+			local walked: { [string]: boolean } = {} -- once per Quest resumed at is enough
+			for i, step in walk.steps do
+				if #step.events > 0 then
+					saves += 1
+					local resumed = throughSave(step.progress)
+					local expected = if step.progress.ended or step.progress.showing == "ending"
+						then nil
+						else step.quest
+					if resumed.quest ~= expected then
+						error(`step {i}: saved at {tostring(step.quest)}, resumed at {tostring(resumed.quest)}`)
+					end
+					local at = tostring(resumed.quest)
+					if not walked[at] then
+						walked[at] = true
+						local world = Walker.rebuild(story, StoryEngine.resume(story, resumed))
+						expect(Walker.walk(story, resumed, world).progress.ended).toBe(true)
+					end
+				end
+			end
+			expect(saves > #walk.progress.completed).toBe(true)
+		end)
+	end)
 
 	describe("the Beats", function()
 		it("plays beat sam_catches and teleports Amy to spot GardenInside on EnteredZone(GardenGate)", function()
@@ -108,6 +187,23 @@ return function(t: any)
 			expect(world.player).toBe("GardenInside")
 			expect(world.characters.Sam).toBe("SamGuardPost")
 		end)
+
+		it(
+			"plays beat sam_catches in order: Sam bounds to spot GateOutside before Amy is put at spot GardenInside",
+			function()
+				local commands = assert(stepPlaying("sam_catches"), "never played").commands :: { any }
+				local function at(kind: string, spot: string): number?
+					for i, command in commands do
+						if command.kind == kind and command.spot == spot then
+							return i
+						end
+					end
+					return nil
+				end
+				local bounds, caught = at("MoveCharacter", "GateOutside"), at("TeleportPlayer", "GardenInside")
+				expect(bounds and caught and bounds < caught).toBe(true)
+			end
+		)
 
 		it("plays beat sam_catches after both sneak-outs, waiting 0.5 s and 0.4 s each time", function()
 			local waits = {}

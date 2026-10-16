@@ -251,7 +251,7 @@ Scene (look + sound)                     Player
 | **Line** | One thing said: Speaker, text, optional narration audio. **Canon** Lines are Clara's exact words and are locked. | `{ speaker, text }` | Narrator: "She tryed again but Sam brang her back." |
 | **Speaker** | Who says a Line: Amy, the Narrator, or a Character. | `speaker` | `Narrator` |
 | **Beat** | A named, staged moment: a fixed sequence of World commands played at a Hook. Beats are how the story *moves the world*. | `samCatches`, `samGoesToFarm`, `paradiseReveal`, `machineArrives`, `machineStops` | `beat:sam_catches` |
-| **Hook** | A point in a Quest's life where Beats run: `onStart`, `onComplete`. A Quest names its Hooks' Beats in the chapter's `data.luau`; the Beats are in its `hooks.luau`. | `questStartedHooks[...]`, `onComplete` | `chapter1.sneak_out_1.onComplete → sam_catches` |
+| **Hook** | A point in a Quest's life where Beats run: `onStart`, `onTalkedTo` (a `talk` Quest's Character is talked to), `onComplete`. A Quest names its Hooks' Beats in the chapter's `data.luau`; the Beats are in its `hooks.luau`. | `questStartedHooks[...]`, `onComplete` | `chapter1.sneak_out_1.onComplete → sam_catches` |
 | **Scene** | A region of the world with its own look and sound: terrain, Props, Spots, Zones, ambience, music. | implicit in `WorldBuilder` | Garden, Village, Field, Forest Wall, Paradise, Heart Glade |
 | **Spot** | A named position and facing inside a Scene. Content never holds raw coordinates; it names Spots. | `position`, `faceZ`, `spawnPoints` | `spot:GardenGateInside` |
 | **Zone** | A named invisible volume the player can enter. Entering one is a Player event. | `zone` | `zone:ForestGap` |
@@ -290,7 +290,9 @@ StoryEngine.step(progress, playerEvent) → progress', storyEvents[], worldComma
   `ShowDialogue`, `SetObjective`, `ShowChapterCard`, `Wait`,
   `MoveCharacter`, `TeleportPlayer`, `SetPropState`, `PlayCue`,
   `SetLighting`, `FrameShot`, `OfferTalk`, `WithdrawTalk`, `SpawnPickups`,
-  `RemovePickup`, `ClearPickups`, `SaveProgress`, `SaveCheckpoint`.
+  `RemovePickup`, `ClearPickups`. (Saving is the adapter's answer to Story
+  events, not a World command; brief 010 dropped the reserved
+  `SaveProgress` and `SaveCheckpoint`.)
 
 A Beat is a list of World commands with optional waits. A Hook maps a
 Quest moment to Beats. The server adapter's only jobs are to turn engine
@@ -424,13 +426,14 @@ a Studio publish would silently overwrite CI's version. This goes in
 |---|---|---|
 | `ROBLOX_DEV_API_KEY` | Repository secret | Dev universe only: place publish (write), Luau Execution, Assets (read/write) |
 | `ROBLOX_RELEASE_API_KEY` | `release` environment secret, required reviewer = you | Release universe only: place publish (write) |
-| `DEV_UNIVERSE_ID`, `DEV_PLACE_ID`, `RELEASE_UNIVERSE_ID`, `RELEASE_PLACE_ID` | Repository variables | Config |
+| `DEV_UNIVERSE_ID`, `DEV_PLACE_ID`, `RELEASE_UNIVERSE_ID`, `RELEASE_PLACE_ID`, `ROBLOX_CREATOR_USER_ID` | Repository variables | Config |
 
 - Two keys, so nothing that runs on a PR can touch Release. Both keys get
   an expiry date; rotation is a line in the release checklist.
 - **The agent never holds a key.** Publishing, engine tests and asset
-  uploads are CI jobs. The agent triggers asset uploads by pushing a
-  manifest change that a `workflow_dispatch` job acts on.
+  uploads are CI jobs. The agent adds assets to the manifest; once that
+  PR merges, the owner runs the `workflow_dispatch` upload job, which opens
+  a PR with the ids (`docs/ASSETS.md`).
 - Workflows use `pull_request`, never `pull_request_target`; PRs from forks
   do not get secrets.
 - Keys are created at create.roblox.com/credentials with IP restriction
@@ -469,24 +472,26 @@ Design notes:
   accept a "player-like" object (UserId, Character, position setter) and
   tier 2 drives them with a fake. Real client behaviour is tier 3's job;
   client logic is covered in tier 1 through the view-model.
-- **Reachability is tested, traversal may be.** Whether physics and
-  `Heartbeat` step inside Luau Execution is unverified. Phase 0 spike:
-  if they do, tier 2 drives a Humanoid with `MoveTo` through each chapter;
-  if not, pathfinding is the ceiling in tier 2 and real traversal is tier 3
-  only. The answer gets written into this document.
+- **Reachability is tested in tier 2, traversal in tier 3.** Physics does
+  not step in a Luau Execution task (decided by brief 007's spike; the
+  evidence is in `docs/OPEN_CLOUD.md`, "Physics in a task"). So
+  pathfinding is the ceiling in tier 2, and real traversal, a Humanoid
+  walking each chapter, is tier 3 only.
 - **Engine tests have real side effects on DataStores.** The DataModel is
   not persisted, but `DataStoreService`, `MemoryStoreService` and
   `MessagingService` are live. Tier 2 names every store with `storeName`
   (prefix `test-<RUN_ID>-`) and deletes those keys at the end, in a cleanup
   step through the Open Cloud DataStore API. Never against Release. The
   prefix is enforced only for test scripts and the `game` they hand to
-  modules; Checkpoint B closes the gap through `Persist`'s configured prefix
+  modules; brief 010 closes the gap through `Persist`'s configured prefix
   (2.3). `docs/OPEN_CLOUD.md` states the exact guarantee and the key
   permission the cleanup needs.
 - **Tier 3 is never on the critical path for PRs**, but it is for releases.
-  On PRs the Studio job uses `continue-on-error`, a 30-minute queue timeout,
-  and reports "skipped: runner offline". The release workflow refuses to
-  promote a build that has no tier 3 result.
+  On a PR the Studio job runs only when the PR is labelled
+  `needs-playtest`, as a separate dispatched run that uses
+  `continue-on-error` and never gates the PR; while the Mac is asleep it
+  waits in GitHub's queue (up to 24 hours) rather than skipping. The
+  release workflow refuses to promote a build that has no tier 3 result.
 - **Screenshots are review material and agent feedback.** Tier 3 uploads a
   contact sheet to the PR. For perceptual tasks the agent reads it and
   iterates against the per-scene checklist in `docs/design/feel.md`.
@@ -508,9 +513,10 @@ Design notes:
   justified case. A nightly **mutation check** applies a dozen canned
   faults (rename a quest, drop a hook, break a migration, blank a canon
   line) and asserts the suite fails for each, so the tests are proven to
-  bite. A non-blocking spike looks at exposing Luau VM coverage through
-  Lune for the pure core tests; if it stabilises, the number is reported
-  in PRs and only then considered as a gate. These guards arrive with the
+  bite. Luau VM line coverage of the pure core tests is possible through
+  the Luau CLI, not Lune (decided by brief 008's spike; the evidence is in
+  `docs/MAINTENANCE.md`); once wired in, the number is reported in PRs and
+  only then considered as a gate. These guards arrive with the
   Checkpoint B refactor, when `src/core` comes into being.
 - **Flake policy.** Open Cloud is beta. Tier 2 retries once on transport
   errors only, never on assertion failures. Outages are reported in the PR.
@@ -518,9 +524,20 @@ Design notes:
 ### Mac runner specifics
 
 - A GitHub Actions self-hosted runner on the MacBook, labelled `studio`,
-  with Roblox Studio installed and logged in, running as a launchd *agent*
-  in a logged-in GUI session (never a daemon), with screen lock and sleep
-  disabled while on power.
+  isolated from the owner's account: inside a macOS virtual machine on
+  the Mac (brief mac-001a; its fallback is a standard macOS account of
+  its own), holding none of the owner's files, keys or logins, the runner
+  a launchd *agent* in the VM's logged-in GUI session (never a daemon).
+  The VM image is also what moves to a dedicated machine later. No host
+  power, screen-saver or lock setting is changed: tier 3 runs when the
+  Mac is awake. Studio there is signed in to a separate Roblox
+  account with no access to Dev or Release and plays local files only.
+- A job on the Mac never runs code from a pull request: it checks out the
+  tools from `main` and acts on the built `place` artifact. Mac workflows
+  start only from `workflow_dispatch`, a push to `main` or the
+  `needs-playtest` label, never from a fork's `pull_request`; they hold no
+  secrets and run with read-only permissions; the repository requires
+  approval for every outside collaborator's workflow run.
 - The bridge of record is **Roblox Studio's built-in MCP server** (which
   exposes run code, run script in play mode, start/stop play, console
   output and Creator Store insertion), wrapped behind
@@ -529,7 +546,11 @@ Design notes:
   Images come from macOS `screencapture`.
 - Studio auto-updates weekly and can break automation. The Mac job pins
   and reports the Studio version; "Studio version drift" is a tracked risk.
-- When the Mac is closed or off, PR jobs queue up to 30 minutes then skip.
+- When the Mac is closed or off, a dispatched Mac job waits in GitHub's
+  queue for up to 24 hours. The `needs-playtest` label reaches the Mac
+  through `playtest-label.yml`, which runs on GitHub's runners and
+  dispatches `studio-playtest.yml` on `main` with the PR's number, so the
+  Mac runs only `main`'s workflow files (brief mac-002).
 
 ### Autonomous visual testing on the Mac
 
@@ -595,11 +616,13 @@ repeats, and you see the result once.
 - Capture uses macOS `screencapture` of the Studio viewport rectangle
   driven through the Studio MCP server; in-engine `CaptureService` is
   not relied on because it is unreliable in Studio.
-- Device classes are emulated with Studio's device emulation; whether it
-  can be switched from a script is a Phase 1 spike. The fallback is
-  resizing the Studio window to each device's aspect ratio by AppleScript,
-  which tests layout but not DPI; DPI-dependent text checks then use the
-  emulated scale factor from `feel.md`.
+- Device classes are emulated with Studio's device simulator, switched
+  from a script (decided by brief mac-002's spike: the MCP server reaches
+  `StudioDeviceSimulatorService` in Edit, so each device and orientation
+  is set before its own Play; the evidence is in `docs/MAC_RUNNER.md`,
+  "Device emulation"). The simulator emulates the device's resolution and
+  density, so DPI-dependent checks use the device's own units and no
+  AppleScript window resizing is needed.
 - A full visual pass takes 5 to 10 minutes, so the agent batches scene
   changes and runs it per batch, not per edit.
 - Baselines change deliberately: a PR that changes a baseline shows the
@@ -688,13 +711,19 @@ choice.
 
 ### 5.5 Sourcing free Creator Store assets from Linux
 
-There is no Open Cloud endpoint to download a Creator Store model. Phase 0
-spikes two paths and records the winner here:
+There is no Open Cloud endpoint to download a Creator Store model. Two
+paths were spiked (brief mac-002, 2026-10-14); **(b) won**:
 
 - (a) A Luau Execution task calls `InsertService:LoadAsset(id)`, serialises
   the result with `SerializationService`, and returns it for CI to write to
-  `assets/meshes/`, chunked if the return-size limit requires it.
-- (b) The Mac runner's Studio MCP `insert_model` plus save-to-`.rbxm`.
+  `assets/meshes/`. **Fails:** "User is not authorized to access Asset"; a
+  game server loads only assets its owner owns.
+- (b) Studio on the Mac: the MCP server's `insert_asset`, then
+  `SerializationService` to a binary `.rbxm`. **Works**, in about a second;
+  `tools/studio-playtest/fetch-model.luau` does it, refuses a model that
+  carries scripts or is not free, and prints the manifest entry. A
+  MeshPart's mesh stays on Roblox under its creator's asset id. Evidence
+  in `docs/MAC_RUNNER.md`, "Fetching Creator Store models".
 
 Either way the manifest records asset id, creator, licence and moderation
 status, and tier 0 fails on any `rbxassetid://` not in the manifest.
@@ -747,7 +776,8 @@ Outcome: version 1.0 on the Release channel.
   at the current Quest with the world rebuilt from Progress, chapter
   checkpoints, a "continue" title screen, and "start again" behind a
   confirmation. Studio DataStore access enabled on the Dev experience so
-  Mac playtests can exercise it under the test prefix.
+  the owner's own Studio playtests can exercise it under the test prefix
+  (the Mac runner's Roblox account has no access to Dev).
 - Phone and tablet support as separate device classes: touch controls,
   per-class UI layouts, safe areas, first-minute onboarding (where the
   thumbstick is, how to talk), tested under Studio device emulation on the
@@ -868,6 +898,7 @@ Outcome: players return because there is more to discover.
 |---|---|
 | Open Cloud Luau Execution is beta and may change or have outages | Tier 2 is isolated behind one runner script; failures are reported, not hidden; tier 3 and Lune cover most of the same logic |
 | Mac runner is often off | Tier 3 optional on PRs, mandatory for releases; perceptual briefs scheduled when the Mac is on |
+| A self-hosted runner on a public repository | The runner lives in a macOS VM (or, failing that, an unprivileged account) with nothing of the owner's in it; Mac jobs never run pull-request code and hold no secrets; fork workflow runs need approval (mac-001a) |
 | Studio version drift breaks the Mac bridge | Studio version pinned and reported by the job; bridge wrapped behind one module |
 | Agent cannot see or hear the game | Perceptual scope declared per brief; contact sheets and baselines; human review is part of the definition of done for perceptual work |
 | A PR job could publish to the public experience | Separate Dev and Release keys; Release key only in the gated environment; agent never holds a key; no `pull_request_target` |
@@ -902,7 +933,8 @@ Outcome: players return because there is more to discover.
    others) into `assets/images/` or a shared folder.
 6. Add testers as friends of the owning account when Dev is ready.
 7. In Phase 1, install Roblox Studio and the self-hosted runner on the
-   MacBook; the agent provides a setup script and checklist.
+   MacBook, isolated in a virtual machine (brief mac-001a); the agent
+   provides a setup script and checklist.
 
 Phase 0 agent work starts as soon as item 3 is done; items 1–2 can be done
 in parallel with the characterization test and refactor.

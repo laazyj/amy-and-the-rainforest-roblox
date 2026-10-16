@@ -76,4 +76,6 @@ so engine tests can require the module where Scripts do not run.
 - **Run `/simplify` on your changes before each commit** and apply its fixes.
 - Never commit secrets. Workflows use `pull_request`, never
   `pull_request_target`.
-- Never merge a PR: the owner reviews and merges every PR.
+- Never merge a PR: the owner reviews and merges every PR. (Dependabot's
+  patch and minor action bumps are merged by DependaBuddy, the owner's
+  own automation, once CI is green; see `docs/MAINTENANCE.md`.)

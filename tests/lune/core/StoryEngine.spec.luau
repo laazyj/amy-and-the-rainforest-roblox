@@ -13,6 +13,16 @@ local fixture = require("./fixtureStory")
 return function(t: any)
 	local describe, it, expect = t.describe, t.it, t.expect
 
+	describe("StoryEngine.started", function()
+		it("is false for fresh Progress and true once a Quest is active, completed or the Story has ended", function()
+			expect(StoryEngine.started(StoryEngine.fresh())).toBe(false)
+			expect(StoryEngine.started(StoryEngine.progressAt(fixture, "chapter1.greet"))).toBe(true)
+			local ended = StoryEngine.fresh()
+			ended.ended = true
+			expect(StoryEngine.started(ended)).toBe(true)
+		end)
+	end)
+
 	describe("StoryEngine.start", function()
 		local progress, events, commands = StoryEngine.start(fixture, StoryEngine.fresh())
 
@@ -80,16 +90,26 @@ return function(t: any)
 			expect(progress).toBe(playable)
 		end)
 
-		local talking, _, talked = StoryEngine.step(fixture, playable, { kind = "TalkedTo", character = "Guide" })
+		local talking, talkedEvents, talked =
+			StoryEngine.step(fixture, playable, { kind = "TalkedTo", character = "Guide" })
 
 		it("withdraws the talk affordance and shows the dialogue on TalkedTo(Guide)", function()
-			expect(Walker.kinds(talked)).toEqual({ "WithdrawTalk", "ShowDialogue" })
-			expect(talked[2]).toEqual({
+			expect(Walker.kinds(talked)).toEqual({ "WithdrawTalk", "FrameShot", "FrameShot", "ShowDialogue" })
+			expect(talked[4]).toEqual({
 				kind = "ShowDialogue",
 				lines = { { speaker = "the Hero", text = "Hi!" }, { speaker = "the Guide", text = "Welcome." } },
 			})
 			expect(talking.showing).toBe("dialogue")
 			expect(talking.quest).toBe("chapter1.greet")
+		end)
+
+		it("plays beat guide_turns at onTalkedTo, before the dialogue", function()
+			expect(talkedEvents).toEqual({ { kind = "BeatPlayed", beat = "guide_turns" } })
+			expect(talked[2]).toEqual({ kind = "FrameShot", shot = "MeetCharacter", character = "Guide" })
+		end)
+
+		it("frames the dialogue with shot:Dialogue of the Guide, the first Speaker in the world", function()
+			expect(talked[3]).toEqual({ kind = "FrameShot", shot = "Dialogue", character = "Guide" })
 		end)
 
 		local outro, _, outroCommands = StoryEngine.step(fixture, talking, { kind = "DialogueFinished" })
@@ -143,6 +163,7 @@ return function(t: any)
 				"ShowChapterCard",
 				"Wait",
 				"SetObjective",
+				"FrameShot",
 				"ShowDialogue",
 			})
 			expect(Walker.kinds(step.events)).toEqual({
@@ -206,6 +227,22 @@ return function(t: any)
 			expect(walk.progress.ended).toBe(true)
 		end)
 
+		it("shows the end card at once when the Ending has no Lines", function()
+			local silent = table.clone(fixture)
+			silent.ending = table.clone(fixture.ending)
+			silent.ending.lines = {}
+			local steps = Walker.walk(silent).steps
+			local final = steps[#steps]
+			expect(final.event).toEqual({ kind = "TouchedPickup", pickup = "FlowerB" })
+			expect(final.commands[#final.commands]).toEqual({
+				kind = "ShowChapterCard",
+				title = fixture.ending.title,
+				subtitle = fixture.ending.subtitle,
+				ending = true,
+			})
+			expect(final.events[#final.events]).toEqual({ kind = "StoryEnded" })
+		end)
+
 		it("ignores a Pickup already touched", function()
 			local progress = walk.playable["chapter2.pick"].progress
 			local once = StoryEngine.step(fixture, progress, { kind = "TouchedPickup", pickup = "FlowerC" })
@@ -248,6 +285,23 @@ return function(t: any)
 			local resumed = Walker.rebuild(fixture, StoryEngine.resume(fixture, progress))
 			expect(resumed.pickups["chapter2.pick"]).toEqual({ FlowerA = true, FlowerC = true })
 			expect(resumed.objective).toBe("Pick flowers  (1/2)")
+		end)
+	end)
+
+	describe("StoryEngine.progressAt", function()
+		local walk = Walker.walk(fixture)
+		for _, placed in Story.quests(fixture) do
+			it(`is the Progress the walk had once {placed.quest.id} was playable`, function()
+				expect(StoryEngine.progressAt(fixture, placed.quest.id)).toEqual(
+					walk.playable[placed.quest.id].progress
+				)
+			end)
+		end
+
+		it("refuses a Quest the Story does not have", function()
+			t.expectError(function()
+				StoryEngine.progressAt(fixture, "chapter9.fly")
+			end, "no Quest chapter9.fly")
 		end)
 	end)
 

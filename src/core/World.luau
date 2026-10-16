@@ -15,6 +15,7 @@ export type World = {
 	teleportPlayer: (spot: string) -> (),
 	setPropState: (prop: string, state: string) -> (),
 	setLighting: (preset: string) -> (),
+	frameShot: (shot: string, character: string?) -> (),
 	spawnPickups: (quest: string) -> (),
 	removePickup: (pickup: string) -> (),
 	clearPickups: (quest: string) -> (),
@@ -25,8 +26,20 @@ export type World = {
 
 local World = {}
 
--- Carries out `command` through `world`.
+-- How long a Wait of which `left` seconds remain has left after `elapsed`
+-- more: none passes while `held` (the player has the Pause screen open),
+-- so a Beat stops where it is and goes on when they resume.
+function World.waitLeft(left: number, elapsed: number, held: boolean): number
+	return if held then left else math.max(0, left - elapsed)
+end
+
+-- Carries out `command` through `world`, once it holds to its schema in
+-- Events; a malformed command is an error.
 function World.execute(world: World, command: Events.WorldCommand)
+	local ok, reason = Events.check(Events.WORLD_COMMANDS, command)
+	if not ok then
+		error(`malformed World command: {reason}`, 2)
+	end
 	if command.kind == "ShowDialogue" then
 		world.showDialogue(command.lines)
 	elseif command.kind == "SetObjective" then
@@ -41,6 +54,8 @@ function World.execute(world: World, command: Events.WorldCommand)
 		world.setPropState(command.prop, command.state)
 	elseif command.kind == "SetLighting" then
 		world.setLighting(command.preset)
+	elseif command.kind == "FrameShot" then
+		world.frameShot(command.shot, command.character)
 	elseif command.kind == "SpawnPickups" then
 		world.spawnPickups(command.quest)
 	elseif command.kind == "RemovePickup" then

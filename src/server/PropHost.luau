@@ -216,12 +216,20 @@ local function retreat(model: Model)
 	end)
 end
 
+local machineState = "absent"
+
 local function setMachine(state: string)
-	if state == "absent" then
-		if machineModel then
-			machineModel:Destroy()
-		end
+	if state == machineState then
+		return
+	end
+	-- A machine that has backed away is rebuilt at its Spot for any other
+	-- state, so a Resume can go from retreating back to advancing.
+	if machineModel and (state == "absent" or machineState == "retreating") then
+		machineModel:Destroy()
 		machineModel, machineBladeModel, machineSmoke = nil, nil, nil
+	end
+	machineState = state
+	if state == "absent" then
 		return
 	end
 	if not machineModel then
@@ -229,8 +237,8 @@ local function setMachine(state: string)
 	end
 	local model = machineModel :: Model
 	machineSpinning = state == "advancing"
-	if machineSmoke and state ~= "advancing" then
-		machineSmoke.Enabled = false
+	if machineSmoke then
+		machineSmoke.Enabled = state == "advancing"
 	end
 	if state == "retreating" then
 		retreat(model)

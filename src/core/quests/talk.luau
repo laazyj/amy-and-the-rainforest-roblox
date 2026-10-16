@@ -19,7 +19,11 @@ local talk: Story.Kind = {
 	end,
 	handle = function(quest, _collected, event)
 		if event.kind == "TalkedTo" and event.character == quest.character then
-			return { commands = { { kind = "WithdrawTalk", character = event.character } }, done = true }
+			return {
+				commands = { { kind = "WithdrawTalk", character = event.character } },
+				done = true,
+				hook = "onTalkedTo",
+			}
 		end
 		return nil
 	end,

@@ -15,7 +15,7 @@ move and talk.
    viewport size and last input type, per `feel.md`; tier 1 tests for the
    boundaries and orientation changes.
 2. **Layouts** per class for every screen: dialogue box (60-character
-   cap, minimum text size on a 6-inch phone), objective panel, touch
+   cap, minimum text size on a 6-inch phone), Objective tracker, touch
    control zones, chapter cards, title screen. Safe-area insets respected.
 3. **Touch input** with `ContextActionService`: a talk-and-advance button in
    the right zone, thumbstick in the left; prompts remain the universal

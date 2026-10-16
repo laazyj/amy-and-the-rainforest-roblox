@@ -17,10 +17,11 @@ return function(t: any)
 			expect((talk.begin(labelled, {})[1] :: any).label).toBe("Explain")
 		end)
 
-		it("is done on TalkedTo(Dad), withdrawing the talk affordance", function()
+		it("is done on TalkedTo(Dad), withdrawing the talk affordance and playing the onTalkedTo Hook", function()
 			expect(talk.handle(quest, {}, { kind = "TalkedTo", character = "Dad" })).toEqual({
 				commands = { { kind = "WithdrawTalk", character = "Dad" } },
 				done = true,
+				hook = "onTalkedTo",
 			})
 		end)
 

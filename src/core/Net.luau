@@ -8,12 +8,27 @@
 	The remote names predate the glossary and are kept on the wire, so the
 	golden file (tests/fixtures/golden/walkthrough.json) still names them:
 	ShowChapterCard travels as ShowChapter, or ShowEnding for the end card.
+
+	ShowTitle and TitleChoice carry the Title screen (src/core/TitleScreen),
+	an adapter detail like ClientReady, not World commands: only a returning
+	player is sent ShowTitle, so the golden file has none.
+
+	ApplySettings and ChangeSettings carry the player's Settings
+	(src/core/Settings), held to every allowed value: the server sends them
+	at join only when they are not the defaults, which the client starts
+	from, so the golden file (a fresh player) has none; the client sends
+	each change, and the server keeps it in the Save.
+
+	SetPaused tells the server the player opened or closed the Pause
+	screen (World.waitLeft).
 ]]
 
 local Events = require("./Events")
 
 export type Direction = "toClient" | "toServer"
-export type Remote = { direction: Direction, args: { Events.FieldType } }
+-- `sometimes`: a remote to the client that a fresh player is never sent,
+-- so the golden file has none (tests/engine/contract.luau)
+export type Remote = { direction: Direction, args: { Events.FieldType }, sometimes: boolean? }
 export type Args = { n: number, [number]: any }
 
 local Net = {}
@@ -25,8 +40,21 @@ Net.REMOTES = table.freeze({
 	SetObjective = { direction = "toClient", args = { "string?" } },
 	ShowChapter = { direction = "toClient", args = { "string", "string" } },
 	ShowEnding = { direction = "toClient", args = { "string", "string" } },
+	-- a Shot by name, and the Character it frames when it frames one
+	FrameShot = { direction = "toClient", args = { "string", "string?" } },
 	DialogueFinished = { direction = "toServer", args = {} },
 	ClientReady = { direction = "toServer", args = {} },
+	-- the Title screen's offer to a returning player (TitleScreen.Offer):
+	-- the Chapter they are in, and whether there is a Quest to continue
+	ShowTitle = { direction = "toClient", args = { "string", "boolean" }, sometimes = true },
+	-- the Title choice: "continue", "replay" or "restart" (TitleScreen.CHOICES)
+	TitleChoice = { direction = "toServer", args = { "string" } },
+	-- the player's Settings from their Save, when not the defaults
+	ApplySettings = { direction = "toClient", args = { "settings" }, sometimes = true },
+	-- the player changed their Settings
+	ChangeSettings = { direction = "toServer", args = { "settings" } },
+	-- the player opened (true) or closed (false) the Pause screen
+	SetPaused = { direction = "toServer", args = { "boolean" } },
 } :: { [string]: Remote })
 
 -- Holds a remote's arguments (from table.pack) to its payload: the right
@@ -47,6 +75,21 @@ function Net.check(remote: string, args: Args): (boolean, string?)
 	return true, nil
 end
 
+-- A handler for `remote`'s payload that holds it to the contract first: a
+-- payload that holds is passed to `handler`, and a malformed one is dropped
+-- and its reason given to `reject`. The client wraps every remote it
+-- receives in one.
+function Net.guard(remote: string, handler: (...any) -> (), reject: (reason: string) -> ()): (...any) -> ()
+	return function(...)
+		local ok, reason = Net.check(remote, table.pack(...))
+		if ok then
+			handler(...)
+		else
+			reject(`dropped a malformed {remote}: {reason}`)
+		end
+	end
+end
+
 -- The remote and arguments that carry `command` to the client, or nil for a
 -- command the server carries out itself.
 function Net.message(command: Events.WorldCommand): (string?, Args?)
@@ -56,6 +99,8 @@ function Net.message(command: Events.WorldCommand): (string?, Args?)
 		return "SetObjective", table.pack(command.text)
 	elseif command.kind == "ShowChapterCard" then
 		return if command.ending then "ShowEnding" else "ShowChapter", table.pack(command.title, command.subtitle)
+	elseif command.kind == "FrameShot" then
+		return "FrameShot", table.pack(command.shot, command.character)
 	end
 	return nil, nil
 end

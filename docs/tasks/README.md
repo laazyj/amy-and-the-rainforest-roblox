@@ -27,16 +27,20 @@ Rules every build session follows, regardless of brief:
 | 004 Golden walkthrough on Dev | A | done |
 | 005 Integrate toolchain and Open Cloud tooling | A | done |
 | 006 Core and content (the refactor) | B | done (#20) |
-| 007 Client view-model and engine suite | B | running (B2) |
-| 008 Content schema, purity and coverage guards | B | after 007 |
-| 009 Asset pipeline | Phase 1 | running (P1) |
-| 010 Saves and resume | Phase 1 | after 006 |
-| 011 Locked-behind camera and Shots | Phase 1 | after 007; Mac for the visual pass |
-| 012 Device classes, touch and onboarding | Phase 1 | after 007; Mac for emulation |
+| 007 Client view-model and engine suite | B | done (#25, #28) |
+| 008 Content schema, purity and coverage guards | B | done (#29) |
+| 009 Asset pipeline | Phase 1 | done (#26); first upload run opened #30 |
+| 010 Saves and resume | Phase 1 | done (#33) |
+| 011 Locked-behind camera and Shots | Phase 1 | done (#36); visual pass waits on the Mac runner |
+| 012 Device classes, touch and onboarding | Phase 1 | done (#39); device pass waits on the Mac runner and real devices |
 | 013 Audio and narration | Phase 1 | after 009 and 006; owner's recordings |
 | 014 Characters and Sam's chase | Phase 1 | after 006; Mac for the look |
-| 015 Settings, accessibility, store page, compliance | Phase 1 | after 011 and 012 |
+| 015 Settings, accessibility, store page, compliance | Phase 1 | done (#42); the owner's Creator Hub steps and the real-device pass remain |
 | 016 Visual pass | Phase 1 | after 011, 012, 014; Mac required |
-| 017 Agent bootstrap and Selene standard library | tooling | in review (#24) |
-| mac-001 Runner bootstrap | Phase 1 | on the MacBook, any time |
-| mac-002 Studio bridge, emulation and asset spikes | Phase 1 | after mac-001 |
+| 017 Agent bootstrap and Selene standard library | tooling | done (#24) |
+| 018 Playtest fixes, round 1 | Phase 1 | done (#44) |
+| 019 Title lettering: Dancing Script through the manifest | Phase 1 | done (#46); the owner confirms the look on Dev, phone included |
+| mac-001 Runner bootstrap | Phase 1 | superseded by mac-001a |
+| mac-001a Runner in an isolated virtual machine | Phase 1 | done (#47) |
+| mac-002 Studio bridge, emulation and asset spikes | Phase 1 | done (#50) |
+| mac-003 Screenshots on pull requests | Phase 1 | ready: PR A from the cloud, then PR B on the MacBook |

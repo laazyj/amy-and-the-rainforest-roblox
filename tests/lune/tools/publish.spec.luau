@@ -1,4 +1,6 @@
 local F = require("../fixtures/opencloud")
+local Release = require("../../../tools/lib/release")
+local roblox = require("@lune/roblox") :: any
 local OpenCloud = require("../../../tools/opencloud")
 local Publish = require("../../../tools/lib/publish")
 
@@ -15,11 +17,12 @@ local function mock(options: {
 	args: { string },
 	env: { [string]: string }?,
 	handler: ((OpenCloud.Request) -> OpenCloud.Response)?,
+	place: string?,
 }): F.Mock
 	return F.mock({
 		args = options.args,
 		env = options.env,
-		files = { ["place.rbxl"] = "<roblox!binary>" },
+		files = { ["place.rbxl"] = options.place or "<roblox!binary>" },
 		handler = options.handler or function()
 			return F.response(200, '{"versionNumber":7}')
 		end,
@@ -87,7 +90,17 @@ return function(t: any)
 		end)
 
 		it("publishes to the Release universe with RELEASE_JOB=1", function()
-			local m = mock({ args = args("Published", F.RELEASE), env = F.env({ RELEASE_JOB = "1" }) })
+			-- the release job strips the Dev shortcuts, so it needs a place that
+			-- has them (tests/lune/tools/release.spec.luau checks the real one)
+			local place = roblox.Instance.new("DataModel")
+			local dev = roblox.Instance.new("Folder")
+			dev.Name = Release.DEV_ONLY
+			dev.Parent = place:GetService("ServerScriptService")
+			local m = mock({
+				args = args("Published", F.RELEASE),
+				env = F.env({ RELEASE_JOB = "1" }),
+				place = roblox.serializePlace(place),
+			})
 			Publish.main(m.ctx)
 			expect(m.calls[1].url).toContain(`/universes/v1/{F.RELEASE}/`)
 		end)

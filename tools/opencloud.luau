@@ -153,6 +153,11 @@ function OpenCloud.listLogsRequest(apiKey: string, taskPath: string, pageToken: 
 	return { method = "GET", url = url, headers = headers(apiKey, "application/json") }
 end
 
+-- A page's token or cursor for the next page; "" or none means the last page.
+local function nextPage(value: any): string?
+	return if type(value) == "string" and value ~= "" then value else nil
+end
+
 -- The messages on one page of logs, and the token for the next page if any.
 function OpenCloud.parseLogsPage(response: Response): ({ string }, string?)
 	local page = serde.decode("json", response.body)
@@ -160,8 +165,289 @@ function OpenCloud.parseLogsPage(response: Response): ({ string }, string?)
 	for _, chunk in page.luauExecutionSessionTaskLogs or {} do
 		table.move(chunk.messages or {}, 1, #(chunk.messages or {}), #messages + 1, messages)
 	end
-	local token = page.nextPageToken
-	return messages, if token and token ~= "" then token else nil
+	return messages, nextPage(page.nextPageToken)
+end
+
+-- Assets API: upload an image, sound or model to the creator's account.
+-- Verified against content/en-us/reference/cloud/assets/v1.json and
+-- cloud/guides/usage-assets.md; see docs/OPEN_CLOUD.md.
+
+-- The Roblox asset type for each manifest kind. Images go up as `Image`, whose
+-- id an ImageLabel takes directly (a `Decal` id would need resolving first).
+OpenCloud.ASSET_TYPES = table.freeze({
+	image = "Image",
+	audio = "Audio",
+	model = "Model",
+})
+
+-- The file extensions the Assets API accepts for each kind, and the content
+-- type each is sent with.
+OpenCloud.ASSET_CONTENT_TYPES = table.freeze({
+	image = table.freeze({
+		png = "image/png",
+		jpg = "image/jpeg",
+		jpeg = "image/jpeg",
+		bmp = "image/bmp",
+		tga = "image/tga",
+	}),
+	audio = table.freeze({ mp3 = "audio/mpeg", ogg = "audio/ogg", wav = "audio/wav", flac = "audio/flac" }),
+	model = table.freeze({
+		fbx = "model/fbx",
+		gltf = "model/gltf+json",
+		glb = "model/gltf-binary",
+		rbxm = "model/x-rbxm",
+		rbxmx = "model/x-rbxm",
+	}),
+})
+
+-- Largest file Create Asset accepts ("up to 20 MB").
+OpenCloud.MAX_ASSET_BYTES = 20_000_000
+
+-- The content type for `path` as an asset of `kind`, or nil if the API takes no such file.
+function OpenCloud.assetContentType(kind: string, path: string): string?
+	local types = OpenCloud.ASSET_CONTENT_TYPES[kind]
+	local extension = string.match(path, "%.(%w+)$")
+	return if types and extension then types[string.lower(extension)] else nil
+end
+
+-- Why the Assets API would refuse `bytes` bytes named `fileName` as a `kind`, or nil.
+function OpenCloud.assetUploadProblem(kind: string, fileName: string, bytes: number): string?
+	if not OpenCloud.ASSET_TYPES[kind] then
+		return `{kind} is not an asset kind (image, audio, model)`
+	elseif not OpenCloud.assetContentType(kind, fileName) then
+		return `the Assets API takes no {kind} file named {fileName}`
+	elseif bytes > OpenCloud.MAX_ASSET_BYTES then
+		return `{fileName} is {bytes} bytes; the Assets API accepts {OpenCloud.MAX_ASSET_BYTES}`
+	end
+	return nil
+end
+
+export type AssetUpload = {
+	kind: string,
+	displayName: string,
+	description: string,
+	creatorUserId: string,
+	fileName: string,
+	file: string,
+}
+
+-- POST /assets/v1/assets, multipart/form-data with a JSON `request` part and
+-- the file as `fileContent`. Scopes asset:read and asset:write. The response
+-- is an Operation to poll.
+function OpenCloud.createAssetRequest(apiKey: string, upload: AssetUpload): Request
+	local problem = OpenCloud.assetUploadProblem(upload.kind, upload.fileName, #upload.file)
+	if problem then
+		error(problem, 0)
+	end
+	local contentType = OpenCloud.assetContentType(upload.kind, upload.fileName)
+	local request = serde.encode("json", {
+		assetType = OpenCloud.ASSET_TYPES[upload.kind],
+		displayName = upload.displayName,
+		description = upload.description,
+		creationContext = { creator = { userId = upload.creatorUserId } },
+	})
+	-- A boundary that occurs nowhere in the parts.
+	local boundary = "amy-asset-boundary"
+	while string.find(upload.file, boundary, 1, true) or string.find(request, boundary, 1, true) do
+		boundary ..= "-x"
+	end
+	local body = table.concat({
+		`--{boundary}`,
+		'Content-Disposition: form-data; name="request"',
+		"Content-Type: application/json",
+		"",
+		request,
+		`--{boundary}`,
+		`Content-Disposition: form-data; name="fileContent"; filename="{upload.fileName}"`,
+		`Content-Type: {contentType}`,
+		"",
+		upload.file,
+		`--{boundary}--`,
+		"",
+	}, "\r\n")
+	return {
+		method = "POST",
+		url = `{OpenCloud.BASE_URL}/assets/v1/assets`,
+		headers = headers(apiKey, `multipart/form-data; boundary={boundary}`),
+		body = body,
+	}
+end
+
+export type Operation = {
+	path: string,
+	done: boolean,
+	assetId: string?,
+	moderation: string?,
+	error: string?,
+}
+
+-- "Approved", "MODERATION_STATE_APPROVED" -> "approved". The spec and the
+-- guide's example disagree on the form, so both are read.
+local function moderationState(asset: any): string?
+	local result = type(asset) == "table" and asset.moderationResult
+	local state = type(result) == "table" and result.moderationState
+	return if type(state) == "string" then string.lower((string.gsub(state, "^MODERATION_STATE_", ""))) else nil
+end
+
+-- The asset id as digits; the spec says integer, the guide's example a string.
+local function assetIdOf(asset: any): string?
+	local id = type(asset) == "table" and asset.assetId
+	if type(id) == "number" then
+		return string.format("%d", id)
+	end
+	return if type(id) == "string" and string.match(id, "^%d+$") then id else nil
+end
+
+-- An Operation from a create or get-operation response. Its path is checked,
+-- because it is used to build the next URL.
+function OpenCloud.parseOperation(response: Response): Operation
+	local decoded = serde.decode("json", response.body)
+	local path = decoded.path
+	if type(path) ~= "string" or not string.match(path, "^operations/[%w%-]+$") then
+		error(`unexpected operation path in response: {response.body}`, 0)
+	end
+	local failure = decoded.error
+	return {
+		path = path,
+		done = decoded.done == true,
+		assetId = assetIdOf(decoded.response),
+		moderation = moderationState(decoded.response),
+		error = if type(failure) == "table" then `{failure.code or "?"} {failure.message or ""}` else nil,
+	}
+end
+
+-- GET /assets/v1/{operation.path}. Scope asset:read.
+function OpenCloud.getOperationRequest(apiKey: string, operationPath: string): Request
+	return {
+		method = "GET",
+		url = `{OpenCloud.BASE_URL}/assets/v1/{operationPath}`,
+		headers = headers(apiKey, "application/json"),
+	}
+end
+
+-- GET /assets/v1/assets/{assetId}, for its moderation state. Scope asset:read.
+function OpenCloud.getAssetRequest(apiKey: string, assetId: string): Request
+	assert(string.match(assetId, "^%d+$"), `not an asset id: {assetId}`)
+	return {
+		method = "GET",
+		url = `{OpenCloud.BASE_URL}/assets/v1/assets/{assetId}?readMask=moderationResult`,
+		headers = headers(apiKey, "application/json"),
+	}
+end
+
+-- The moderation state in a get-asset response ("reviewing", "approved", "rejected").
+function OpenCloud.parseAssetModeration(response: Response): string?
+	return moderationState(serde.decode("json", response.body))
+end
+
+-- What happens after an asset is created, for --dry-run (the operation path is not known yet).
+function OpenCloud.describeOperationPolling(): string
+	return `then GET {OpenCloud.BASE_URL}/assets/v1/\{operation.path\} until done`
+end
+
+-- DataStores (v1), for the test-store cleanup (tools/clean-test-stores).
+-- Verified against content/en-us/reference/cloud/datastores-api/v1.json in
+-- github.com/Roblox/creator-docs; see docs/OPEN_CLOUD.md.
+
+local function datastores(universeId: string, path: string, query: { { string } }, cursor: string?): string
+	if cursor then
+		table.insert(query, { "cursor", cursor })
+	end
+	local parts = {}
+	for _, pair in query do
+		table.insert(parts, `{pair[1]}={urlEncode(pair[2])}`)
+	end
+	local url = `{OpenCloud.BASE_URL}/datastores/v1/universes/{universeId}/standard-datastores{path}`
+	return if #parts > 0 then `{url}?{table.concat(parts, "&")}` else url
+end
+
+-- GET the data stores whose names start with `prefix`. Scope
+-- universe-datastores.control:list.
+function OpenCloud.listDataStoresRequest(apiKey: string, universeId: string, prefix: string, cursor: string?): Request
+	return {
+		method = "GET",
+		url = datastores(universeId, "", { { "prefix", prefix }, { "limit", "50" } }, cursor),
+		headers = headers(apiKey, "application/json"),
+	}
+end
+
+-- The data store names on one page, and the cursor for the next. The spec's
+-- schema calls the list `data`, its example `datastores`; both are read.
+function OpenCloud.parseDataStoresPage(response: Response): ({ string }, string?)
+	local decoded = serde.decode("json", response.body)
+	local names = {}
+	for _, store in decoded.datastores or decoded.data or {} do
+		table.insert(names, store.name)
+	end
+	return names, nextPage(decoded.nextPageCursor)
+end
+
+export type EntryKey = { scope: string, key: string }
+
+-- GET the keys of every scope of a data store. Scope
+-- universe-datastores.objects:list.
+function OpenCloud.listEntriesRequest(apiKey: string, universeId: string, datastore: string, cursor: string?): Request
+	local query = { { "datastoreName", datastore }, { "allScopes", "true" }, { "limit", "100" } }
+	return {
+		method = "GET",
+		url = datastores(universeId, "/datastore/entries", query, cursor),
+		headers = headers(apiKey, "application/json"),
+	}
+end
+
+-- The keys on one page, and the cursor for the next. The spec's schema gives
+-- keys as strings, its example as {scope?, key}; both are read.
+function OpenCloud.parseEntriesPage(response: Response): ({ EntryKey }, string?)
+	local decoded = serde.decode("json", response.body)
+	local keys = {}
+	for _, item in decoded.keys or {} do
+		if type(item) == "string" then
+			table.insert(keys, { scope = "global", key = item })
+		else
+			table.insert(keys, { scope = item.scope or "global", key = item.key })
+		end
+	end
+	return keys, nextPage(decoded.nextPageCursor)
+end
+
+-- DELETE one entry. Scope universe-datastores.objects:delete. 204 when done.
+function OpenCloud.deleteEntryRequest(apiKey: string, universeId: string, datastore: string, entry: EntryKey): Request
+	return {
+		method = "DELETE",
+		url = datastores(
+			universeId,
+			"/datastore/entries/entry",
+			{ { "datastoreName", datastore }, { "entryKey", entry.key }, { "scope", entry.scope } }
+		),
+		headers = headers(apiKey, "application/json"),
+	}
+end
+
+-- GET a data store's entries through Open Cloud v2 (openapi.json, List Data
+-- Store Entries), which leaves out entries marked for deletion
+-- (`showDeleted` is false by default); the v1 listing above still lists a
+-- key a while after it is deleted. Scope universe-datastores.objects:list.
+function OpenCloud.listLiveEntriesRequest(
+	apiKey: string,
+	universeId: string,
+	datastore: string,
+	pageToken: string?
+): Request
+	local url = cloudV2(`universes/{universeId}/data-stores/{urlEncode(datastore)}/entries?maxPageSize=256`)
+	if pageToken then
+		url ..= `&pageToken={urlEncode(pageToken)}`
+	end
+	return { method = "GET", url = url, headers = headers(apiKey, "application/json") }
+end
+
+-- The entry ids on one page of a v2 listing, and the token for the next.
+function OpenCloud.parseLiveEntriesPage(response: Response): ({ string }, string?)
+	local decoded = serde.decode("json", response.body)
+	local ids = {}
+	for _, entry in decoded.dataStoreEntries or {} do
+		table.insert(ids, entry.id or entry.path)
+	end
+	return ids, nextPage(decoded.nextPageToken)
 end
 
 -- A request as it would be sent, with the key redacted. For --dry-run.
@@ -219,14 +505,21 @@ local function isBusy(response: Response): boolean
 		and string.find(string.lower(body.message), "try again", 1, true) ~= nil
 end
 
+export type SendOptions = {
+	-- false for a request that creates something new each time and takes no
+	-- idempotency key (Create Asset): one that reached Roblox before the
+	-- connection dropped would be done twice. Default true.
+	retryTransport: boolean?,
+}
+
 -- Sends a request with the retry policy from the plan:
--- - a transport error is retried once;
+-- - a transport error is retried once, unless `options.retryTransport` is false;
 -- - a 5xx is retried once only for GET, because a POST that failed with a 5xx
 --   may still have been accepted (a second publish or a duplicate task);
 -- - a "server busy" 409 is retried with BUSY_BACKOFF, then returned;
 -- - any other 4xx is returned at once.
 -- Returns the response, or raises.
-function OpenCloud.send(http: Http, sleep: Sleep, request: Request): Response
+function OpenCloud.send(http: Http, sleep: Sleep, request: Request, options: SendOptions?): Response
 	local retried = false
 	local busyRetries = 0
 	while true do
@@ -234,6 +527,9 @@ function OpenCloud.send(http: Http, sleep: Sleep, request: Request): Response
 		local failure
 		if not ok then
 			failure = `transport error: {result}`
+			if options and options.retryTransport == false then
+				error(`{request.method} {request.url} failed, not retried ({failure})`, 0)
+			end
 		else
 			local response = result :: Response
 			if isBusy(response) and busyRetries < #OpenCloud.BUSY_BACKOFF then
@@ -262,8 +558,8 @@ function OpenCloud.expectOk(request: Request, response: Response): Response
 end
 
 -- `send`, then `expectOk`.
-function OpenCloud.call(http: Http, sleep: Sleep, request: Request): Response
-	return OpenCloud.expectOk(request, OpenCloud.send(http, sleep, request))
+function OpenCloud.call(http: Http, sleep: Sleep, request: Request, options: SendOptions?): Response
+	return OpenCloud.expectOk(request, OpenCloud.send(http, sleep, request, options))
 end
 
 return OpenCloud

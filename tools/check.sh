@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Tier 0 static checks: StyLua formatting, Selene lint, luau-lsp type checking,
-# and actionlint and zizmor (installed by tools/bootstrap-agent.sh) over .github.
+# the asset manifest (docs/ASSETS.md), actionlint and zizmor (installed by
+# tools/bootstrap-agent.sh) over .github, and the guards of tools/guard.luau
+# (plan sections 2.1, 2.4 and 4).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$PWD/build/bin:$PATH" # where tools/bootstrap-agent.sh installs
@@ -23,6 +25,9 @@ fi
 echo "== StyLua"
 stylua --check src tests tools
 
+echo "== Assets: the manifest, and every rbxassetid:// in src/ is in it"
+lune run tools/check-assets
+
 echo "== Selene"
 # Both configs use the committed roblox.yml in the working directory.
 if [ ! -f roblox.yml ]; then
@@ -36,6 +41,9 @@ echo "== luau-lsp: src (Roblox)"
 rojo sourcemap default.project.json -o build/sourcemap.json
 luau-lsp analyze --platform=roblox --sourcemap=build/sourcemap.json --definitions=@roblox="$defs" src
 
+echo "== luau-lsp: tests/studio (Roblox, tier 3 scripts run by hand in Studio)"
+luau-lsp analyze --platform=roblox --definitions=@roblox="$defs" tests/studio
+
 echo "== luau-lsp: tests/engine (Roblox, with the names the runner injects)"
 luau-lsp analyze --platform=roblox --definitions=@roblox="$defs" \
 	--definitions=@engine=tests/engine/globals.d.luau --ignore="**/*.d.luau" tests/engine
@@ -48,3 +56,26 @@ if ! grep -q "typedefs/$lune_version/" .luaurc; then
 fi
 lune setup >/dev/null # writes the @lune type definitions that .luaurc points at
 luau-lsp analyze --platform=standard tests/lune tools
+
+echo "== Content schema (derived from docs/GLOSSARY.md)"
+lune run tools/guard schema
+
+echo "== Purity: src/core and src/content"
+lune run tools/guard purity
+
+echo "== No external links in any text under src/"
+lune run tools/guard links
+
+echo "== Compliance: no surname under src/, assets/ or docs/store/; no web address in the store page kit; nothing to buy or type"
+lune run tools/guard names
+lune run tools/guard store-links
+lune run tools/guard purchases-and-text
+
+echo "== Coverage guards: a spec per core module, glossary names in specs, a Walkthrough per Chapter"
+lune run tools/guard coverage
+
+echo "== Mac runner: no workflow with a self-hosted job starts from a pull request"
+lune run tools/guard mac-workflows
+
+echo "== Mutation check: every canned fault still applies (the nightly job runs them)"
+lune run tools/guard faults

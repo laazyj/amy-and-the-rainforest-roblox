@@ -1,9 +1,12 @@
 --!strict
 -- Publishes a place file to a universe through Open Cloud and prints the new
--- version number on stdout. Entry point: tools/publish.luau.
+-- version number on stdout. Entry point: tools/publish.luau. With
+-- RELEASE_JOB=1 (the release job) the Dev-only instances are stripped from
+-- the place first (tools/lib/release.luau).
 
 local Cli = require("./cli")
 local OpenCloud = require("../opencloud")
+local Release = require("./release")
 
 local USAGE = "usage: lune run tools/publish --file <path.rbxl> --version-type Saved|Published"
 
@@ -21,6 +24,10 @@ local function main(ctx: Cli.Context)
 			error(`place file not found: {path}`, 0)
 		end
 		ctx.log(`warning: place file not found: {path}`)
+	end
+	if placeFile and ctx.env.RELEASE_JOB == "1" then
+		placeFile = Release.strip(placeFile)
+		ctx.log(`release build: stripped ServerScriptService.{Release.DEV_ONLY} from {path}`)
 	end
 
 	local request = OpenCloud.publishRequest(
