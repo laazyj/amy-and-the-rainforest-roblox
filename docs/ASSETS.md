@@ -63,9 +63,9 @@ cards and the end card), `ui:` (frames, motifs, screens), `store:`
 (store page art), `ref:` (references, never shown), `cue:` and `music:`
 (Cues), `prop:` (Prop models), `font:` (Creator Store font families). The game looks an Asset up by its name in
 `AssetIds.luau`; a name with no id yet is absent, and the game is to fall
-back to plain UI (or silence, for a Cue). Nothing in `src/` reads
-`AssetIds.luau` yet; the briefs that show the cards and play the Cues
-(013, 015, 016) do.
+back to plain UI (or silence, for a Cue). The client binder reads
+`AssetIds.luau` for the Chapter cards, the UI frames, the Title screen and
+its font; brief 013 adds the Cues.
 
 ## How to add an asset
 
