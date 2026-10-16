@@ -56,7 +56,11 @@ Playthrough.DEVICE_TIMEOUT = 600
 -- leaving time to install the tools, stop and upload. A device is not
 -- started with less than MIN_DEVICE of it left (one takes about 200 s).
 Playthrough.BUDGET = 45 * 60
-Playthrough.MIN_DEVICE = 300
+-- Kept back from each device's time for what follows its deadline: the
+-- step in progress, Stop Play and stopping the simulator, each of which
+-- can wait on Studio.
+Playthrough.TEARDOWN_RESERVE = 180
+Playthrough.MIN_DEVICE = Playthrough.TEARDOWN_RESERVE + 240
 -- How far the client's viewport may differ from the simulated device's
 -- size in points, as a fraction: its short side, and at most its long side
 -- (a phone's long side loses its safe-area insets).
@@ -491,8 +495,15 @@ function Playthrough.run(bridge: Smoke.Bridge, options: Options): Report
 	end
 	local function progress()
 		report.durationSeconds = round(options.clock() - started)
-		if options.progress then
-			options.progress(report)
+		-- A report that cannot be written is logged, and the run goes on.
+		local write = options.progress
+		if write then
+			local written, err = pcall(function()
+				write(report)
+			end)
+			if not written then
+				options.log(`could not write the report: {err}`)
+			end
 		end
 	end
 	local function deviceReport(run: DeviceRun): DeviceReport
@@ -524,61 +535,68 @@ function Playthrough.run(bridge: Smoke.Bridge, options: Options): Report
 	if not ok then
 		fail(`Open the place in Studio: {err}`)
 	else
-		local simulated, stopped = false, true
-		for index, run in options.devices do
-			local remaining = budget - (options.clock() - started)
-			if remaining < Playthrough.MIN_DEVICE then
-				fail(`the run's {budget}-second budget was spent before {run.name}`)
-				skip(index, "the run's time budget was spent")
-				break
-			end
-			options.log(`== {run.name}`)
-			local device = deviceReport(run)
-			local deviceStarted = options.clock()
-			local deadline = deviceStarted + math.min(Playthrough.DEVICE_TIMEOUT, remaining)
-			local playing = false
-			local played, failure = pcall(function()
-				simulated = simulated or run.device ~= nil
-				device.simulation = Smoke.checkSimulation(run.device, bridge.setDevice(run.device))
-				playing = true
-				bridge.startPlay()
-				playDevice(bridge, options, run, device, deadline)
-			end)
-			local stopFailure = nil
-			if playing then
-				stopped, stopFailure = pcall(bridge.stopPlay)
-			end
-			device.seconds = round(options.clock() - deviceStarted)
-			local story = type(failure) == "table"
-			if not played then
-				device.result = "fail"
-				device.failure = if story then (failure :: StoryFailure).story else tostring(failure)
-				fail(`{run.name}: {device.failure}`)
-			end
-			local skipRest = nil
-			if not stopped then
-				device.result = "fail"
-				device.failure = device.failure or `Stop Play: {stopFailure}`
-				fail(`{run.name}: Stop Play: {stopFailure}`)
-				skipRest = "Studio did not stop Play" -- the next device would play in a session still in Play
-			elseif story and run.class == "PC" then
-				skipRest = "the Story did not end on PC" -- nor will it on a phone
-			end
-			if skipRest then
-				skip(index + 1, skipRest)
+		-- Whatever goes wrong below, Studio is still quit after it.
+		local ran, crash = pcall(function()
+			local simulated, stopped = false, true
+			for index, run in options.devices do
+				local remaining = budget - (options.clock() - started)
+				if remaining < Playthrough.MIN_DEVICE then
+					fail(`the run's {budget}-second budget was spent before {run.name}`)
+					skip(index, "the run's time budget was spent")
+					break
+				end
+				options.log(`== {run.name}`)
+				local device = deviceReport(run)
+				local deviceStarted = options.clock()
+				local deadline = deviceStarted
+					+ math.min(Playthrough.DEVICE_TIMEOUT, remaining - Playthrough.TEARDOWN_RESERVE)
+				local playing = false
+				local played, failure = pcall(function()
+					simulated = simulated or run.device ~= nil
+					device.simulation = Smoke.checkSimulation(run.device, bridge.setDevice(run.device))
+					playing = true
+					bridge.startPlay()
+					playDevice(bridge, options, run, device, deadline)
+				end)
+				local stopFailure = nil
+				if playing then
+					stopped, stopFailure = pcall(bridge.stopPlay)
+				end
+				device.seconds = round(options.clock() - deviceStarted)
+				local story = type(failure) == "table"
+				if not played then
+					device.result = "fail"
+					device.failure = if story then (failure :: StoryFailure).story else tostring(failure)
+					fail(`{run.name}: {device.failure}`)
+				end
+				local skipRest = nil
+				if not stopped then
+					device.result = "fail"
+					device.failure = device.failure or `Stop Play: {stopFailure}`
+					fail(`{run.name}: Stop Play: {stopFailure}`)
+					skipRest = "Studio did not stop Play" -- the next device would play in a session still in Play
+				elseif story and run.class == "PC" then
+					skipRest = "the Story did not end on PC" -- nor will it on a phone
+				end
+				if skipRest then
+					skip(index + 1, skipRest)
+					progress()
+					break
+				end
 				progress()
-				break
 			end
-			progress()
-		end
-		-- Studio as it was found: no device simulated.
-		if simulated and stopped then
-			local restored, restoreFailure = pcall(function()
-				Smoke.checkSimulation(nil, bridge.setDevice(nil))
-			end)
-			if not restored then
-				fail(`Stop the device simulator: {restoreFailure}`)
+			-- Studio as it was found: no device simulated.
+			if simulated and stopped then
+				local restored, restoreFailure = pcall(function()
+					Smoke.checkSimulation(nil, bridge.setDevice(nil))
+				end)
+				if not restored then
+					fail(`Stop the device simulator: {restoreFailure}`)
+				end
 			end
+		end)
+		if not ran then
+			fail(`the run stopped: {crash}`)
 		end
 	end
 	pcall(bridge.close)

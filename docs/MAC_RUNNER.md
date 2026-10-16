@@ -330,8 +330,11 @@ against a scripted fake client:
   run checks no device is simulated before it plays.
 - **Within the job's time.** The run has a 45-minute budget, Studio's
   start included, inside the job's 60 minutes: no device starts with
-  under 5 minutes of it left (those are reported as skipped), and a
-  device's 10 minutes shrink to what is left. `report.json` is written
+  under 7 minutes of it left (those are reported as skipped), and a
+  device's 10 minutes shrink to what is left less a 3-minute teardown
+  reserve, for the step in progress, Stop Play and stopping the simulator
+  when Studio is slow. A report that cannot be written is logged and the
+  run still stops Play and quits Studio. `report.json` is written
   after every device with `"finished": false`, so a job cut short still
   uploads what it played, and the summary says it stopped before the end.
 

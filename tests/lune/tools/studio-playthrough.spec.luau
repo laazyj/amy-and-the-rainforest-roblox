@@ -358,6 +358,45 @@ return function(t: any)
 			t.expect(only(calls, "startPlay")).toEqual({ "startPlay" })
 		end)
 
+		t.it("ends a device early enough to leave the teardown reserve inside the budget", function()
+			local walking = {}
+			-- More looks than fit before the deadline (a look takes about 0.3 s).
+			for step = 1, 2000 do
+				table.insert(walking, { amy = { x = step * 3, y = 0, z = 0 } })
+			end
+			local bridge, _, clock, sleep = fakeStudio(walking)
+			local budget = Playthrough.MIN_DEVICE + 100
+			local report = play(bridge, clock, sleep, { PHONE }, { budget = budget })
+			local seconds = tonumber(string.match(report.failure :: string, "did not end within ([%d.]+) seconds"))
+			t.expect(seconds ~= nil).toBe(true)
+			t.expect((seconds :: number) <= budget - Playthrough.TEARDOWN_RESERVE).toBe(true)
+			t.expect(report.durationSeconds <= budget).toBe(true)
+		end)
+
+		t.it("still quits Studio when the report cannot be written", function()
+			local bridge, calls, clock, sleep = fakeStudio({ THE_END })
+			local report = play(bridge, clock, sleep, { PHONE }, {
+				progress = function()
+					error("disk full", 0)
+				end,
+			})
+			t.expect(report.finished).toBe(true)
+			t.expect(calls[#calls]).toBe("close")
+		end)
+
+		t.it("still quits Studio when the run itself breaks between devices", function()
+			local bridge, calls, clock, sleep = fakeStudio({ THE_END })
+			local report = play(bridge, clock, sleep, { PHONE }, {
+				log = function(line)
+					if line == "== phone-landscape" then
+						error("the log broke", 0)
+					end
+				end,
+			})
+			t.expect(report.failure).toBe("the run stopped: the log broke")
+			t.expect(calls[#calls]).toBe("close")
+		end)
+
 		t.it("hands over the report after every device, finished only at the end", function()
 			local seen = {}
 			local bridge, _, clock, sleep = fakeStudio({ THE_END })
