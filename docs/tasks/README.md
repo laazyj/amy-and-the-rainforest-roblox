@@ -33,7 +33,7 @@ Rules every build session follows, regardless of brief:
 | 010 Saves and resume | Phase 1 | done (#33) |
 | 011 Locked-behind camera and Shots | Phase 1 | done (#36); visual pass waits on the Mac runner |
 | 012 Device classes, touch and onboarding | Phase 1 | done (#39); device pass waits on the Mac runner and real devices |
-| 013 Audio and narration | Phase 1 | after 009 and 006; owner's recordings |
+| 013 Audio and narration | Phase 1 | built (#57), with two departures: Must 2 (library tracks by default, nothing uploaded) is replaced for now by 15 synthesised placeholder Cues with `upload: true`, which cost 15 of the month's audio uploads (10 a month without ID verification, 100 with) unless the owner sets them to `upload: false`; Must 5 (tier 3 loudness) is not done and waits for the Mac. The owner's library picks, recordings and audio review remain |
 | 014 Characters and Sam's chase | Phase 1 | after 006; Mac for the look |
 | 015 Settings, accessibility, store page, compliance | Phase 1 | done (#42); the owner's Creator Hub steps and the real-device pass remain |
 | 016 Visual pass | Phase 1 | after 011, 012, 014; Mac required |

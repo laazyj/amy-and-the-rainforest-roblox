@@ -41,13 +41,16 @@ Manifest.NAME_PREFIXES = table.freeze({
 	ref = true, -- a Character reference; not shown in the game
 	cue = true, -- a Cue: a sound or effect
 	music = true, -- a Cue: a music track
+	narration = true, -- a Chapter's narration file
 	prop = true, -- a Prop's model
 	font = true, -- a Creator Store font family, referenced by id
 })
 
--- The kind of a Creator Store font family: referenced by its id, never
--- uploaded, so it has no file.
+-- The kinds referenced by their Creator Store id, never uploaded, so with
+-- no file: a font family, and a track from Roblox's audio library.
 Manifest.FONT = "font"
+Manifest.LIBRARY_AUDIO = "library-audio"
+Manifest.REFERENCED = table.freeze({ [Manifest.FONT] = true, [Manifest.LIBRARY_AUDIO] = true })
 
 Manifest.LICENCES = table.freeze({
 	owner = true, -- made for this game by the owner's family (Clara's work), or generated here
@@ -150,17 +153,19 @@ local function nonEmpty(value: any): boolean
 	return type(value) == "string" and string.match(value, "%S") ~= nil
 end
 
--- A font is a Creator Store family the game references by its id: it has no
--- file, is never uploaded, and Roblox published it, so it is approved.
-local function fontProblems(entry: any, bad: (string) -> ())
+-- A font or a library-audio track is on the Creator Store and the game
+-- references it by its id: it has no file, is never uploaded, and Roblox
+-- published it, so it is approved.
+local function referencedProblems(entry: any, bad: (string) -> ())
+	local a = if entry.kind == Manifest.FONT then "a font" else "a library-audio track"
 	if entry.path ~= nil or entry.sha256 ~= nil or entry.amy ~= nil then
-		bad("a font has no path, sha256 or amy: it is referenced, not uploaded")
+		bad(`{a} has no path, sha256 or amy: it is referenced, not uploaded`)
 	end
 	if entry.upload ~= false or entry.moderation ~= "approved" then
-		bad('a font has upload false and moderation "approved"')
+		bad(`{a} has upload false and moderation "approved"`)
 	end
 	if type(entry.assetId) ~= "string" or not string.match(entry.assetId, "^%d+$") then
-		bad("a font needs its Creator Store assetId, a string of digits")
+		bad(`{a} needs its Creator Store assetId, a string of digits`)
 	end
 end
 
@@ -209,8 +214,8 @@ function Manifest.validate(manifest: any, readFile: (string) -> string?): { stri
 		elseif entry.licence == "cc-by" and not nonEmpty(entry.attribution) then
 			bad("a cc-by licence needs an attribution")
 		end
-		if entry.kind == Manifest.FONT then
-			fontProblems(entry, bad)
+		if Manifest.REFERENCED[entry.kind] then
+			referencedProblems(entry, bad)
 			continue
 		end
 
@@ -225,7 +230,7 @@ function Manifest.validate(manifest: any, readFile: (string) -> string?): { stri
 			end
 		end
 		if not OpenCloud.ASSET_TYPES[entry.kind] then
-			bad(`kind must be one of {keys(OpenCloud.ASSET_TYPES)}, or {Manifest.FONT}`)
+			bad(`kind must be one of {keys(OpenCloud.ASSET_TYPES)}, or {keys(Manifest.REFERENCED)}`)
 		elseif type(path) == "string" then
 			local refused = OpenCloud.assetUploadProblem(entry.kind, path, if contents then #contents else 0)
 			if refused then
@@ -302,8 +307,8 @@ function Manifest.scanSources(manifest: Manifest, sources: { [string]: string })
 end
 
 -- The source of src/shared/AssetIds.luau: asset name -> content id, for every
--- entry with an id that the game shows: uploaded, or a font (validation
--- allows no other entry an id).
+-- entry with an id that the game shows: uploaded, or referenced by its
+-- Creator Store id (validation allows no other entry an id).
 function Manifest.generateAssetIds(manifest: Manifest): string
 	local rows = {}
 	for _, entry in manifest.assets do
@@ -361,11 +366,16 @@ end
 -- The tier 0 asset check: the manifest is valid, every asset id in src/ and
 -- default.project.json is in it, and src/shared/AssetIds.luau is what the
 -- manifest generates. Returns the problems, and logs a note for each entry
--- still to upload.
-function Manifest.check(ctx: Cli.Context): { string }
+-- still to upload. With `writeIds`, a valid manifest's AssetIds is written
+-- first: for an entry referenced by its Creator Store id, which no upload
+-- run writes (`lune run tools/check-assets --write-ids`).
+function Manifest.check(ctx: Cli.Context, writeIds: boolean?): { string }
 	local manifest, problems, readAsset = Manifest.load(ctx)
 	if #problems > 0 then
 		return problems
+	end
+	if writeIds then
+		ctx.writeFile(Manifest.ASSET_IDS_PATH, Manifest.generateAssetIds(manifest))
 	end
 	local sources = {}
 	readSources(ctx, "src", ctx.listDir("src") or {}, sources)
@@ -374,7 +384,7 @@ function Manifest.check(ctx: Cli.Context): { string }
 	if ctx.readFile(Manifest.ASSET_IDS_PATH) ~= Manifest.generateAssetIds(manifest) then
 		table.insert(
 			problems,
-			`{Manifest.ASSET_IDS_PATH} does not match {Manifest.PATH}; only tools/upload-assets writes it`
+			`{Manifest.ASSET_IDS_PATH} does not match {Manifest.PATH}; only tools/upload-assets, or tools/check-assets --write-ids, writes it`
 		)
 	end
 	for _, entry in manifest.assets do

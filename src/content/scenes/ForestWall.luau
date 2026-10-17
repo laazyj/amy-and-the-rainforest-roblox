@@ -17,6 +17,10 @@ return {
 	spots = {},
 	zones = zones,
 	props = {},
+	music = "music:field",
+	ambience = "cue:ambience_field",
+	-- the trunks and the gap through them
+	bounds = layout.zone(at(0, 40, 155), at(190, 100, 20)),
 	z = 150,
 	gapHalfWidth = 6,
 	-- which trees, counted out from the gap, carry nests on each side

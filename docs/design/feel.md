@@ -342,6 +342,24 @@ and canopy greens.
 | `scene:Paradise` | Moss, gold, bubblegum and grape; shafts of light; drifting sparkles; a trail of glowing flowers |
 | `scene:HeartGlade` | The ring of big glowing flowers, open space around it |
 
+### Audio rubric
+
+The owner listens to every Scene and every Cue on Dev, with the volume
+Setting at full, and passes the mix when each holds. Clara's palette of
+feeling is gentle and warm. The Cues and where each plays are in the
+[glossary](../GLOSSARY.md#cues); the placeholders and what to replace
+them with, in [`ASSETS.md`](../ASSETS.md#cues-the-placeholders-and-the-shopping-list).
+
+| Criterion | Holds when |
+|---|---|
+| Every Scene sounds | Each Scene has its music and its ambience; walking from one Scene to the next crossfades, with no gap and no jump in level |
+| Under the Lines | Music and ambience never cover a Line's narration or make the player want to turn the game down; a Cue is heard over them |
+| Feedback | Using a prompt, touching a Pickup, a Chapter card and each Beat's Cue sound at once; footsteps follow Amy's walking and stop when she stops |
+| Gentle | Nothing startles: no sudden loud Cue, nothing harsh or scary, the machine big but not menacing |
+| Loops | No click or audible restart where a track loops |
+| Volume | The volume Setting at 0 silences everything; each step down is quieter |
+| Narration | When recorded, a Line's narration starts with it and ends before the next; a Line without one is shown as text, as ever |
+
 ## 8. Automatic translation is off
 
 Roblox can translate an experience's text automatically. It stays

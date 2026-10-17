@@ -15,6 +15,7 @@ export type World = {
 	teleportPlayer: (spot: string) -> (),
 	setPropState: (prop: string, state: string) -> (),
 	setLighting: (preset: string) -> (),
+	playCue: (cue: string) -> (),
 	frameShot: (shot: string, character: string?) -> (),
 	spawnPickups: (quest: string) -> (),
 	removePickup: (pickup: string) -> (),
@@ -54,6 +55,8 @@ function World.execute(world: World, command: Events.WorldCommand)
 		world.setPropState(command.prop, command.state)
 	elseif command.kind == "SetLighting" then
 		world.setLighting(command.preset)
+	elseif command.kind == "PlayCue" then
+		world.playCue(command.cue)
 	elseif command.kind == "FrameShot" then
 		world.frameShot(command.shot, command.character)
 	elseif command.kind == "SpawnPickups" then

@@ -42,6 +42,8 @@ Net.REMOTES = table.freeze({
 	ShowEnding = { direction = "toClient", args = { "string", "string" } },
 	-- a Shot by name, and the Character it frames when it frames one
 	FrameShot = { direction = "toClient", args = { "string", "string?" } },
+	-- a sound Cue by name (cue:<name>), played once
+	PlayCue = { direction = "toClient", args = { "string" } },
 	DialogueFinished = { direction = "toServer", args = {} },
 	ClientReady = { direction = "toServer", args = {} },
 	-- the Title screen's offer to a returning player (TitleScreen.Offer):
@@ -101,6 +103,8 @@ function Net.message(command: Events.WorldCommand): (string?, Args?)
 		return if command.ending then "ShowEnding" else "ShowChapter", table.pack(command.title, command.subtitle)
 	elseif command.kind == "FrameShot" then
 		return "FrameShot", table.pack(command.shot, command.character)
+	elseif command.kind == "PlayCue" then
+		return "PlayCue", table.pack(command.cue)
 	end
 	return nil, nil
 end

@@ -29,9 +29,10 @@ return function(t: any)
 			expect(collect.objective(quest, { "FlowerC" })).toBe("Pick flowers  (1/2)")
 		end)
 
-		it("removes a touched Pickup and updates the Objective, not yet done", function()
+		it("plays cue:pickup, removes a touched Pickup and updates the Objective, not yet done", function()
 			expect(collect.handle(quest, {}, { kind = "TouchedPickup", pickup = "FlowerB" })).toEqual({
 				commands = {
+					{ kind = "PlayCue", cue = "cue:pickup" },
 					{ kind = "RemovePickup", pickup = "FlowerB" },
 					{ kind = "SetObjective", text = "Pick flowers  (1/2)" },
 				} :: { any },
