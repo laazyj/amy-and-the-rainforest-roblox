@@ -35,8 +35,7 @@
 	                  than 30 x the body size (60 characters); it grows up
 	                  to fit its Line, its name tag staying below the
 	                  head window of shot:Dialogue (the speaker's head is
-	                  inside y 0.15-0.5 of the viewport), and to at most
-	                  40% of the height in phone portrait
+	                  inside y 0.15-0.5 of the viewport)
 	  Objective       the top right; on a Phone it collapses to an icon
 	  tracker         while a Dialogue shows
 	  touch control   the bottom-left and bottom-right corners of the
@@ -48,7 +47,7 @@
 	                  Talk-and-advance button ("Talk", "Next") in the
 	                  corner, the Skip button (while a Hint shows in free
 	                  play) beside it, or above it where a row would leave
-	                  the right zone (portrait)
+	                  the right zone
 	  touch targets   at least 48 x 48, 8 apart
 	  Pause screen    its button at the top right of the safe area, on
 	                  every class, clear of Roblox's buttons at the top
@@ -60,9 +59,8 @@
 	While a Dialogue shows on touch, Amy listens: the player's controls are
 	disabled (the old full-screen click catcher already took every touch),
 	so the box may use the left zone. On every class it keeps clear of the
-	Talk-and-advance button, beside it in landscape (and on a PC) and above
-	it in portrait. The Skip button shows only in free play (the
-	Onboarding's Hint on the first Line is skipped by tapping).
+	Talk-and-advance button, beside it. The Skip button shows only in free
+	play (the Onboarding's Hint on the first Line is skipped by tapping).
 ]]
 
 local DeviceClass = require("./DeviceClass")
@@ -92,7 +90,6 @@ export type Layout = {
 	class: Class,
 	-- a Phone or a Tablet: touch controls, and a tap on the box advances
 	touch: boolean,
-	portrait: boolean,
 	textScale: number,
 	safe: Rect,
 	text: TextSizes,
@@ -199,8 +196,6 @@ ScreenLayout.MAX_SCALE = Settings.TEXT_SCALES[#Settings.TEXT_SCALES]
 -- 60 characters of about half the text size each.
 ScreenLayout.COLUMN_EMS = 30
 ScreenLayout.PADDING = 24
--- The tallest a box may grow in phone portrait, as a share of the height.
-ScreenLayout.PORTRAIT_BOX = 0.4
 -- Where shot:Dialogue frames the speaker's head (feel.md section 2), as
 -- shares of the viewport; nothing covers it (section 1).
 ScreenLayout.HEAD_WINDOW = table.freeze({ left = 0.33, right = 0.67, top = 0.15, bottom = 0.5 })
@@ -209,7 +204,7 @@ ScreenLayout.SCALE_STEP = 0.05
 ScreenLayout.TARGET = 48
 ScreenLayout.TARGET_GAP = 8
 -- The longest Skip label the Skip button is sized for, in characters: it
--- fits beside the phone's portrait zone at Text scale 1.5.
+-- fits beside the right touch control zone at Text scale 1.5.
 ScreenLayout.SKIP_CHARACTERS = 6
 -- The longest Talk-and-advance label ("Talk", "Next"), in characters.
 ScreenLayout.TALK_CHARACTERS = 4
@@ -348,7 +343,6 @@ function ScreenLayout.new(screen: Screen): Layout
 	local class: Class = screen.class -- annotated: the Roblox checker widens it through the sourcemap
 	local width, height, insets = screen.width, screen.height, screen.insets
 	local scale = math.clamp(screen.textScale, ScreenLayout.MIN_SCALE, ScreenLayout.MAX_SCALE)
-	local portrait = DeviceClass.portrait(width, height)
 	local text = scaled(ScreenLayout.SIZES[class], scale)
 	local safe = rect(insets.left, insets.top, width - insets.left - insets.right, height - insets.top - insets.bottom)
 	local right, bottom = safe.x + safe.width, safe.y + safe.height
@@ -385,7 +379,7 @@ function ScreenLayout.new(screen: Screen): Layout
 	-- The button row at the bottom right, on every class: the
 	-- Talk-and-advance button in the corner, the Skip button beside it, or
 	-- above it where the row would leave the right touch control zone
-	-- (portrait, at the larger Text scales).
+	-- (at the larger Text scales).
 	local side = TALK[class]
 	local talkWidth =
 		math.max(side, math.ceil(ScreenLayout.TALK_CHARACTERS * ScreenLayout.CHARACTER * text.speaker) + 2 * MARGIN)
@@ -424,17 +418,11 @@ function ScreenLayout.new(screen: Screen): Layout
 			reach
 		)
 		-- a Hint: just above the thumbstick's zone, at the left, and in
-		-- landscape clear of the Objective tracker to its right
-		if not portrait then
-			hintWidth = math.min(hintWidth, objectiveX - ScreenLayout.TARGET_GAP - (safe.x + MARGIN))
-		end
+		-- clear of the Objective tracker to its right
+		hintWidth = math.min(hintWidth, objectiveX - ScreenLayout.TARGET_GAP - (safe.x + MARGIN))
 		hint = rect(safe.x + MARGIN, left.y - ScreenLayout.TARGET_GAP - hintHeight, hintWidth, hintHeight)
 
-		if portrait then
-			box = { left = safe.x, space = safe.width, bottom = talk.y - ScreenLayout.TARGET_GAP }
-		else
-			box = { left = safe.x + MARGIN, space = besideTalk, bottom = bottom - MARGIN }
-		end
+		box = { left = safe.x + MARGIN, space = besideTalk, bottom = bottom - MARGIN }
 	else
 		hint = rect(safe.x + (safe.width - hintWidth) / 2, bottom - BOTTOM_MARGIN - hintHeight, hintWidth, hintHeight)
 		-- clear of the Talk-and-advance button, which shows with it
@@ -446,12 +434,8 @@ function ScreenLayout.new(screen: Screen): Layout
 	local textColumn = column(box.space, text.body)
 	local boxWidth = textColumn + 2 * ScreenLayout.PADDING
 	local boxX = box.left + (box.space - boxWidth) / 2
-	-- the name tag stays below the head window; in phone portrait the box
-	-- also grows to at most 40% of the height
+	-- the name tag stays below the head window
 	local maxHeight = box.bottom - (height * ScreenLayout.HEAD_WINDOW.bottom + overhang)
-	if class == "Phone" and portrait then
-		maxHeight = math.min(maxHeight, ScreenLayout.PORTRAIT_BOX * height)
-	end
 
 	local titleWidth = safe.width - 2 * MARGIN
 	-- the pill's words at the body size, smaller (down to the hint size)
@@ -512,7 +496,6 @@ function ScreenLayout.new(screen: Screen): Layout
 	return {
 		class = class,
 		touch = touch,
-		portrait = portrait,
 		textScale = scale,
 		safe = safe,
 		text = text,

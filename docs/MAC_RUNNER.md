@@ -305,7 +305,7 @@ another Studio is open.
 ## The playthrough
 
 ```sh
-lune run tools/studio-playtest/play --file build/AmyAndTheRainforest.rbxl --out build/studio-playtest [--devices pc,phone-portrait]
+lune run tools/studio-playtest/play --file build/AmyAndTheRainforest.rbxl --out build/studio-playtest [--devices pc,phone-landscape]
 ```
 
 It plays the Story on a real client in Studio, from a fresh Save (Studio
@@ -357,29 +357,30 @@ against a scripted fake client:
   uploads what it played, and the summary says it stopped before the end.
 
 The devices, one Play each, in order: `pc` (no simulation),
-`phone-landscape` and `phone-portrait` (Studio's `iphone_16` preset, 852
-x 393 units, the 6-inch phone of `feel.md`), `tablet-landscape` and
-`tablet-portrait` (`ipad_10th_generation`, 1180 x 820). `report.json`
+`phone-landscape` (Studio's `iphone_16` preset, 852 x 393 units, the
+6-inch phone of `feel.md`) and `tablet-landscape`
+(`ipad_10th_generation`, 1180 x 820). The `phone-portrait` and
+`tablet-portrait` presets were removed on 2026-10-17: the game is
+landscape only. `report.json`
 holds, per device, pass, fail or skipped, the seconds, what the simulator
 reported (preset, orientation, scaling, size), the viewport and
-orientation the client actually played in, any warning (portrait played
-as landscape), each Quest as it became active and each capture with its
-luminance and pixel size; and the Studio version against
+orientation the client actually played in, any warning, each Quest as it
+became active and each capture with its luminance and pixel size; and the Studio version against
 `studio-version.txt`. The job summary shows the same, warnings included.
 
 Run in the VM on 2026-10-15 (Studio 0.743.0.7431133), the place built from
 `main` at 3debd6b plus this branch: every device passed, 13 Quests and 22
 screenshots each, 936 s in all. After the review's fixes (the device read
-back and checked, the budget), `pc`, `phone-portrait` and
+back and checked, the budget), `pc`, `phone-portrait` (since removed) and
 `tablet-landscape` passed again in 521 s, 170 s each.
 
 | Device | Seconds | The client played at |
 |---|---|---|
 | `pc` | 231 | 541 x 414 (Studio's viewport) |
 | `phone-landscape` | 189 | 733 x 392, landscape |
-| `phone-portrait` | 168 | 733 x 392, landscape (see "Device emulation") |
+| `phone-portrait` (removed) | 168 | 733 x 392, landscape (see "Device emulation") |
 | `tablet-landscape` | 169 | 1178 x 819, landscape |
-| `tablet-portrait` | 170 | 1178 x 819, landscape |
+| `tablet-portrait` (removed) | 170 | 1178 x 819, landscape |
 
 Studio updated itself in the guest overnight, from 0.742.0.7421053 to
 0.743.0.7431133, between two runs: the first launch after it failed at
@@ -426,16 +427,11 @@ The setting can only change in Edit ("Edit datamodel is not available in
 Play mode"), so each device and orientation is its own Play. The older
 `StudioDeviceEmulatorService` is not reachable from the MCP server.
 
-**Portrait does not play today, because the game holds itself to
-landscape.** The place's `StarterGui.ScreenOrientation` is Roblox's
-default, `LandscapeSensor`, and the simulator honours it as a real phone
-would: asked for a portrait `iphone_16`, the client plays
-`LandscapeRight`. So the `phone-portrait` and `tablet-portrait` runs play
-landscape, and `report.json` records each device's actual viewport and
-orientation, with a warning when portrait was asked for. `feel.md` says
-the phone and tablet work in portrait too; making the game allow it
-(`StarterGui.ScreenOrientation` set to `Sensor`) is a game change for a
-later brief, after which these runs test portrait with no change here.
+**The game is landscape only.** The place's `StarterGui.ScreenOrientation`
+is Roblox's default, `LandscapeSensor`, and the simulator honours it as a
+real phone would: asked for a portrait `iphone_16`, the client played
+`LandscapeRight`. The owner dropped portrait on 2026-10-17, so the
+portrait presets are gone and the runs set `LandscapeRight`.
 
 So no AppleScript window resizing is needed, and DPI-dependent checks can
 use the simulated device's own units: the simulator emulates the device's

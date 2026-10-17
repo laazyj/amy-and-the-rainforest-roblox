@@ -11,7 +11,7 @@ export type Vector = { x: number, y: number, z: number }
 
 -- A device Studio's device simulator plays as: its preset id (from
 -- StudioDeviceSimulatorService:GetDeviceListAsync) and its orientation.
-export type Device = { simulator: string, orientation: "Landscape" | "Portrait" }
+export type Device = { simulator: string, orientation: "Landscape" }
 
 -- What Studio's device simulator says it is set to, read back after setting
 -- it: the preset id, the orientation and scaling mode (Enum item names) and

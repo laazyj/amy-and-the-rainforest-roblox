@@ -614,9 +614,7 @@ return function(t: any)
 		local HEADS: { [string]: number } = { Dad = 5.9, Mum = 5.9, Sam = 3.5, Squirrel = 2.2, Fox = 3.1, Lion = 5 }
 		local VIEWPORTS: { [string]: number } = {
 			["phone landscape"] = 844 / 390,
-			["phone portrait"] = 390 / 844,
 			["tablet landscape"] = 1376 / 1032,
-			["tablet portrait"] = 1032 / 1376,
 			["PC"] = 1280 / 720,
 		}
 		it("puts the speaker's head inside x 0.33-0.67, y 0.15-0.5 in shot:Dialogue, on every device class", function()

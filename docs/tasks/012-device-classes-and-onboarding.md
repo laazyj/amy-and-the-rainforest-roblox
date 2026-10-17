@@ -25,7 +25,7 @@ move and talk.
    approval), skippable, shown once per save.
 5. **Tests.** Tier 1 for layout maths (text column width ≤ 30 × text size,
    touch targets ≥ 44 points). Tier 3 scripts under `tests/studio/` for a
-   phone and a tablet preset in both orientations, with the on-screen
+   phone and a tablet preset in landscape, with the on-screen
    assertions from plan section 4 (text fits, safe areas, contrast ≥ 4.5:1,
    no overlapping interactive elements).
 
@@ -36,5 +36,11 @@ move and talk.
 ## Done when
 
 - Tier 1 green; on the Mac, device-emulation screenshots for both classes
-  and orientations pass the assertions; the owner plays on a real phone and
+  passes the assertions; the owner plays on a real phone and
   tablet per the release checklist.
+
+> **Portrait dropped, 2026-10-17.** The owner decided the game is landscape
+> only (recorded on PR #56): the camera needs width, the phone-portrait
+> playtest cut characters and prompts off screen, and children rotate the
+> phone for 3D games. Read "both orientations" above as landscape; see
+> `docs/design/feel.md` section 1.

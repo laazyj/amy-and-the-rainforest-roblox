@@ -230,11 +230,10 @@ runner runs it, the owner runs it by hand on the Mac:
    (an iPhone of about 844 × 390, such as iPhone 14) in landscape.
 4. Press **Play**. With no Save in Studio the Story is fresh, so the
    Onboarding runs: let the Chapter card fade (or tap it), tap past the
-   first Line, walk, and talk to Dad. Then rotate to portrait with the
-   emulator's rotate button and play on: the layout is checked again on
+   first Line, walk, and talk to Dad. Then play on: the layout is checked again on
    every viewport change.
 5. Stop, switch to a tablet preset (an iPad Pro of about 1366 × 1024),
-   and repeat in landscape and portrait. Use **Start again** on the Title
+   and repeat in landscape. Use **Start again** on the Title
    screen to see the Onboarding again on a Save that has one.
 6. Read the Output: every failure is a `[DeviceLayout] FAIL` line, every
    Onboarding expectation met is a `[DeviceLayout] ok:` line, and a
