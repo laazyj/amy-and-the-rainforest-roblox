@@ -68,12 +68,4 @@ return function(t: any)
 			expect(DeviceClass.starting("Unknown", false, true)).toBe("pointer")
 		end)
 	end)
-
-	describe("DeviceClass.portrait", function()
-		it("is true only when the viewport is taller than wide", function()
-			expect(DeviceClass.portrait(390, 844)).toBe(true)
-			expect(DeviceClass.portrait(844, 390)).toBe(false)
-			expect(DeviceClass.portrait(800, 800)).toBe(false)
-		end)
-	end)
 end

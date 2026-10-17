@@ -21,22 +21,17 @@ export type DeviceRun = {
 	device: Smoke.Device?, -- nil: no simulation
 }
 
--- PC, then a phone and a tablet preset in both orientations (plan section 4).
+-- PC, then a phone and a tablet preset, landscape only: the game is landscape
+-- only (feel.md section 1; portrait was dropped on 2026-10-17).
 -- The phone is the 6-inch phone of feel.md (about 844 x 390 units), the
 -- tablet an 11-inch one (up to 1376 x 1032).
 Playthrough.DEVICES = table.freeze({
 	{ name = "pc", class = "PC" },
 	{ name = "phone-landscape", class = "Phone", device = { simulator = "iphone_16", orientation = "Landscape" } },
-	{ name = "phone-portrait", class = "Phone", device = { simulator = "iphone_16", orientation = "Portrait" } },
 	{
 		name = "tablet-landscape",
 		class = "Tablet",
 		device = { simulator = "ipad_10th_generation", orientation = "Landscape" },
-	},
-	{
-		name = "tablet-portrait",
-		class = "Tablet",
-		device = { simulator = "ipad_10th_generation", orientation = "Portrait" },
 	},
 } :: { DeviceRun })
 
@@ -358,12 +353,6 @@ local function playDevice(
 			local mismatch = report.simulation and viewportMismatch(screen.viewport, report.simulation)
 			if mismatch then
 				error(mismatch, 0)
-			end
-			local device = run.device
-			if device and device.orientation == "Portrait" and not string.find(screen.orientation, "Portrait") then
-				local warning = `asked for portrait, the place plays {screen.orientation}`
-				table.insert(report.warnings, warning)
-				options.log(`  warning: {warning}`)
 			end
 		end
 		-- The client's clock now: its clock when it looked, plus the time since.

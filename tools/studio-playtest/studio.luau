@@ -149,9 +149,8 @@ function Studio.deviceScript(device: Smoke.Device?): string
 		'local s = game:GetService("StudioDeviceSimulatorService")',
 	}
 	if device then
-		local orientation = if device.orientation == "Portrait" then "Portrait" else "LandscapeRight"
 		table.insert(lines, `s:SetDeviceAsync({string.format("%q", device.simulator)})`)
-		table.insert(lines, `s:SetOrientationAsync(Enum.ScreenOrientation.{orientation})`)
+		table.insert(lines, "s:SetOrientationAsync(Enum.ScreenOrientation.LandscapeRight)")
 		-- The whole device in the viewport: at physical size a tablet
 		-- overflows Studio's window and only part of it is captured.
 		table.insert(lines, "s:SetScalingModeAsync(Enum.DeviceSimulatorScalingMode.FitToWindow)")

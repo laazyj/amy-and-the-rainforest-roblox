@@ -4,7 +4,7 @@
 -- writes a screenshot at every Shot, Chapter card and Scene entry under
 -- <out>/<device>/ and <out>/report.json. Exits non-zero on any failure.
 -- See docs/MAC_RUNNER.md.
--- lune run tools/studio-playtest/play --file build/AmyAndTheRainforest.rbxl --out build/studio-playtest [--devices pc,phone-portrait]
+-- lune run tools/studio-playtest/play --file build/AmyAndTheRainforest.rbxl --out build/studio-playtest [--devices pc,phone-landscape]
 local fs = require("@lune/fs")
 
 local Cli = require("../lib/cli")
