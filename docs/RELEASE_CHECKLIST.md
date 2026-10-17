@@ -97,7 +97,8 @@ in the order to do them in one sitting.
       window and input bar off unless the build has the Dev folder, which
       the release job strips (`Config.chat`;
       `tests/lune/place/Config.spec.luau`, the Wiring spec,
-      `tests/engine/chat.luau` for Dev). **Human**: after publishing, join
+      `tests/engine/chat.luau` for Dev), which works only with the place's
+      chat on `TextChatService` (`tests/lune/place/chat.spec.luau`). **Human**: after publishing, join
       Release once and see no chat window.
 - [ ] **Human: voice chat is off.** Where: the Creator Hub, the
       experience, **Communication** (or **Audience**, voice chat).

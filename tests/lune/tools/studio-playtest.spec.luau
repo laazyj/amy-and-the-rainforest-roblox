@@ -44,6 +44,8 @@ local function fakeStudio(overrides: { [string]: any }?): (Smoke.Bridge, { strin
 		end,
 		press = function() end,
 		walkTo = function() end,
+		chat = function() end,
+		click = function() end,
 		insertAsset = function() end,
 	}
 	for name, fn in overrides or {} :: { [string]: any } do
