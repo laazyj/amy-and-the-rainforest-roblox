@@ -22,12 +22,23 @@ local function simulating(device: any): any
 	}
 end
 
+-- The Continue button's instance path, as the client reports it.
+local CONTINUE = "LocalPlayer.PlayerGui.StoryUI.TitleScreen.Choices.Buttons.continue"
+
 -- A Studio whose client shows `screens` one after another, one per look,
--- and keeps showing the last; records what was asked of it.
+-- and keeps showing the last; records what was asked of it. /title in chat
+-- puts the Title screen over the screen it was typed on; Continue, clicked,
+-- takes it away (or Return, once it is selected), and that screen shows for
+-- two more looks (the Title screen seen gone, then the Story carrying on)
+-- before the next.
 local function fakeStudio(screens: { { [string]: any } }, overrides: { [string]: any }?)
 	local calls: { string } = {}
 	local now = 0
 	local shown = 0
+	local titled, selected, held = false, false, 0
+	local function resume()
+		titled, selected, held = false, false, 2
+	end
 	local bridge: any = {
 		studioVersion = function()
 			return "0.742.0.7421053"
@@ -50,9 +61,24 @@ local function fakeStudio(screens: { { [string]: any } }, overrides: { [string]:
 			if code == Playthrough.INSTALL_SCRIPT then
 				table.insert(calls, "install")
 				return "installed"
+			elseif code == Playthrough.chatBarScript(true) or code == Playthrough.chatBarScript(false) then
+				table.insert(calls, `chat bar {string.match(code, "%a+$")}`)
+				return ""
+			elseif code == Playthrough.selectScript(CONTINUE) then
+				table.insert(calls, "select Continue")
+				selected = titled
+				return "Players.Amy.PlayerGui.StoryUI.TitleScreen.Choices.Buttons.continue"
 			end
-			shown = math.min(shown + 1, #screens)
+			-- While the Title screen is up the Story waits on the Title choice.
+			if held > 0 then
+				held -= 1
+			elseif not titled then
+				shown = math.min(shown + 1, #screens)
+			end
 			local screen = table.clone(screens[shown])
+			if titled then
+				screen.title = { continue = CONTINUE }
+			end
 			screen.now = now
 			-- The client sends only the Shots after the first `since`.
 			local since = tonumber(string.match(code, "^local SINCE = (%d+)")) or 0
@@ -66,9 +92,22 @@ local function fakeStudio(screens: { { [string]: any } }, overrides: { [string]:
 		end,
 		press = function(key)
 			table.insert(calls, `press {key}`)
+			if key == "Return" and selected then
+				resume()
+			end
 		end,
 		walkTo = function(position)
 			table.insert(calls, `walk {position.x},{position.z}`)
+		end,
+		chat = function(text)
+			table.insert(calls, `chat {text}`)
+			titled = titled or text == "/title"
+		end,
+		click = function(instancePath)
+			table.insert(calls, `click {instancePath}`)
+			if titled and instancePath == CONTINUE then
+				resume()
+			end
 		end,
 		close = function()
 			table.insert(calls, "close")
@@ -155,8 +194,9 @@ return function(t: any)
 			t.expect(report.failure).toBeNil()
 			t.expect(only(calls, "capture")).toEqual({
 				"capture out/pc/01-card-chapter-one.png",
-				"capture out/pc/02-shot-dialogue.png",
-				"capture out/pc/03-card-the-end.png",
+				"capture out/pc/02-title-title.png",
+				"capture out/pc/03-shot-dialogue.png",
+				"capture out/pc/04-card-the-end.png",
 			})
 			t.expect(only(calls, "press")).toEqual({ "press E", "press E", "press E" })
 			t.expect(only(calls, "walk")).toEqual({ "walk 4,-26" })
@@ -165,14 +205,85 @@ return function(t: any)
 			t.expect(calls[#calls - 1]).toBe("stopPlay")
 			t.expect(calls[#calls]).toBe("close")
 			t.expect(report.devices[1].quests).toEqual({ "chapter1.ask_dad" })
-			t.expect(report.devices[1].captures[2]).toEqual({
-				file = "pc/02-shot-dialogue.png",
+			t.expect(report.devices[1].captures[3]).toEqual({
+				file = "pc/03-shot-dialogue.png",
 				kind = "shot",
 				name = "Dialogue",
 				luminance = 0.4,
 				pixels = "1024x768",
 			})
 			t.expect(report.finished).toBe(true)
+		end)
+
+		t.it("captures the Title screen once per device, after the first card, and goes on from there", function()
+			local bridge, calls, clock, sleep = fakeStudio({
+				-- pc
+				{ card = { title = "Chapter One", settled = false } },
+				{ card = CARD },
+				TALK_FAR,
+				TALK_NEAR,
+				{ card = { title = "Chapter Two", settled = true } },
+				TALK_NEAR,
+				THE_END,
+				-- phone-landscape
+				{ card = CARD },
+				TALK_NEAR,
+				THE_END,
+			})
+			local report = play(bridge, clock, sleep, { Playthrough.DEVICES[1], PHONE })
+			t.expect(report.result).toBe("pass")
+			local steps = {}
+			for _, call in calls do
+				if
+					string.find(call, "^chat")
+					or string.find(call, "^click")
+					or string.find(call, "^select")
+					or call == "press Return"
+					or string.find(call, "%-title%-title%.png$")
+				then
+					table.insert(steps, call)
+				end
+			end
+			-- Once per device, not again after Chapter Two's card: Continue
+			-- clicked on PC, selected and Return pressed in the simulator.
+			t.expect(steps).toEqual({
+				"chat bar true",
+				"chat /title",
+				"chat bar false",
+				"capture out/pc/02-title-title.png",
+				`click {CONTINUE}`,
+				"chat bar true",
+				"chat /title",
+				"chat bar false",
+				"capture out/phone-landscape/02-title-title.png",
+				"select Continue",
+				"press Return",
+			})
+			t.expect(report.devices[1].captures[2]).toEqual({
+				file = "pc/02-title-title.png",
+				kind = "title",
+				name = "title",
+				luminance = 0.4,
+				pixels = "1024x768",
+			})
+			-- Dad was far before /title, and still is after Continue: Amy walks to him.
+			t.expect(only(calls, "walk")[1]).toBe("walk 4,-26")
+			t.expect(report.devices[1].quests).toEqual({ "chapter1.ask_dad" })
+		end)
+
+		t.it("fails the device when /title shows no Title screen, or Continue does not close it", function()
+			local failures: { [string]: string } = { -- on PC
+				chat = "/title did not show the Title screen with Continue",
+				click = "Continue did not close the Title screen",
+			}
+			for broken, failure in failures do
+				local bridge, _, clock, sleep = fakeStudio({ { card = CARD }, TALK_NEAR, THE_END }, {
+					[broken] = function() end,
+				})
+				local report = play(bridge, clock, sleep)
+				t.expect(report.result).toBe("fail")
+				t.expect(report.failure).toBe(`pc: {failure} within {Playthrough.TITLE_TIMEOUT} seconds`)
+			end
 		end)
 
 		t.it("captures a Shot only once it has eased in", function()
@@ -445,7 +556,7 @@ return function(t: any)
 			local summary = Playthrough.summary(play(bridge, clock, sleep))
 			t.expect(string.find(summary, "**Studio playtest: pass**", 1, true)).toBe(1)
 			t.expect(string.find(summary, "| pc | pass |", 1, true) ~= nil).toBe(true)
-			t.expect(string.find(summary, "| 1 | 3 |", 1, true) ~= nil).toBe(true)
+			t.expect(string.find(summary, "| 1 | 4 |", 1, true) ~= nil).toBe(true)
 		end)
 
 		t.it("lists PC, then a phone and a tablet in both orientations", function()
