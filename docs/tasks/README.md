@@ -43,4 +43,5 @@ Rules every build session follows, regardless of brief:
 | mac-001 Runner bootstrap | Phase 1 | superseded by mac-001a |
 | mac-001a Runner in an isolated virtual machine | Phase 1 | done (#47) |
 | mac-002 Studio bridge, emulation and asset spikes | Phase 1 | done (#50) |
-| mac-003 Screenshots on pull requests | Phase 1 | ready: PR A from the cloud, then PR B on the MacBook |
+| mac-003 A Screenshots on pull requests: `/title`, the publishing job, baselines, the CI prompt | Phase 1 | in review (cloud session B12) |
+| mac-003 B Screenshots on pull requests: the title capture, the guest's display, the first baselines | Phase 1 | on the MacBook, once A is on `main` |

@@ -16,9 +16,11 @@ rules:
 
   # Named by the brief; replacing it with gh calls means hand-rolled push and
   # PR-update logic holding a write token. SHA-pinned, kept current by Dependabot.
-  # upload-assets.yml opens its id PR the same way.
+  # upload-assets.yml opens its id PR the same way, and baselines.yml (brief
+  # mac-003) its Baselines PR.
   superfluous-actions:
     ignore:
+      - baselines.yml
       - toolchain-check.yml
       - upload-assets.yml
 
@@ -26,8 +28,10 @@ rules:
   # publish-dev.yml and upload-assets.yml read the Dev key from the `dev`
   # environment. engine-tests.yml runs on PR branches by design, so it reads
   # the repository secret (docs/MAINTENANCE.md); toolchain-check.yml reads
-  # the PR token. Each key is passed only to the steps that need it.
+  # the PR token, as baselines.yml does to open its Baselines PR. Each key is
+  # passed only to the steps that need it.
   secrets-outside-env:
     ignore:
+      - baselines.yml
       - engine-tests.yml
       - toolchain-check.yml

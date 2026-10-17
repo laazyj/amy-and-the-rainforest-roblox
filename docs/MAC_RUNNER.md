@@ -20,11 +20,15 @@ screen saver and lock settings are never touched, by script or by hand.
 | `tools/mac/vm.sh` | on the host, as the owner | Creates the VM from the pinned image; `start`, `stop`, `status`, `exec`, `push`, `seal`, `reset`. Never mounts a host directory into the guest. |
 | `tools/mac/setup.sh` | in the guest | `studio` installs Roblox Studio; `runner` installs the pinned runner (SHA-256 checked), registers it and installs its launchd agent. Refuses to run as root, and refuses to run outside a virtual machine. |
 | `tools/mac/check-repo.sh` | on the host, as the owner | Fails unless fork pull requests need approval for all external contributors, the `studio` environment allows `main` only, and no workflow with a job on a self-hosted runner starts from a pull request. |
-| `tools/lib/mac-workflows.luau` | in tier 0 (`tools/check.sh`), on every PR | The workflow half of that check: a job on anything but a GitHub-hosted runner must use `environment: studio`, and its workflow may start only from `workflow_dispatch`, `schedule` or a `push` to `main`. |
+| `tools/lib/mac-workflows.luau` | in tier 0 (`tools/check.sh`), on every PR | The workflow half of that check: a job on anything but a GitHub-hosted runner must use `environment: studio`, declare its own permissions with none beyond `read`, and name no secret, and its workflow may start only from `workflow_dispatch`, `schedule` or a `push` to `main`. A GitHub-hosted job in the same workflow may write (the playtest's `publish`). |
 | `tools/studio-playtest/` | in the guest, by the job | The bridge to Studio and what runs on it: `run.luau`, the smoke run (open a place, Play, run a script, capture, quit); `play.luau`, the playthrough (the Story from a fresh Save to the end card per device, a screenshot at every Shot, Chapter card and Scene entry); `fetch-model.luau`, a free Creator Store model saved as `.rbxm`. |
 | `.github/workflows/studio-smoke.yml` | started by hand | The proof that the runner and the bridge work, from the cloud. |
-| `.github/workflows/studio-playtest.yml` | started by hand, or by the `needs-playtest` label | The tier 3 playthrough of `main`'s place, or of a pull request's CI-built place. |
-| `.github/workflows/playtest-label.yml` | on GitHub's runners, when a pull request gets `needs-playtest` | Dispatches `studio-playtest.yml` on `main` with the pull request's number. Never runs on the Mac. |
+| `.github/workflows/studio-playtest.yml` | started by hand, or by the `needs-playtest` label | The tier 3 playthrough of `main`'s place, or of a pull request's CI-built place, on the Mac; then, on GitHub's runners, its contact sheets and baseline comparison (`sheets`) and the pull request's comment (`publish`). See "Screenshots on a pull request". |
+| `tools/screens.luau` | on GitHub's runners, by the `sheets` job and `baselines.yml` | The contact sheets and the comparison with `docs/screens/` through ImageMagick; the logic, and the comment, in `tools/lib/screens.luau`. |
+| `.github/workflows/playtest-cleanup.yml` | on GitHub's runners, when a pull request closes | Deletes its `playtest/pr-<N>` branch. |
+| `.github/workflows/baselines.yml` | started by hand, on GitHub's runners | Opens the "Baselines" pull request from a passing playtest of `main` ([`screens/README.md`](screens/README.md)). |
+| `.github/workflows/playtest-label.yml` | on GitHub's runners, when a pull request gets `needs-playtest` | Dispatches `studio-playtest.yml` on `main` with the pull request's number, and sets the commit status "Studio playtest" to `pending` on the pull request's head commit. Never runs on the Mac. |
+| The commit status "Studio playtest" | set by `playtest-label.yml` and the playtest's `publish` job | Ties a playtest, which runs on `main`, to the pull request's commit: `pending` when asked, then `success` or `failure` with the outcome in a few words and a link to the run. Never a required check (see "Screenshots on a pull request"). |
 
 ## The rules for every job on the Mac
 
@@ -79,6 +83,10 @@ The repository is public, so these hold for every workflow that targets
   `place` artifact. It never checks out or runs a pull request's source.
 - `permissions: contents: read, actions: read`, no secrets, a
   `timeout-minutes`, and `concurrency: studio` (one Studio, one screen).
+  Tier 0 fails a Mac job without its own permissions, with any permission
+  beyond `read`, or naming a secret. A write token may live only in a job
+  on GitHub's runners that runs nothing from the artifact (the playtest's
+  `publish`; see "Screenshots on a pull request").
 - Fork pull requests need the owner's approval before any workflow runs
   (Settings → Actions → General → "Require approval for all external
   contributors"). Keep it; `check-repo.sh` checks it.
@@ -380,7 +388,12 @@ against a scripted fake client:
   in (0.8 s after it was framed), each Chapter card and the end card once
   faded in, and each Scene the first time Amy stands in one of its Zones
   with nothing over the view. Screenshots are
-  `<out>/<device>/<nn>-<shot|card|scene>-<name>.png`.
+  `<out>/<device>/<nn>-<shot|card|scene>-<name>.png`. The Title screen is
+  the next capture (brief mac-003, Must B6, made on the Mac): after the
+  first Chapter card the playthrough sends the Dev shortcut `/title`,
+  which offers the Title screen at the current Progress, captures it as
+  `<nn>-title-title.png` (kind `title`, which the `sheets` job puts in the
+  title index), and presses Continue, which carries on where Amy was.
 - **Failing** when the Story stops changing for 60 seconds (Amy moving or
   a Line still being written counts as change), takes over 10 minutes,
   reaches a Quest kind it cannot play (only reach and talk today), or a
@@ -461,7 +474,8 @@ Limits today:
   fades. Chat is on only in Dev builds (`Config.chat`), where the Dev
   shortcuts are chat commands, so a Release build has no such frame.
 - Level 1 assertions (plan section 4: text fits, safe areas, the camera
-  rule) and the baseline diffs are not part of it yet;
+  rule) are not part of it yet (the baseline diffs are: "Screenshots on a
+  pull request");
   `tests/studio/CameraRule.client.luau` and `DeviceLayout.client.luau` are
   the assertions to run inside it next.
 - A Shot is captured 0.8 s after it was framed, not when the camera has
@@ -474,6 +488,101 @@ Limits today:
   Paradise) is never captured. A count against the Story's Chapters and a
   signal from the Scene change itself would close both.
 - Phone runs press E like a PC, so touch input is not exercised yet.
+
+## Screenshots on a pull request
+
+Brief mac-003. A playtest's Captures go where they are reviewed: one
+comment on the pull request, with a **Contact sheet** per device and, for
+every Capture that differs from its **Baseline** in `docs/screens/`, the
+before, the after and the difference. The Mac keeps its read-only token.
+
+**When.** On the owner's `needs-playtest` label (`playtest-label.yml`
+dispatches `studio-playtest.yml` on `main` with the pull request's
+number), or by hand. CI prompts for it: a pull request that changes a path
+in `tools/lib/visual-paths.luau` (`src/client/`, `ScreenLayout.luau`,
+`palette.luau`, `title.luau`, `hints.luau`, `feel.md`, `assets/images/`)
+gets one comment from CI's `screen-prompt` job, updated in place: "This
+pull request changes what is on screen. The owner's `needs-playtest` label
+brings screenshots here." CI's own job finds the paths and holds no write
+token; `screen-prompt` runs only `.github/actions/post-comment`, which
+posts the comment or updates the one found by its first line, as
+`publish` does. A fork's pull
+request is skipped: its token cannot comment, and it is never played.
+
+**The three jobs of `studio-playtest.yml`.**
+
+| Job | Runs on | Token | Does |
+|---|---|---|---|
+| `playtest` | the Mac | `contents: read`, `actions: read` | Plays the place, uploads the `studio-playtest` artifact (`report.json` and the Captures) and gives its id and link as outputs. Its permissions are as before mac-003. |
+| `sheets` | GitHub's runners (`ubuntu-24.04`, ImageMagick installed by the job) | `contents: read` | Whenever the artifact was uploaded, whatever the playtest's result: `lune run tools/screens sheets` on the artifact and `main`'s `docs/screens/`. Makes `sheets/<device>.png` (ImageMagick `montage`, each Capture labelled with its name), `sheets/title.png` (the Title screen's Capture across devices), and, for each Capture that differs from its Baseline, `before/` and `diff/` (ImageMagick `compare`), and writes the comment. Uploads them as `studio-playtest-screens`. |
+| `publish` | GitHub's runners | `contents: write`, `pull-requests: write`, `statuses: write` | Runs nothing from the artifact, and of this repository only `main`'s `.github/actions/post-comment`: commits the images as one commit with no parent, force-pushes it to the branch `sheets` named, `playtest/pr-<N>` (`playtest/main` for a run of `main`), and posts the comment on pull request N, or updates the one already there (found by the marker `<!-- studio-playtest-screens -->`). A run of `main` writes the comment to its job summary instead. |
+
+The artifact holds what a pull request's place did in Studio, so it is
+read only where there is no write token, and nothing in it is trusted: a
+Capture whose file name is not `<device>/<nn>-<kind>-<name>.png` in lower
+case is left out and listed, and every text from `report.json` (warnings,
+failures, the Studio version) is shown in a code span, where Markdown,
+HTML and mentions do nothing.
+
+**The comment** has the playtest's result and time, the Studio version
+against the pin, a table of each device's Captures, changed, new and
+Baselines no Capture matched, the device warnings and failures, the title
+index, each device's Contact sheet, a row of before, after and difference
+for each changed Capture (at most 30; the rest are in the artifact), and
+links to the run and the artifact. Its images are raw file links into the
+`playtest/pr-<N>` branch, under a folder per run (`run-<id>/`), so a new
+run's images are never an old one's from a cache. The branch is
+force-pushed as one commit, so it never grows, and
+`playtest-cleanup.yml` deletes it when the pull request closes; the
+comment's images go with it. A run that finishes after the pull request
+closed pushes `playtest/pr-<N>` again after the cleanup; delete it by hand
+or leave it for the next close.
+
+**Changed** means more than 1% of the Capture's pixels moved by more than
+10% (ImageMagick's `-fuzz`), or its size changed. Plan section 4 asks for
+a structural-similarity measure; ImageMagick 6 on `ubuntu-latest` has
+none, so this stands in until the tolerance is tuned per Capture. A
+Capture is paired with the Baseline of the same device, kind and name, the
+number ignored, so a Capture added early does not unpair the rest.
+
+**Baselines** change only through a "Baselines" pull request, which
+`baselines.yml` opens from a passing playtest of `main` that played every
+device; the owner accepts them by merging it
+([`screens/README.md`](screens/README.md)). Until the first one merges,
+every Capture shows as new.
+
+**The commit status "Studio playtest"** (brief mac-003, A6). The
+playtest runs on `main` from a dispatch, so GitHub never ties it to the
+pull request's commit; this status does. `playtest-label.yml` sets it to
+`pending` on the pull request's head commit as soon as it dispatches
+("Asked the Mac to play this pull request", linking the workflow's runs,
+since the run's id is not known then). `publish` sets it to `success` or
+`failure` when the run ends ("5 devices, 111 screenshots, 2 changed", or
+"playthrough failed on phone-portrait"), linking the run, on the commit
+the place was built from, the one `download-place` resolved, not the
+pull request's head at that moment: a push during the run never gets a
+status for a place it was not built from. A run of `main`'s place sets
+none. `publish` runs whenever `sheets` succeeded, the playtest's result
+aside, and sets the status even when its push or comment failed. Nothing
+clears a `pending` status when: a queued run is cancelled by the
+`studio` concurrency group (three labels in a row: the middle one is
+replaced); the label is given before CI is green on the pull request's
+new head (the playtest plays the older CI build, and its result lands on
+that older commit, by design); or the Mac job uploaded no artifact, or
+`sheets` failed. Label again to play. Each job that sets it has
+`statuses: write` and no other job does; the Mac job gains nothing.
+**The status is never a required check in the ruleset**: it exists only
+on labelled pull requests, so requiring it would block every other pull
+request; the owner reads it in the merge box. A status belongs to one
+commit: after a new push the pull request shows no playtest result until
+the owner labels it again (the label event fires only on labelling, so
+remove and re-add `needs-playtest` to play the new commit).
+
+What only a real run proves (brief mac-003, Must B8): that
+`raw.githubusercontent.com` serves the branch's images inline in the
+comment, that the job token may push `playtest/*` (a branch ruleset that
+covers `playtest/*` would refuse it), and the comparison's noise on real
+Captures.
 
 ## Device emulation: scripted (spike, mac-002)
 

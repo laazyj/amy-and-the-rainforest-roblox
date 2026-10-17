@@ -4,6 +4,11 @@
 name: Download the place
 description: Download CI's place artifact for main or a pull request into build/place.
 
+outputs:
+  head-sha:
+    description: "The commit the place was built from (a pull request's head commit, for a pull request)."
+    value: ${{ steps.download.outputs.head-sha }}
+
 inputs:
   pr:
     description: "A pull request number; empty for main."
@@ -17,14 +22,15 @@ runs:
   using: composite
   steps:
     - name: Download the place artifact
+      id: download
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.token }}
         PR: ${{ inputs.pr }}
       run: |
         if [ -z "$PR" ]; then
-          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --event push \
-            --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          run=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --event push \
+            --status success --limit 1 --json databaseId,headSha --jq '.[0] | "\(.databaseId) \(.headSha)"')
           source="main"
         else
           case "$PR" in
@@ -32,14 +38,17 @@ runs:
           esac
           # CI's latest successful run for the pull request (a fork's runs
           # carry no pull request, and forks never reach the Mac).
-          run_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?event=pull_request&status=success&per_page=100" \
-            --jq "[.workflow_runs[] | select(any(.pull_requests[]; .number == $PR))][0].id")
+          run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?event=pull_request&status=success&per_page=100" \
+            --jq "[.workflow_runs[] | select(any(.pull_requests[]; .number == $PR))][0] | \"\\(.id) \\(.head_sha)\"")
           source="pull request #$PR"
         fi
+        run_id=${run%% *}
+        head_sha=${run#* }
         if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
           echo "::error::no successful CI run for $source to take the place artifact from"
           exit 1
         fi
         rm -rf build/place
         gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name place --dir build/place
-        echo "Place file from CI run $run_id ($source)" >> "$GITHUB_STEP_SUMMARY"
+        echo "Place file from CI run $run_id ($source) at $head_sha" >> "$GITHUB_STEP_SUMMARY"
+        echo "head-sha=$head_sha" >> "$GITHUB_OUTPUT"

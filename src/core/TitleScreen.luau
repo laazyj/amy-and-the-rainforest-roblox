@@ -20,7 +20,11 @@
 	The client's: the view-model the client binder renders. The Title
 	screen shows from the moment the client loads (it is the loading
 	screen too); the choices appear when the server offers them, and it
-	closes when a choice is made or the Story's first message arrives.
+	closes when a choice is made or the Story's first message arrives. Each
+	offer opens it, also once closed: the server alone decides when it is
+	offered (StoryHost holds the Story until the Title choice), which is at
+	the start of a returning player's visit, or mid-Story for the Dev
+	shortcut /title.
 
 	  new()               the Title screen, loading: the words, no buttons
 	  show(vm, offer)     the server's offer (ShowTitle): the buttons
@@ -112,10 +116,8 @@ function TitleScreen.new(): TitleScreen
 end
 
 function TitleScreen.show(vm: TitleScreen, offer: Offer)
-	if vm.state ~= "closed" then
-		vm.state = "choosing"
-		vm.offer = offer
-	end
+	vm.state = "choosing"
+	vm.offer = offer
 end
 
 -- The Title choice `button` makes, if any. "Start again" asks first.
