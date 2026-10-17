@@ -147,7 +147,8 @@ Done once, on 2026-10-13. The host is an Apple silicon MacBook on macOS
 3. **The VM:** `tools/mac/vm.sh create` clones Tart's published macOS
    image, pinned by digest in the script
    (`ghcr.io/cirruslabs/macos-tahoe-base@sha256:87f3aa5c…`, macOS 26.6.2,
-   build 25G83), and gives it 4 cores, 8 GB of memory and a 60 GB disk.
+   build 25G83), and gives it 4 cores, 8 GB of memory, a 60 GB disk and a
+   1920 x 1200 pixel display (see "The frame" below).
    The first pull downloads about 25 GB. The image logs its user in
    automatically, never sleeps, and carries the Tart guest agent that
    `vm.sh exec` talks to, Homebrew, and the GitHub CLI (`gh`) the smoke
@@ -159,7 +160,8 @@ Done once, on 2026-10-13. The host is an Apple silicon MacBook on macOS
 5. **Studio:** `tools/mac/vm.sh exec /bin/sh -c 'cd ~/incoming && tools/mac/setup.sh studio'`.
    Roblox publishes only its current build and no checksum, so Studio
    cannot be pinned; the script checks that the download is signed and
-   notarised by Roblox Corporation.
+   notarised by Roblox Corporation. It also hides the guest's Dock, so
+   Studio's maximized window has the screen's full height.
 6. **By a person, in the VM's window** (`tools/mac/vm.sh stop`, then
    `tools/mac/vm.sh start window`): open Roblox Studio, sign in to the
    runner's Roblox account, and open any place once.
@@ -302,11 +304,59 @@ Two things about Studio that the wrapper works around:
 It only ever ends the Studio it launched, so it is safe on a Mac where
 another Studio is open.
 
+### The frame
+
+Every screenshot is Studio's whole window, so the window and Studio's
+panels decide how much of it is the game. Three settings make the game's
+viewport most of each capture (brief mac-003, Must 7):
+
+- **The guest's display is 1920 x 1200 pixels, at 1x** (`DISPLAY_SIZE` in
+  `vm.sh`). With the display in points, Tart's default, the guest ran a
+  1024 x 768 Retina mode it had saved, whatever size was set, and Studio's
+  window was 1024 x 680 points. In pixels the guest has one mode to
+  choose. At 2x the same screen would have four times the pixels in each
+  screenshot (about 2 MB each already, 22 a device) for no more of the
+  game. For an existing VM: `vm.sh stop`, `tart set amy-studio
+  --display 1920x1200px`, `vm.sh start`, then `stop` and `seal`.
+- **Studio's window is maximized and its panels share one column**, set
+  by the bridge before each launch (`frameTheViewport` in `studio.luau`),
+  only in a virtual machine (`kern.hv_vmm_present`, as `setup.sh` checks):
+  on a person's own Mac the layout is theirs and is left alone.
+  Studio keeps both in its preferences (`com.roblox.RobloxStudio`): the
+  window as Qt's saved geometry, the panels as a Qtitan dock layout in
+  XML. The bridge writes the geometry maximized for the guest's screen,
+  and moves every docked panel (Explorer, Properties, the Toolbox, the
+  Terrain Editor, the Assistant) into the first one's tab group, so they
+  take one column of about 280 pixels, their minimum, on the right.
+  Studio reads both at launch and never writes them back, since the
+  bridge ends it with `kill -9`. Two things that do not hold: a panel
+  marked closed in the layout is docked again by Studio at launch if it
+  is one of its default panels (only the Assistant stayed closed), and a
+  panel moved beside the place's own tab sends Play's game view into a
+  pane of its own, half the window's height. Nothing in Luau reaches
+  Studio's panels: the MCP server's `execute_luau` sees no plugin widgets.
+  If the layout is not what the bridge expects (a Studio update), it
+  warns and opens the place as it is.
+- **Roblox's player list is hidden in Play**, by the playthrough's
+  recorder (`INSTALL_SCRIPT`, on the client, so only in Play), so the
+  runner's account name is not in every frame. This is the one way the
+  screenshots differ from the game as players see it: the game itself
+  still shows the list.
+
 ## The playthrough
 
 ```sh
 lune run tools/studio-playtest/play --file build/AmyAndTheRainforest.rbxl --out build/studio-playtest [--devices pc,phone-portrait]
 ```
+
+**Before any manual run in the VM** (`vm.sh exec`), check that no Studio
+job is running or queued: `gh run list --workflow studio-playtest.yml`
+and `--workflow studio-smoke.yml` show none in progress, queued or
+waiting, and `pgrep -lf RobloxStudio` in the guest shows no Studio from
+`actions-runner-studio/_work`. The runner and a manual run share one
+guest, one screen and one MCP server, and `concurrency: studio` knows
+nothing of a manual run: on 2026-10-16 one cost an approved playtest
+(run 38925724410) its `pc` result.
 
 It plays the Story on a real client in Studio, from a fresh Save (Studio
 has no DataStores, so every Play is a new player) to the end card, as a
@@ -387,14 +437,29 @@ once with "Studio exited while starting", the installer took about 15
 minutes in the guest, and the bridge then passed unchanged, so
 `studio-version.txt` moved to 0.743.0.7431133 and the VM was sealed again.
 
+Run in the VM on 2026-10-16 with the frame above (Studio 0.743.0.7431133,
+the place built from `main` at 226cf78): `pc` and `phone-landscape`
+passed, 13 Quests and 22 screenshots each, 385.3 s in all. Every
+screenshot is 1920 x 1170 pixels (2048 x 1362 before, at 2x), and the
+game has most of it:
+
+| Device | Seconds | The client played at | The game in each screenshot | Before |
+|---|---|---|---|---|
+| `pc` | 207 | 1630 x 900 | 1630 x 900 pixels | 541 x 414 points, 1082 x 828 pixels |
+| `phone-landscape` | 169 | 733 x 392, landscape | the phone drawn about 1590 pixels wide | the phone about 1020 pixels wide |
+
+The simulated devices' sizes in `report.json` are unchanged; only how
+large Studio draws them grows. A PC player's viewport at 1630 x 900 is
+also nearer a real desktop's than 541 x 414 was.
+
 Limits today:
 
-- Studio's window in the guest is about 1024 x 680 points with its panels
-  open, so the game's viewport is about half of each screenshot (on a
-  simulated device, smaller again). A larger guest display, or the panels
-  closed, is the next improvement.
-- Roblox's own player name panel (`roblox_ci1234`) sits in the top right of
-  the viewport in every frame.
+- Studio's ribbon, its tab bar, the command bar and the column of panels
+  stay in each screenshot: the game is about two thirds of it. Cropping to
+  the viewport would need its position on screen, which nothing reports.
+- Roblox's chat window shows over the first Chapter card on `pc` until it
+  fades. Chat is on only in Dev builds (`Config.chat`), where the Dev
+  shortcuts are chat commands, so a Release build has no such frame.
 - Level 1 assertions (plan section 4: text fits, safe areas, the camera
   rule) and the baseline diffs are not part of it yet;
   `tests/studio/CameraRule.client.luau` and `DeviceLayout.client.luau` are
@@ -566,6 +631,7 @@ and the snapshot had to be discarded and the VM booted cold.
 | Studio cannot capture | "could not create image from window" | Step 9: Screen Recording for `node`. A runner update that replaces its Node.js may ask again. |
 | A future macOS drops `/usr/bin/perl` (Apple has called it deprecated since 10.15) | Every bridge command fails at once with "/usr/bin/perl" in the error | The wrapper's 30-second command timeout is a few lines of Perl (`TIMEOUT_SCRIPT` in `studio.luau`); install Perl in the guest or rewrite that wrapper. |
 | A job is refused at "Set up job" | "this runner runs only workflow files from main" or "does not run jobs started by …" | Intended: the workflow ran from a branch or an event the Mac does not take. Run it from `main`. |
+| A Studio update changes how it saves its layout | "Studio's panels and window were left as they are: …" as a warning; the screenshots show the panels again | Read the new layout (`defaults export com.roblox.RobloxStudio -`, the `LayoutSettings.Docking.*` keys) and fix `Studio.dockLayout`. |
 | A job left the guest in a bad state | Anything | `tools/mac/vm.sh reset`. |
 | Tart is updated by Homebrew | `vm.sh` warns that the version differs | If the VM still starts and the smoke job passes, bump `TART_VERSION` in `vm.sh`. |
 | Softnet is updated by Homebrew | `vm.sh start` fails with "root privileges are required" | Step 2 above, with the new path. |
