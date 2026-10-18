@@ -3,7 +3,8 @@
 -- to the end card on a real client in Roblox Studio, once per device, as a
 -- player would: E advances each Dialogue and presses each talk prompt, and
 -- the Player Character walks to each Quest's Zone or Character. A screenshot
--- is taken at every Shot, Chapter card and Scene entry.
+-- is taken at every Shot, Chapter card and Scene entry, and of the Title
+-- screen, which the Dev shortcut /title shows after the first Chapter card.
 --
 -- Pure: Studio is reached through the Bridge (studio.luau), and what the
 -- client sees comes back from Playthrough.observeScript as JSON, so the spec drives the
@@ -48,6 +49,11 @@ Playthrough.POLL = 0.25
 Playthrough.AFTER_PRESS = 0.5
 -- A talk prompt is pressed from this close to its Character, in studs.
 Playthrough.TALK_RANGE = 8
+-- The Title screen is captured this long after its buttons are built, so
+-- its picture has loaded.
+Playthrough.TITLE_SETTLE = 1
+-- How long /title, and then Continue, have to open and close it.
+Playthrough.TITLE_TIMEOUT = 15
 -- No change on screen for this long means the Story is stuck.
 Playthrough.STALL = 60
 -- The whole Story, per device.
@@ -76,6 +82,11 @@ if player:FindFirstChild("PlaytestLog") then
 end
 -- Roblox's player list would put the runner's account name in every frame.
 game:GetService("StarterGui"):SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
+-- Roblox's chat is on in Dev only, for the Dev shortcuts: hidden here as on
+-- Release, its input bar shown only while the playthrough types /title.
+local chat = game:GetService("TextChatService")
+chat:WaitForChild("ChatWindowConfiguration").Enabled = false
+chat:WaitForChild("ChatInputBarConfiguration").Enabled = false
 local http = game:GetService("HttpService")
 local log = Instance.new("Folder")
 log.Name = "PlaytestLog"
@@ -131,6 +142,14 @@ local dialogueFrame = gui:FindFirstChild("DialogueFrame", true)
 out.dialogue = dialogueFrame.Visible
 if out.dialogue then
 	out.line = dialogueFrame:FindFirstChild("Body", true).Text
+end
+local titleScreen = gui:FindFirstChild("TitleScreen", true)
+if titleScreen.Visible then
+	-- The Title screen, its Continue button once the server's offer built it.
+	local button = titleScreen:FindFirstChild("continue", true)
+	out.title = {
+		continue = button and (string.gsub(button:GetFullName(), "^Players%.[^.]+%.", "LocalPlayer.")),
+	}
 end
 local overlay = gui:FindFirstChild("TitleOverlay", true)
 if overlay.Visible then
@@ -221,6 +240,9 @@ export type Observation = {
 	line: string?, -- the Dialogue's text so far, while it shows
 	ended: boolean?, -- the server has sent the end card
 	card: { title: string, settled: boolean }?,
+	-- The Title screen; `continue` is its Continue button's instance path,
+	-- once the server's offer has built the buttons.
+	title: { continue: string? }?,
 	objective: string?,
 	target: Target?,
 	scene: string?, -- the Scene of the Zone Amy stands in, if any
@@ -230,9 +252,11 @@ export type Observation = {
 	screen: { viewport: string, orientation: string }?,
 }
 
+export type CaptureKind = "shot" | "card" | "scene" | "title"
+
 export type Capture = {
 	file: string,
-	kind: "shot" | "card" | "scene",
+	kind: CaptureKind,
 	name: string,
 	luminance: number,
 	pixels: string,
@@ -280,6 +304,28 @@ export type Options = {
 
 local round = Smoke.round
 
+-- Shows or hides Roblox's chat input bar on the client (INSTALL_SCRIPT
+-- hides it).
+function Playthrough.chatBarScript(enabled: boolean): string
+	return `game:GetService("TextChatService").ChatInputBarConfiguration.Enabled = {enabled}`
+end
+
+-- Selects the GuiButton at `instancePath` ("LocalPlayer.PlayerGui...") on
+-- the client, so Return activates it as it does for a keyboard player.
+function Playthrough.selectScript(instancePath: string): string
+	return string.format(
+		[[
+local object = game:GetService("Players").LocalPlayer
+for name in string.gmatch((string.gsub(%q, "^LocalPlayer%%.", "")), "[^.]+") do
+	object = object:FindFirstChild(name) or error(`no {name} in {object:GetFullName()}`)
+end
+game:GetService("GuiService").SelectedObject = object
+return object:GetFullName()
+]],
+		instancePath
+	)
+end
+
 -- The observing script, reporting only the Shots after the first `since`.
 function Playthrough.observeScript(since: number): string
 	return `local SINCE = {since}\n` .. OBSERVE_BODY
@@ -323,11 +369,11 @@ local function playDevice(
 	deadline: number
 )
 	local started = options.clock()
-	local shotsTaken, cardsTaken, scenesTaken = 0, {}, {}
+	local shotsTaken, cardsTaken, scenesTaken, titleTaken = 0, {}, {}, false
 	local function observe(): Observation
 		return serde.decode("json", bridge.run("Client", Playthrough.observeScript(shotsTaken)))
 	end
-	local function capture(kind: "shot" | "card" | "scene", name: string)
+	local function capture(kind: CaptureKind, name: string)
 		local file = string.format("%s/%02d-%s-%s.png", run.name, #report.captures + 1, kind, slug(name))
 		local shot = bridge.capture(`{options.outDir}/{file}`)
 		table.insert(report.captures, {
@@ -343,6 +389,44 @@ local function playDevice(
 		elseif shot.luminance > Smoke.LUMINANCE_CEILING then
 			error(`{file} is nearly white where the viewport should be: something covers the game`, 0)
 		end
+	end
+
+	-- Looks at the client until `find` finds something in what it shows; a
+	-- Story failure after TITLE_TIMEOUT. For the Title screen's two waits.
+	local function lookForTitle<T>(find: (Observation) -> T?, failure: string): T
+		local giveUp = options.clock() + Playthrough.TITLE_TIMEOUT
+		while true do
+			local found = find(observe())
+			if found ~= nil then
+				return found
+			elseif options.clock() > giveUp then
+				storyFailure(`{failure} within {Playthrough.TITLE_TIMEOUT} seconds`)
+			end
+			options.sleep(Playthrough.POLL)
+		end
+	end
+	-- The Title screen, through the Dev shortcut /title as a person testing
+	-- Dev types it; Continue carries on where the Story was. On PC it is
+	-- clicked; in the device simulator, which takes no mouse input on the
+	-- game's buttons, it is selected and Return pressed, as by a keyboard.
+	local function captureTitle()
+		bridge.run("Client", Playthrough.chatBarScript(true))
+		bridge.chat("/title")
+		bridge.run("Client", Playthrough.chatBarScript(false))
+		local continue = lookForTitle(function(seen)
+			return seen.title and seen.title.continue
+		end, "/title did not show the Title screen with Continue")
+		options.sleep(Playthrough.TITLE_SETTLE)
+		capture("title", "title")
+		if run.device then
+			bridge.run("Client", Playthrough.selectScript(continue))
+			bridge.press("Return")
+		else
+			bridge.click(continue)
+		end
+		lookForTitle(function(seen)
+			return not seen.title or nil
+		end, "Continue did not close the Title screen")
 	end
 
 	bridge.run("Client", Playthrough.INSTALL_SCRIPT)
@@ -395,6 +479,13 @@ local function playDevice(
 		if seen.scene and not scenesTaken[seen.scene] and not seen.dialogue and not card then
 			scenesTaken[seen.scene] = true
 			capture("scene", seen.scene)
+		end
+		-- Once, after the first Chapter card, while the Story waits on the player.
+		if not titleTaken and next(cardsTaken) and seen.objective and not card and not seen.dialogue then
+			titleTaken = true
+			captureTitle()
+			lastChange = options.clock()
+			continue
 		end
 
 		local target = seen.target

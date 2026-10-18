@@ -47,6 +47,9 @@ local COMMAND_TIMEOUT = 30
 -- The square in the middle of the screenshot whose brightness is measured, in
 -- pixels: inside the viewport in Studio's default layout.
 local LUMINANCE_SQUARE = "400"
+-- Between the keys of a chat message: time for the input bar to take focus,
+-- and the text, before Return sends it.
+local CHAT_PAUSE_MS = 300
 
 -- Both run with `osascript -l JavaScript` and print JSON.
 -- Why this login session cannot render Studio, or null when it can.
@@ -552,6 +555,33 @@ function Studio.bridge(options: Options): Smoke.Bridge
 
 		walkTo = function(position)
 			tool("character_navigation", { datamodel_type = "Client", x = position.x, y = position.y, z = position.z })
+		end,
+
+		chat = function(text)
+			tool("user_keyboard_input", {
+				datamodel_type = "Client",
+				actions = {
+					-- "/" is the key that focuses Roblox's chat input bar.
+					{ action = "keyPress", key_code = "Slash" },
+					{ action = "wait", wait_time_ms = CHAT_PAUSE_MS },
+					{ action = "textInput", text_inputs = text },
+					{ action = "wait", wait_time_ms = CHAT_PAUSE_MS },
+					{ action = "keyPress", key_code = "Return" },
+				} :: { { [string]: any } },
+			})
+		end,
+
+		click = function(instancePath)
+			tool("user_mouse_input", {
+				datamodel_type = "Client",
+				actions = {
+					{ action = "moveTo", instance_path = instancePath },
+					{ action = "mouseButtonClick", mouse_button = "left" },
+					-- Then into the viewport's corner, so the pointer is not
+					-- in the middle of the screenshots that follow.
+					{ action = "moveTo", x = 1, y = 1 },
+				} :: { { [string]: any } },
+			})
 		end,
 
 		insertAsset = function(assetId, parentPath)

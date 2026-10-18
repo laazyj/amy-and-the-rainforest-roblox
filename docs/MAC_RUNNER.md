@@ -349,7 +349,10 @@ viewport most of each capture (brief mac-003, Must 7):
   recorder (`INSTALL_SCRIPT`, on the client, so only in Play), so the
   runner's account name is not in every frame. This is the one way the
   screenshots differ from the game as players see it: the game itself
-  still shows the list.
+  still shows the list. The recorder also hides Roblox's chat window and
+  input bar, which only Dev shows (`Config.chat`), so the screenshots are
+  as a Release player sees them; the bar shows only while the playthrough
+  types `/title` (see "The title").
 
 ## The playthrough
 
@@ -387,17 +390,14 @@ against a scripted fake client:
 - **Capturing,** before anything moves on: each Shot once it has eased
   in (0.8 s after it was framed), each Chapter card and the end card once
   faded in, and each Scene the first time Amy stands in one of its Zones
-  with nothing over the view. Screenshots are
-  `<out>/<device>/<nn>-<shot|card|scene>-<name>.png`. The Title screen is
-  the next capture (brief mac-003, Must B6, made on the Mac): after the
-  first Chapter card the playthrough sends the Dev shortcut `/title`,
-  which offers the Title screen at the current Progress, captures it as
-  `<nn>-title-title.png` (kind `title`, which the `sheets` job puts in the
-  title index), and presses Continue, which carries on where Amy was.
+  with nothing over the view, and the Title screen once per device (see
+  "The title"). Screenshots are
+  `<out>/<device>/<nn>-<shot|card|scene|title>-<name>.png`.
 - **Failing** when the Story stops changing for 60 seconds (Amy moving or
   a Line still being written counts as change), takes over 10 minutes,
-  reaches a Quest kind it cannot play (only reach and talk today), or a
-  capture is black or nearly white, with what was on screen. A failed
+  reaches a Quest kind it cannot play (only reach and talk today), a
+  capture is black or nearly white, or the Title screen does not open on
+  `/title` or close on Continue within 15 seconds, with what was on screen. A failed
   device is reported and the next one still plays, with two exceptions:
   when the Story does not end on `pc` the rest are skipped (it will not
   end on a phone either), and when Stop Play fails the rest are skipped
@@ -418,6 +418,48 @@ against a scripted fake client:
   run still stops Play and quits Studio. `report.json` is written
   after every device with `"finished": false`, so a job cut short still
   uploads what it played, and the summary says it stopped before the end.
+
+### The title
+
+Brief mac-003, Must B6. Once per device, after the first Chapter card,
+when the Objective shows and nothing is over it (in the Garden, at the
+first Quest), the playthrough:
+
+1. **Types the Dev shortcut `/title` into Roblox's chat, as a person
+   testing Dev types it:** the chat input bar is shown for it
+   (`Playthrough.chatBarScript`), then the bridge's `chat` sends `/`
+   (the key that focuses the bar), the text and Return through Studio's
+   MCP `user_keyboard_input`, and the bar is hidden again. The server's
+   `TextChatCommand` runs `DevShortcuts.onCommand`, which offers the Title
+   screen at the current Progress (`StoryHost.offerTitle`).
+2. **Waits for the Title screen as the observe script reports it,** with
+   its buttons built (the client reports Continue's instance path), then 1
+   s for its picture, and **captures it** as `<nn>-title-title.png` (kind
+   `title`, which the `sheets` job puts in the title index).
+3. **Presses Continue.** On `pc` the bridge's `click` clicks it as a
+   player's mouse does (MCP `user_mouse_input`, moved to the button by its
+   instance path), then moves the pointer to the viewport's corner, out of
+   the following screenshots. In the device simulator no mouse input
+   reaches the game's buttons (a click by instance path, at the button's
+   centre, or at its centre plus the top bar's inset, all left the Title
+   screen open), so there the button is selected
+   (`GuiService.SelectedObject`, `Playthrough.selectScript`) and Return
+   pressed, as a keyboard player activates a selected button: the button's
+   own `Activated` handler makes the Title choice. Touch is not exercised.
+4. **Waits for the Title screen to close** and plays on from where the
+   Story was: Continue is a Resume at the same Quest.
+
+Typing into chat needed one fix to the place. `default.project.json` did
+not set `TextChatService.ChatVersion`, so a Rojo build had the legacy
+chat, in which no `TextChatCommand` fires: `/chapter`, `/quest` and
+`/title` typed in Studio did nothing, and `Config.chat`'s switch
+(`ChatWindowConfiguration`, `ChatInputBarConfiguration`) hid nothing. The
+place now sets `ChatVersion` to `TextChatService`, which
+`tests/lune/place/chat.spec.luau` checks in the built file. The other way
+the brief allowed, `DevShortcuts`' entry point called in the server
+DataModel, does not work: a `require` from the MCP server's
+`execute_luau` gets its own copy of the module, with no sessions (on
+2026-10-16 `StoryHost.activeQuest` from there returned nil mid-Story).
 
 The devices, one Play each, in order: `pc` (no simulation),
 `phone-landscape` and `phone-portrait` (Studio's `iphone_16` preset, 852
@@ -465,14 +507,18 @@ The simulated devices' sizes in `report.json` are unchanged; only how
 large Studio draws them grows. A PC player's viewport at 1630 x 900 is
 also nearer a real desktop's than 541 x 414 was.
 
+Run in the VM on 2026-10-17 with the title (Studio 0.743.0.7431133, the
+place built from `main` at 496fd97 plus this branch, `ChatVersion`
+included): `pc` and `phone-landscape` passed, 13 Quests and 23 screenshots
+each, the third being the title, 352.9 s in all (173 s and 172 s). The
+first Chapter card on `pc` no longer has the chat window over it. With the
+pointer then parked after the click, `pc` passed again in 182 s.
+
 Limits today:
 
 - Studio's ribbon, its tab bar, the command bar and the column of panels
   stay in each screenshot: the game is about two thirds of it. Cropping to
   the viewport would need its position on screen, which nothing reports.
-- Roblox's chat window shows over the first Chapter card on `pc` until it
-  fades. Chat is on only in Dev builds (`Config.chat`), where the Dev
-  shortcuts are chat commands, so a Release build has no such frame.
 - Level 1 assertions (plan section 4: text fits, safe areas, the camera
   rule) are not part of it yet (the baseline diffs are: "Screenshots on a
   pull request");
@@ -487,7 +533,9 @@ Limits today:
   standing in one of the Scene's Zones, so a Scene without Zones (Village,
   Paradise) is never captured. A count against the Story's Chapters and a
   signal from the Scene change itself would close both.
-- Phone runs press E like a PC, so touch input is not exercised yet.
+- Phone runs press E like a PC, and select Continue and press Return, so
+  touch input is not exercised yet: Studio's MCP has keyboard and mouse
+  input, and the simulator takes no mouse input on the game's buttons.
 
 ## Screenshots on a pull request
 
@@ -740,6 +788,7 @@ and the snapshot had to be discarded and the VM booted cold.
 | Studio cannot capture | "could not create image from window" | Step 9: Screen Recording for `node`. A runner update that replaces its Node.js may ask again. |
 | A future macOS drops `/usr/bin/perl` (Apple has called it deprecated since 10.15) | Every bridge command fails at once with "/usr/bin/perl" in the error | The wrapper's 30-second command timeout is a few lines of Perl (`TIMEOUT_SCRIPT` in `studio.luau`); install Perl in the guest or rewrite that wrapper. |
 | A job is refused at "Set up job" | "this runner runs only workflow files from main" or "does not run jobs started by …" | Intended: the workflow ran from a branch or an event the Mac does not take. Run it from `main`. |
+| `/title` does not open the Title screen, or Continue does not close it | The device fails: "/title did not show the Title screen with Continue within 15 seconds", or "Continue did not close the Title screen …" | Look at the device's last capture. Chat must be TextChatService (`chat.spec`); a Studio update may have moved the chat key or changed the MCP's input tools. |
 | A Studio update changes how it saves its layout | "Studio's panels and window were left as they are: …" as a warning; the screenshots show the panels again | Read the new layout (`defaults export com.roblox.RobloxStudio -`, the `LayoutSettings.Docking.*` keys) and fix `Studio.dockLayout`. |
 | A job left the guest in a bad state | Anything | `tools/mac/vm.sh reset`. |
 | Tart is updated by Homebrew | `vm.sh` warns that the version differs | If the VM still starts and the smoke job passes, bump `TART_VERSION` in `vm.sh`. |
