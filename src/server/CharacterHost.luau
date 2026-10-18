@@ -1,25 +1,40 @@
 --!strict
 --[[
-	CharacterHost: builds the Characters out of parts at their home Spots,
-	moves them between Spots, and offers or withdraws each one's talk
+	CharacterHost: builds the Characters at their home Spots, moves them
+	between Spots (running there when a Beat says so), dresses the Player
+	Character as Amy, and offers or withdraws each Character's talk
 	affordance (a ProximityPrompt, Enabled while a talk Quest waits for it).
 
-	Humans are friendly blocky villagers; the animals' kind decides their
-	colours and features: the white dog, the maroon squirrel, the orangest
-	fox, the golden lion with his mane.
+	How each Character is built is Story.build's answer. A human is Roblox's
+	R15 body made from its Description; any other Character is its Character
+	model, ServerStorage.CharacterModels.<id> (assets/meshes/characters),
+	when the place has one, and else its Placeholder, built out of parts:
+	the white dog, the maroon squirrel, the orangest fox, the golden lion
+	with his mane. Every Character has a Humanoid and stands anchored at its
+	root, playing its `idle` animation; it runs with its `run` one. Its
+	animations are the Animation objects in its Animations folder: a human's
+	come from the Animate script Roblox gives the body (which runs only for
+	a player), a Character model's from the model.
 ]]
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 local Workspace = game:GetService("Workspace")
 
 local Story = require(ReplicatedStorage:WaitForChild("core"):WaitForChild("Story"))
 local Convert = require(script.Parent.Convert)
 local Parts = require(script.Parent.Parts)
 
-local SKIN = Color3.fromRGB(228, 194, 160)
 local HAIR = Color3.fromRGB(94, 64, 44)
-local DEFAULT_SHIRT = Color3.fromRGB(120, 120, 140)
 local TALK = "Talk"
+-- the animations a Character may have, by name in its Animations folder
+local ANIMATIONS = { "idle", "walk", "run" }
+-- how fast a Character runs, in studs a second, and how much longer than
+-- that takes it is given to arrive, at most RUN_LIMIT seconds in all
+local RUN_SPEED = 16
+local RUN_SLACK = 0.5
+local RUN_LIMIT = 3
 
 local CharacterHost = {}
 
@@ -27,7 +42,10 @@ local models: { [string]: Model } = {}
 local prompts: { [string]: ProximityPrompt } = {}
 -- how high above its Spot each Character's pivot stands, kept when it moves
 local pivotHeights: { [string]: number } = {}
+-- each Character's loaded animations, by name
+local tracks: { [string]: { [string]: AnimationTrack } } = {}
 local spots: { [string]: Story.Spot } = {}
+local amy: Story.Description? = nil
 
 -- A Character's parts do not collide, but for its body.
 local function makePart(props: { [string]: any }, model: Model): Part
@@ -57,20 +75,127 @@ local function addNameTag(rootPart: BasePart, displayName: string, offsetY: numb
 	billboard.Parent = rootPart
 end
 
--- A friendly blocky human standing on `spot` (Dad, Mum, and the villagers
--- of prop:Villagers). Returns the model and its body, which holds the
--- talk affordance.
-function CharacterHost.buildHuman(
+-- A Description as a HumanoidDescription.
+function CharacterHost.humanoidDescription(description: Story.Description): HumanoidDescription
+	local made = Instance.new("HumanoidDescription")
+	local arms, legs = Convert.colour(description.arms), Convert.colour(description.legs)
+	made.HeadColor = Convert.colour(description.head)
+	made.TorsoColor = Convert.colour(description.torso)
+	made.LeftArmColor, made.RightArmColor = arms, arms
+	made.LeftLegColor, made.RightLegColor = legs, legs
+	return made
+end
+
+-- Readies a Character's Humanoid: it never dies and shows no name or
+-- health of its own (the NameTag does), and its animations are loaded, the
+-- `idle` one playing.
+local function ready(model: Model, humanoid: Humanoid)
+	local name = model.Name
+	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+	humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+	humanoid.RequiresNeck = false
+	humanoid.BreakJointsOnDeath = false
+	humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+	local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator")
+	animator.Parent = humanoid
+
+	local folder: Instance = model:FindFirstChild("Animations") or Instance.new("Folder")
+	folder.Name = "Animations"
+	folder.Parent = model
+	local animate = model:FindFirstChild("Animate")
+	if animate then
+		for _, animationName in ANIMATIONS do
+			local holder = animate:FindFirstChild(animationName)
+			local animation = holder and holder:FindFirstChildWhichIsA("Animation")
+			if animation and not folder:FindFirstChild(animationName) then
+				local copy = animation:Clone()
+				copy.Name = animationName
+				copy.Parent = folder
+			end
+		end
+		animate:Destroy()
+	end
+
+	local loaded: { [string]: AnimationTrack } = {}
+	for _, animationName in ANIMATIONS do
+		local animation = folder:FindFirstChild(animationName)
+		if animation and animation:IsA("Animation") then
+			local ok, track = pcall(animator.LoadAnimation, animator, animation)
+			if ok then
+				track.Looped = true
+				loaded[animationName] = track
+			else
+				warn(`[CharacterHost] {name}'s {animationName} animation did not load: {track}`)
+			end
+		end
+	end
+	tracks[name] = loaded
+	if loaded.idle then
+		loaded.idle:Play()
+	end
+end
+
+-- Anchors `model` at its root and puts it in `parent`, ready: in the world
+-- first, so its animations load.
+local function place(model: Model, root: BasePart, humanoid: Humanoid, parent: Instance)
+	root.Anchored = true
+	model.PrimaryPart = root
+	model.Parent = parent
+	ready(model, humanoid)
+end
+
+-- Gives a Character built of parts its Humanoid: an invisible root where its
+-- pivot stands, `height` above the ground, every part welded to it. Then
+-- puts it in `parent`, ready.
+local function withHumanoid(model: Model, base: CFrame, size: Vector3, height: number, parent: Instance): BasePart
+	local root = makePart({ Name = "HumanoidRootPart", Size = size, CFrame = base, Transparency = 1 }, model)
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") and part ~= root then
+			local weld = Instance.new("WeldConstraint")
+			weld.Part0 = root
+			weld.Part1 = part
+			weld.Parent = root
+			part.Anchored = false
+		end
+	end
+	local humanoid = Instance.new("Humanoid")
+	humanoid.RigType = Enum.HumanoidRigType.R15
+	humanoid.HipHeight = height - size.Y / 2
+	humanoid.Parent = model
+	place(model, root, humanoid, parent)
+	return root
+end
+
+-- A Humanoid's model standing on `spot`, anchored at its root, with its
+-- name tag; nil when it has no Humanoid or no root.
+local function stand(model: Model, display: string, spot: Story.Spot, parent: Instance): BasePart?
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	local root = model:FindFirstChild("HumanoidRootPart")
+	if not humanoid or not root or not root:IsA("BasePart") then
+		return nil
+	end
+	model:PivotTo(Convert.standing(spot, humanoid.HipHeight + root.Size.Y / 2))
+	local head = model:FindFirstChild("Head")
+	addNameTag(if head and head:IsA("BasePart") then head else root, display, 2.2)
+	place(model, root, humanoid, parent)
+	return root
+end
+
+-- A friendly blocky human in the colours of `description`, for when Roblox
+-- makes no R15 body.
+local function buildBlockyHuman(
 	name: string,
 	display: string,
-	shirt: Color3?,
+	description: Story.Description,
 	spot: Story.Spot,
 	parent: Instance
-): (Model, Part)
+): (Model, BasePart)
 	local model = Instance.new("Model")
 	model.Name = name
-	local base = Convert.standing(spot, 2.9)
-	local shirtColour = shirt or DEFAULT_SHIRT
+	local height = 2.9
+	local base = Convert.standing(spot, height)
+	local skin, torso, arms =
+		Convert.colour(description.head), Convert.colour(description.torso), Convert.colour(description.arms)
 
 	-- legs
 	for side = -1, 1, 2 do
@@ -78,15 +203,15 @@ function CharacterHost.buildHuman(
 			Name = "Leg",
 			Size = Vector3.new(0.9, 2.4, 1),
 			CFrame = base * CFrame.new(0.55 * side, -2.1, 0),
-			Color = Color3.fromRGB(64, 74, 94),
+			Color = Convert.colour(description.legs),
 		}, model)
 	end
 	-- torso
-	local body = makePart({
+	makePart({
 		Name = "Body",
 		Size = Vector3.new(2.6, 3, 1.5),
 		CFrame = base * CFrame.new(0, 0.6, 0),
-		Color = shirtColour,
+		Color = torso,
 		CanCollide = true,
 	}, model)
 	-- arms
@@ -95,14 +220,14 @@ function CharacterHost.buildHuman(
 			Name = "Arm",
 			Size = Vector3.new(0.8, 2.8, 1),
 			CFrame = base * CFrame.new(1.75 * side, 0.5, 0),
-			Color = shirtColour,
+			Color = arms,
 		}, model)
 		makePart({
 			Name = "Hand",
 			Shape = Enum.PartType.Ball,
 			Size = Vector3.new(0.8, 0.8, 0.8),
 			CFrame = base * CFrame.new(1.75 * side, -1.1, 0),
-			Color = SKIN,
+			Color = skin,
 		}, model)
 	end
 	-- head + hair + eyes
@@ -111,7 +236,7 @@ function CharacterHost.buildHuman(
 		Shape = Enum.PartType.Ball,
 		Size = Vector3.new(2.1, 2.1, 2.1),
 		CFrame = base * CFrame.new(0, 3, 0),
-		Color = SKIN,
+		Color = skin,
 	}, model)
 	makePart({
 		Name = "Hair",
@@ -131,44 +256,90 @@ function CharacterHost.buildHuman(
 	end
 
 	addNameTag(head, display, 2.6)
-	model.PrimaryPart = body
-	model.Parent = parent
-	return model, body
+	return model, withHumanoid(model, base, Vector3.new(2, 2, 1), height, parent)
 end
 
-type AnimalLook = { body: Color3, belly: Color3, scale: number, tail: "up" | "fluff" | "brush" | "tuft" }
-
-local ANIMALS: { [string]: AnimalLook } = {
-	dog = { body = Color3.fromRGB(238, 230, 214), belly = Color3.fromRGB(150, 110, 74), scale = 1.0, tail = "up" },
-	-- maroon!
-	squirrel = {
-		body = Color3.fromRGB(128, 32, 48),
-		belly = Color3.fromRGB(214, 168, 150),
-		scale = 0.55,
-		tail = "fluff",
-	},
-	-- the orangest orange
-	fox = { body = Color3.fromRGB(240, 120, 32), belly = Color3.fromRGB(248, 240, 226), scale = 0.85, tail = "brush" },
-	-- golden
-	lion = { body = Color3.fromRGB(226, 178, 68), belly = Color3.fromRGB(240, 214, 150), scale = 1.5, tail = "tuft" },
+-- The parts of Roblox's R15 body each colour of a Description paints.
+local BODY_PARTS: { [string]: { string } } = {
+	head = { "Head" },
+	torso = { "UpperTorso", "LowerTorso" },
+	arms = { "LeftUpperArm", "LeftLowerArm", "LeftHand", "RightUpperArm", "RightLowerArm", "RightHand" },
+	legs = { "LeftUpperLeg", "LeftLowerLeg", "LeftFoot", "RightUpperLeg", "RightLowerLeg", "RightFoot" },
 }
 
--- A four-legged friend. Its kind decides colours and signature features;
--- any kind not listed is drawn as the lion.
-local function buildAnimal(character: Story.Character, spot: Story.Spot, parent: Instance): (Model, Part)
+-- Roblox's R15 body, made once (a web call); each human is a copy of it in
+-- its own colours. False when Roblox made none.
+local r15Body: Model | false | nil = nil
+
+local function r15(): Model?
+	if r15Body == nil then
+		local ok, made = pcall(
+			Players.CreateHumanoidModelFromDescriptionAsync,
+			Players,
+			Instance.new("HumanoidDescription"),
+			Enum.HumanoidRigType.R15
+		)
+		if ok then
+			-- its BodyColors would paint over the Descriptions' colours
+			for _, bodyColors in made:GetChildren() do
+				if bodyColors:IsA("BodyColors") then
+					bodyColors:Destroy()
+				end
+			end
+		else
+			warn(`[CharacterHost] the humans are blocky: Roblox made no R15 body ({made})`)
+		end
+		r15Body = if ok then made else false
+	end
+	return r15Body or nil
+end
+
+-- A human standing on `spot` (Dad, Mum, and the villagers of
+-- prop:Villagers): Roblox's R15 body in the colours of `description`. Only
+-- if Roblox makes no body is it the blocky one, which tier 2 refuses.
+-- Returns the model and its root, which holds the talk affordance.
+function CharacterHost.buildHuman(
+	name: string,
+	display: string,
+	description: Story.Description,
+	spot: Story.Spot,
+	parent: Instance
+): (Model, BasePart)
+	local body = r15()
+	if not body then
+		return buildBlockyHuman(name, display, description, spot, parent)
+	end
+	local model = body:Clone()
+	model.Name = name
+	for colour, names in BODY_PARTS do
+		for _, partName in names do
+			local part = model:FindFirstChild(partName)
+			if part and part:IsA("BasePart") then
+				part.Color = Convert.colour((description :: any)[colour])
+			end
+		end
+	end
+	return model, assert(stand(model, display, spot, parent), "Roblox's R15 body has a Humanoid and a root")
+end
+
+-- A four-legged friend, as its Placeholder: colours, size and tail from
+-- content, and its kind's ears, the fox's dark ones and the lion's mane.
+local function buildPlaceholder(character: Story.Character, spot: Story.Spot, parent: Instance): (Model, BasePart)
 	local model = Instance.new("Model")
 	model.Name = character.id
 	local kind = character.kind
-	local look = ANIMALS[kind] or ANIMALS.lion
-	local bodyColor, bellyColor, scale, tailStyle = look.body, look.belly, look.scale, look.tail
+	local look = assert(character.placeholder, `character:{character.id} has no Placeholder`)
+	local bodyColor, bellyColor, scale, tailStyle =
+		Convert.colour(look.body), Convert.colour(look.belly), look.scale, look.tail
 
 	local bodyLift = 1.6 * scale + 0.6
 	local base = Convert.standing(spot, bodyLift)
 
 	-- body (horizontal)
-	local body = makePart({
+	local bodySize = Vector3.new(2 * scale, 1.8 * scale, 3.6 * scale)
+	makePart({
 		Name = "Body",
-		Size = Vector3.new(2 * scale, 1.8 * scale, 3.6 * scale),
+		Size = bodySize,
 		CFrame = base,
 		Color = bodyColor,
 		CanCollide = true,
@@ -309,9 +480,28 @@ local function buildAnimal(character: Story.Character, spot: Story.Spot, parent:
 	end
 
 	addNameTag(head, character.display, if kind == "lion" then 4.6 else 3.2)
-	model.PrimaryPart = body
-	model.Parent = parent
-	return model, body
+	return model, withHumanoid(model, base, bodySize, bodyLift, parent)
+end
+
+-- A Character from its Character model, standing on `spot`; nil when the
+-- model has no Humanoid or no root.
+local function buildFromModel(
+	character: Story.Character,
+	template: Model,
+	spot: Story.Spot,
+	parent: Instance
+): (Model?, BasePart?)
+	local model = template:Clone()
+	model.Name = character.id
+	local root = stand(model, character.display, spot, parent)
+	if not root then
+		warn(
+			`[CharacterHost] character:{character.id}'s Character model has no Humanoid or root; drawn as its Placeholder`
+		)
+		model:Destroy()
+		return nil, nil
+	end
+	return model, root
 end
 
 -- Builds every Character but the Player Character at its home Spot, in the
@@ -321,26 +511,29 @@ function CharacterHost.build(story: Story.Story)
 	folder.Name = "StoryCharacters"
 	folder.Parent = Workspace
 	spots = story.spots
+	local characterModels = ServerStorage:FindFirstChild("CharacterModels")
 
 	for _, character in story.characters do
 		if character.player then
+			amy = character.description
 			continue
 		end
 		local home = assert(spots[character.home], character.home)
-		local model, promptPart
-		if character.kind == "human" then
-			model, promptPart = CharacterHost.buildHuman(
-				character.id,
-				character.display,
-				if character.shirt then Convert.colour(character.shirt) else nil,
-				home,
-				folder
-			)
-		else
-			model, promptPart = buildAnimal(character, home, folder)
+		local template = characterModels and characterModels:FindFirstChild(character.id)
+		local build = Story.build(character, template ~= nil and template:IsA("Model"))
+		local model: Model?, promptPart: BasePart?
+		if build == "description" then
+			local description = assert(character.description, `character:{character.id} has no Description`)
+			model, promptPart = CharacterHost.buildHuman(character.id, character.display, description, home, folder)
+		elseif build == "model" then
+			model, promptPart = buildFromModel(character, template :: Model, home, folder)
 		end
-		models[character.id] = model
-		pivotHeights[character.id] = model:GetPivot().Position.Y - home.at.y
+		if not model or not promptPart then
+			model, promptPart = buildPlaceholder(character, home, folder)
+		end
+		local built = model :: Model
+		models[character.id] = built
+		pivotHeights[character.id] = built:GetPivot().Position.Y - home.at.y
 
 		local prompt = Instance.new("ProximityPrompt")
 		prompt.Name = "TalkPrompt"
@@ -360,12 +553,83 @@ function CharacterHost.prompts(): { [string]: ProximityPrompt }
 	return prompts
 end
 
--- Puts a Character at a Spot, at its own height, facing the Spot's way.
-function CharacterHost.moveCharacter(id: string, spotId: string)
+-- Each Character's loaded animations, by Character id and animation name.
+function CharacterHost.animations(): { [string]: { [string]: AnimationTrack } }
+	return tracks
+end
+
+-- The run each Character is on, so a later move ends it.
+local runs: { [string]: {} } = {}
+
+-- Swaps a Character's playing animation `from` for `to`.
+local function swap(animations: { [string]: AnimationTrack }, from: string, to: string)
+	if animations[from] then
+		animations[from]:Stop(0.2)
+	end
+	if animations[to] then
+		animations[to]:Play(0.2)
+	end
+end
+
+-- Sets a Character running toward `at` with its run animation, and returns.
+-- The run ends when it arrives, when a later move comes, or after as long
+-- as running there takes and RUN_SLACK more, at most RUN_LIMIT seconds
+-- (physics may not step, as in a Luau Execution task); then it stands at
+-- `at`. A Beat gives the run its time with a Wait.
+local function runTo(id: string, model: Model, at: CFrame)
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	local root = model.PrimaryPart
+	if not humanoid or not root then
+		model:PivotTo(at)
+		return
+	end
+	local run = {}
+	runs[id] = run
+	local animations: { [string]: AnimationTrack } = tracks[id] or {}
+	humanoid.WalkSpeed = RUN_SPEED
+	root.Anchored = false
+	pcall(root.SetNetworkOwner, root, nil)
+	swap(animations, "idle", "run")
+	humanoid:MoveTo(at.Position)
+	local seconds = math.min(RUN_LIMIT, (at.Position - root.Position).Magnitude / RUN_SPEED + RUN_SLACK)
+	task.spawn(function()
+		local arrived = false
+		local connection = humanoid.MoveToFinished:Connect(function()
+			arrived = true
+		end)
+		while not arrived and seconds > 0 and runs[id] == run do
+			seconds -= task.wait()
+		end
+		connection:Disconnect()
+		if runs[id] == run then
+			runs[id] = nil
+			root.Anchored = true
+			model:PivotTo(at)
+		end
+		-- unless another run has taken over
+		if runs[id] == nil then
+			swap(animations, "run", "idle")
+		end
+	end)
+end
+
+-- Puts a Character at a Spot, at its own height, facing the Spot's way;
+-- with `run`, sets it running there instead.
+function CharacterHost.moveCharacter(id: string, spotId: string, run: boolean?)
 	local model = models[id]
 	local spot = spots[spotId]
 	if model and spot then
-		model:PivotTo(Convert.standing(spot, pivotHeights[id]))
+		local at = Convert.standing(spot, pivotHeights[id])
+		if run then
+			runTo(id, model, at)
+			return
+		end
+		local running = runs[id] and model.PrimaryPart
+		runs[id] = nil
+		if running then
+			running.Anchored = true
+		end
+		model:PivotTo(at)
 	end
 end
 
@@ -381,6 +645,27 @@ function CharacterHost.withdrawTalk(id: string)
 	local prompt = prompts[id]
 	if prompt then
 		prompt.Enabled = false
+	end
+end
+
+-- Dresses a Player Character as Amy: her Description on Roblox's body.
+-- Her face is never seen (the camera rule), so it is left as Roblox makes it.
+function CharacterHost.dress(character: Model)
+	local humanoid = character:WaitForChild("Humanoid", 10)
+	if not amy or not humanoid or not humanoid:IsA("Humanoid") then
+		return
+	end
+	local ok, problem = pcall(humanoid.ApplyDescriptionAsync, humanoid, CharacterHost.humanoidDescription(amy))
+	if not ok then
+		warn(`[CharacterHost] could not dress {character.Name} as Amy: {problem}`)
+	end
+end
+
+-- Dresses `player`'s Character as Amy each time it spawns.
+function CharacterHost.dressPlayer(player: Player)
+	player.CharacterAdded:Connect(CharacterHost.dress)
+	if player.Character then
+		task.spawn(CharacterHost.dress, player.Character)
 	end
 end
 

@@ -43,6 +43,7 @@ Manifest.NAME_PREFIXES = table.freeze({
 	music = true, -- a Cue: a music track
 	narration = true, -- a Chapter's narration file
 	prop = true, -- a Prop's model
+	character = true, -- a Character model: a Character with its Humanoid and animations
 	font = true, -- a Creator Store font family, referenced by id
 })
 
@@ -59,6 +60,18 @@ Manifest.LICENCES = table.freeze({
 	["cc-by"] = true, -- needs `attribution`
 	synthesised = true, -- audio generated for this game
 })
+
+-- Where a Character model's file is: the place file holds this folder
+-- (ServerStorage.CharacterModels, default.project.json), one model per
+-- Character, named by its id.
+Manifest.CHARACTER_MODELS = "assets/meshes/characters"
+
+-- The file of the Character model named `name` (`character:<id>`), or nil
+-- for a name of another kind.
+function Manifest.characterModelPath(name: string): string?
+	local id = string.match(name, "^character:([%w_]+)$")
+	return if id then `{Manifest.CHARACTER_MODELS}/{id}.rbxm` else nil
+end
 
 -- `pending` until uploaded; then what Roblox moderation says.
 Manifest.MODERATION = table.freeze({ pending = true, reviewing = true, approved = true, rejected = true })
@@ -235,6 +248,12 @@ function Manifest.validate(manifest: any, readFile: (string) -> string?): { stri
 			local refused = OpenCloud.assetUploadProblem(entry.kind, path, if contents then #contents else 0)
 			if refused then
 				bad(refused)
+			end
+		end
+		local file = Manifest.characterModelPath(name)
+		if file then
+			if entry.kind ~= "model" or path ~= file or entry.upload ~= false then
+				bad(`a Character model is kind "model" at {file} with upload false: the place file holds it`)
 			end
 		end
 		if entry.kind == "image" and not Manifest.AMY[entry.amy] then

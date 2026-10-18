@@ -388,11 +388,20 @@ local function characters(schema: Schema): Check
 		display = text,
 		kind = text,
 		home = oneOf(schema.spots, "Spot"),
-		shirt = optional(rgb),
 		player = optional(isTrue),
+		description = optional(record({ head = rgb, torso = rgb, arms = rgb, legs = rgb })),
+		placeholder = optional(record({
+			body = rgb,
+			belly = rgb,
+			scale = number,
+			tail = oneOf({ up = true, fluff = true, brush = true, tuft = true }, "Placeholder tail"),
+		})),
 	})
 	return list(function(value, where, report)
 		character(value, where, report)
+		if type(value) == "table" and value.description ~= nil and value.placeholder ~= nil then
+			report(where, "has a Description (a human's look) or a Placeholder (any other's), not both")
+		end
 		local listed = type(value) == "table" and schema.characters[value.id]
 		if not listed then
 			return

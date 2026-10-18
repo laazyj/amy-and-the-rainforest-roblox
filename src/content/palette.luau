@@ -19,6 +19,9 @@ local palette = {
 	grassLight = rgb(96, 148, 70),
 	canopyDark = rgb(56, 108, 45),
 	canopyLight = rgb(104, 158, 72),
+	-- the Characters' skin and trousers that are not Clara's
+	skin = rgb(228, 194, 160),
+	trousers = rgb(64, 74, 94),
 }
 
 local sky = {

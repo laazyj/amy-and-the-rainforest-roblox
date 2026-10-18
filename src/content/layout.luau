@@ -18,6 +18,12 @@ function layout.rgb(r: number, g: number, b: number): Story.RGB
 	return { r = r, g = g, b = b }
 end
 
+-- A human's Description: `skin` on the head, `top` on the torso and arms,
+-- `bottom` on the legs.
+function layout.dressed(skin: Story.RGB, top: Story.RGB, bottom: Story.RGB): Story.Description
+	return { head = skin, torso = top, arms = top, legs = bottom }
+end
+
 -- A Spot on the ground at (x, z).
 function layout.spot(x: number, z: number, facing: Story.Vec3): Story.Spot
 	return { at = layout.at(x, 0, z), facing = facing }

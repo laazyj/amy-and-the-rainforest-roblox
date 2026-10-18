@@ -80,7 +80,7 @@ Mutate.FAULTS = {
 		name = "break a Beat's command order (beat:sam_catches teleports Amy before Sam reaches the gate)",
 		file = "src/content/chapters/1/hooks.luau",
 		edits = Mutate.swap(
-			'{ kind = "MoveCharacter", character = "Sam", spot = "GateOutside" },',
+			'{ kind = "MoveCharacter", character = "Sam", spot = "GateOutside", run = true },',
 			'{ kind = "TeleportPlayer", spot = "GardenInside" },'
 		),
 	},

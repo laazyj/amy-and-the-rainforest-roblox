@@ -5,14 +5,17 @@
 -- Refuses a model that is not free or that carries scripts. Studio opens the
 -- built place only to have a DataModel to insert into; nothing is saved to it.
 -- lune run tools/studio-playtest/fetch-model --asset 12549617200 --name prop:low_poly_tree --out assets/meshes/low-poly-tree.rbxm
+-- A Character model goes in assets/meshes/characters, named by its Character:
+-- --name character:Sam --out assets/meshes/characters/Sam.rbxm (docs/ASSETS.md).
 local serde = require("@lune/serde")
 
 local Cli = require("../lib/cli")
+local Manifest = require("../lib/manifest")
 local Fetch = require("./fetch")
 local Studio = require("./studio")
 
 local USAGE =
-	"usage: lune run tools/studio-playtest/fetch-model --asset <id> --name <prop:name> --out <assets/meshes/file.rbxm> [--place <file.rbxl>]"
+	"usage: lune run tools/studio-playtest/fetch-model --asset <id> --name <prop:name | character:Id> --out <assets/meshes/file.rbxm | assets/meshes/characters/Id.rbxm> [--place <file.rbxl>]"
 
 Cli.main(function(ctx)
 	local values, dryRun = Cli.options(ctx.args, USAGE, { "asset", "name", "out", "place" })
@@ -22,10 +25,13 @@ Cli.main(function(ctx)
 		error("--asset must be a numeric asset id", 0)
 	end
 	local out = Cli.required(values, "out")
-	if not string.match(out, "^assets/meshes/[%w_-]+%.rbxm$") then
+	local name = Cli.required(values, "name")
+	local characterFile = Manifest.characterModelPath(name)
+	if characterFile and out ~= characterFile then
+		error(`--out must be {characterFile} for {name}`, 0)
+	elseif not characterFile and not string.match(out, "^assets/meshes/[%w_-]+%.rbxm$") then
 		error("--out must be assets/meshes/<name>.rbxm", 0)
 	end
-	local name = Cli.required(values, "name")
 
 	local bridge = Studio.bridge({ ctx = ctx })
 	local ok, err = pcall(function()

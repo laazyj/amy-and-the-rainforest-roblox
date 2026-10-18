@@ -74,7 +74,7 @@ return function(t: any)
 			for _, spot in villagers.spots do
 				expect(story.spots[spot]).never.toBeNil()
 			end
-			expect(#villagers.shirts).toBe(#villagers.spots)
+			expect(#villagers.descriptions).toBe(#villagers.spots)
 		end)
 
 		for _, character in story.characters do

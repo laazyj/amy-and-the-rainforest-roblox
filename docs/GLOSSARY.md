@@ -58,11 +58,13 @@ Scene (look + sound)                     Player
 | **Spot** | A named position and facing inside a Scene. Content never holds raw coordinates; it names Spots. | `spot:GardenGateInside` |
 | **Zone** | A named invisible volume the player can enter. Entering one is the Player event `EnteredZone`. See [enumeration](#zones). | `zone:ForestGap` |
 | **Prop** | A placed object with named states. See [enumeration](#props). | `prop:Machine` |
-| **Character** | A named being in the world with a kind, a display name and a home Spot. See [enumeration](#characters-and-speakers). | `character:Sam` "Sam the Dog" |
+| **Character** | A named being in the world with a kind, a display name and a home Spot. A human is built from its Description; any other Character from its Character model, or as its Placeholder until it has one (`Story.build`). Every Character has a Humanoid and plays its `idle` animation, and its `run` one while it runs. See [enumeration](#characters-and-speakers). | `character:Sam` "Sam the Dog" |
+| **Description** | How a human Character looks: the colour of each part of its R15 body (head, torso, arms, legs), from Clara's palette, in `src/content/characters.luau` (the villagers' in `scene:Field`'s file). `server/CharacterHost` makes it a HumanoidDescription; the Player Character wears hers from the moment she spawns. Catalog items (hair, clothes) are to be added to it once chosen. | Amy: the red jumper, the blue skirt |
+| **Character model** | A free Creator Store model a Character is built from, with its Humanoid and its animations (an Animations folder holding `idle`, `walk` and `run`): an Asset of kind `model`, named for its Character (`character:Sam`), at `assets/meshes/characters/<id>.rbxm`, which the place file holds in `ServerStorage.CharacterModels`. Fetched on the Mac ([`ASSETS.md`](ASSETS.md#character-models)). | `character:Sam` |
 | **Player Character** | The Character the player controls. The player **is Amy**. | `character:Amy` |
 | **Talk affordance** | How the player talks to a Character: a prompt on the Character, offered while a `talk` Quest waits for `TalkedTo` (World commands `OfferTalk`, `WithdrawTalk`). | "Say hello (bravely)" on the Lion |
 | **Talk label** | The words on a talk affordance; a `talk` Quest's `talkLabel`, "Talk" when it has none. | "Explain" |
-| **Companion** | A Character that can follow Amy, help her, and whose Bond with her grows. | Sam; later Squirrel, Fox, Lion |
+| **Companion** | A Character that can follow Amy, help her, and whose Bond with her grows. How it goes about with her is a state machine in core (`src/core/Companion.luau`), in the [Companion states](#companion-states); moving it is the adapter's. | Sam; later Squirrel, Fox, Lion |
 | **Bond** | A Companion's relationship level with Amy. Persisted. | Fox at `friend` |
 | **Pickup** | A Quest-bound thing to touch, spawned at Spots for a `collect` Quest and removed when touched or when the Quest ends. Its id is the Spot it spawned at. | three glowing flowers |
 | **Collectible** | A persistent discoverable with a Journal entry. Found once, remembered forever. | `collectible:maroon_acorn` |
@@ -73,7 +75,7 @@ Scene (look + sound)                     Player
 | **Asset** | An image, sound, model or font the game or its store page uses, listed in the Manifest and uploaded to Roblox by CI when the game shows it (a font, or a track from Roblox's audio library, is on the Creator Store, referenced by its id and never uploaded). Known by its Asset name, an id of the forms in [Ids](#6-ids). See [`ASSETS.md`](ASSETS.md). | `card:chapter2` |
 | **Manifest** | `assets/manifest.json`: every Asset with its file, Roblox asset id, creator, licence, origin and Moderation status. | |
 | **Moderation status** | Where Roblox moderation is with an Asset. See [Lifecycles](#5-lifecycles). | `approved` |
-| **Placeholder** | A plain palette-coloured stand-in with no text for an illustration not drawn yet, until the real piece replaces it. | `card:chapter1` |
+| **Placeholder** | A stand-in until the real piece replaces it: a plain palette-coloured image with no text for an illustration not drawn yet, or a Character built of parts until its Character model is in the place, its colours, size against the dog's and tail (`up`, `fluff`, `brush` or `tuft`) given in `src/content/characters.luau`. | `card:chapter1`; Sam as the white dog of parts |
 | **Shot** | A named camera framing used by a Beat or a Dialogue. Specified in [`design/feel.md`](design/feel.md). See [enumeration](#shots). | `shot:ForestWallReveal` |
 | **Camera rule** | The camera stays within 60° of directly behind Amy: unit(camera − Amy) · (−facing) ≥ 0.5, at every frame. Specified in [`design/feel.md`](design/feel.md#invariants). | |
 | **Follow camera** | The camera in free play: behind Amy, who turns with the view as with shift-lock. Every Shot takes the camera from it and hands it back. | |
@@ -171,7 +173,7 @@ of all three lists below are in `src/core/Events.luau`.
 | `SetObjective` | `text` or none | Shows or clears the Objective |
 | `ShowChapterCard` | `title`, `subtitle`, `ending` | Shows a Chapter card, or the end card when `ending` is true |
 | `Wait` | `seconds` | Pauses `seconds` before the next command |
-| `MoveCharacter` | `character`, `spot` | Puts a Character at a Spot |
+| `MoveCharacter` | `character`, `spot`, `run` or none | Puts a Character at a Spot. With `run`, the Character sets off running there with its run animation (`Humanoid:MoveTo`) and stands at the Spot once it arrives, or after at most 3 seconds; the Beat goes straight on, so it gives the run its time with a `Wait`, which the Pause screen holds |
 | `TeleportPlayer` | `spot` | Puts the Player Character at a Spot |
 | `SetPropState` | `prop`, `state` | Moves a Prop to one of its declared states |
 | `PlayCue` | `cue` | Plays a sound Cue (`cue:`) once on the client; music and ambience follow the Soundscape |
@@ -264,7 +266,7 @@ its `hooks.luau`.
 
 | Beat | Hook | Does |
 |---|---|---|
-| `beat:sam_catches` | `chapter1.sneak_out_1.onComplete`, `chapter1.sneak_out_2.onComplete` | `PlayCue(cue:sam_bark)`; Sam runs to the gate and brings Amy back into the garden |
+| `beat:sam_catches` | `chapter1.sneak_out_1.onComplete`, `chapter1.sneak_out_2.onComplete` | `PlayCue(cue:sam_bark)`; Sam runs after Amy to the gate (`MoveCharacter(Sam, spot:GateOutside, run)`, then `Wait` 1 s) and brings her back into the garden |
 | `beat:sam_goes_to_farm` | `chapter2.walk_to_forest.onStart` | Sam leaves for the farm |
 | `beat:forest_wall_reveal` | `chapter2.walk_to_forest.onComplete` | `FrameShot(shot:ForestWallReveal)`: the wall of trees, the gap centred |
 | `beat:paradise_reveal` | `chapter2.enter_forest.onComplete` | `PlayCue(cue:paradise_shimmer)`, `SetLighting(lighting:paradise)` |
@@ -283,7 +285,7 @@ its `hooks.luau`.
 | `spot:DadHome` | `scene:Garden` | Dad's home Spot |
 | `spot:MumHome` | `scene:Garden` | Mum's home Spot |
 | `spot:SamHome` | `scene:Garden` | Sam's home Spot, by the gate |
-| `spot:GateOutside` | `scene:Garden` | `beat:sam_catches`: Sam bounds to just outside the gate |
+| `spot:GateOutside` | `scene:Garden` | `beat:sam_catches`: Sam runs to Amy, just outside the gate |
 | `spot:GardenInside` | `scene:Garden` | `beat:sam_catches`: Amy lands back in the garden |
 | `spot:SamGuardPost` | `scene:Garden` | `beat:sam_catches`: Sam settles beside her |
 | `spot:Farm` | `scene:Village` | `beat:sam_goes_to_farm` |
@@ -346,6 +348,20 @@ Framing and where each is used are specified in
 | `shot:ForestWallReveal` | none |
 | `shot:MeetCharacter` | the Character being met |
 | `shot:MachineFinale` | none |
+
+### Companion states
+
+How a Companion goes about with Amy (`src/core/Companion.luau`). The
+adapter steps it with how far it is from Amy (and from the Spot it leads
+to), and it answers where it goes: nowhere, to Amy, or to the Spot, walking
+or running.
+
+| State | Does |
+|---|---|
+| `idle` | Stands where it is; while following, sets off once Amy is more than 10 studs away |
+| `follow` | Goes to Amy, walking, running while she is more than 18 studs away; stands again within 5 studs |
+| `react` | Stands and reacts (a bark, a look) for a while, then goes back to what it was doing |
+| `lead` | Goes ahead to a Spot, waiting while Amy is more than 16 studs behind; stands once within 2 studs of it |
 
 ### Onboarding steps
 
@@ -448,7 +464,7 @@ position or raw coordinate.
 | Asset: UI frame, motif or screen | `ui:<snake_case>` | `ui:dialogue_frame`, `ui:title_screen` |
 | Asset: store page art | `store:<snake_case>` | `store:icon`, `store:thumbnail_1` |
 | Asset: reference for building a Character or Prop | `ref:<the Character's or Prop's PascalCase name>` | `ref:Sam`, `ref:Machine` |
-| Asset: a Prop's model or a Cue's sound | the Prop's or Cue's own id | `prop:Machine`, `cue:sam_bark` |
+| Asset: a Character model, a Prop's model or a Cue's sound | the Character's, Prop's or Cue's own id | `character:Sam`, `prop:Machine`, `cue:sam_bark` |
 | Asset: a Creator Store font family | `font:<snake_case>` | `font:dancing_script` |
 | Asset: a Chapter's narration file | `narration:<chapter id>` | `narration:chapter1` |
 | Collectible | `collectible:<snake_case>` | `collectible:maroon_acorn` |
@@ -462,6 +478,7 @@ PRs, use the prefixed form.
 | Say | Not |
 |---|---|
 | Character | NPC, actor, figure |
+| Character model | rig (a Rig is the Camera model's) |
 | Zone | trigger, region, area |
 | Beat | cutscene, sequence, special, scripted moment |
 | Quest | mission |

@@ -74,12 +74,28 @@ export type Scene = {
 	bounds: Box,
 }
 
+-- How a human Character looks: the colour of each part of an R15 body,
+-- from Clara's palette, made into a HumanoidDescription by the adapter.
+export type Description = { head: RGB, torso: RGB, arms: RGB, legs: RGB }
+
+-- How any other Character is drawn, out of parts, until its Character model
+-- is in the place: its colours, its size against the dog's, and its tail.
+export type Placeholder = { body: RGB, belly: RGB, scale: number, tail: "up" | "fluff" | "brush" | "tuft" }
+
+-- How the World builds a Character: one with a Description (a human) from
+-- it; any other from its Character model when the place has one, else as
+-- its Placeholder.
+export type Build = "description" | "model" | "placeholder"
+
 export type Character = {
 	id: string,
 	display: string,
 	kind: string,
 	home: string,
-	shirt: RGB?,
+	-- a human's look
+	description: Description?,
+	-- any other's look until its Character model is in the place
+	placeholder: Placeholder?,
 	-- the Player Character (Amy): a Speaker, never built in the world
 	player: boolean?,
 }
@@ -193,6 +209,15 @@ function Story.character(story: Story, id: string): Character?
 		end
 	end
 	return nil
+end
+
+-- How the World builds `character`, given whether the place has its
+-- Character model.
+function Story.build(character: Character, hasModel: boolean): Build
+	if character.description then
+		return "description"
+	end
+	return if hasModel then "model" else "placeholder"
 end
 
 -- How a Speaker is shown: the Narrator as itself, a Character by its display name.

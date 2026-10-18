@@ -34,7 +34,7 @@ export type WorldCommand =
 	{ kind: "ShowDialogue", lines: { ShownLine } }
 	| { kind: "SetObjective", text: string? }
 	| { kind: "ShowChapterCard", title: string, subtitle: string, ending: boolean }
-	| { kind: "MoveCharacter", character: string, spot: string }
+	| { kind: "MoveCharacter", character: string, spot: string, run: boolean? }
 	| { kind: "TeleportPlayer", spot: string }
 	| { kind: "SetPropState", prop: string, state: string }
 	| { kind: "SetLighting", preset: string }
@@ -49,8 +49,8 @@ export type WorldCommand =
 
 -- A field's type: "string", "number", "boolean", "lines" (a non-empty list
 -- of ShownLines), "settings" (a player's Settings, every value allowed:
--- src/core/Settings) and "string?" for a string that may be absent.
-export type FieldType = "string" | "string?" | "number" | "boolean" | "lines" | "settings"
+-- src/core/Settings), and a type ending "?" for that type or absent.
+export type FieldType = "string" | "string?" | "number" | "boolean" | "boolean?" | "lines" | "settings"
 export type Schemas = { [string]: { [string]: FieldType } }
 
 local Events = {}
@@ -75,7 +75,7 @@ Events.WORLD_COMMANDS = table.freeze({
 	ShowDialogue = { lines = "lines" },
 	SetObjective = { text = "string?" },
 	ShowChapterCard = { title = "string", subtitle = "string", ending = "boolean" },
-	MoveCharacter = { character = "string", spot = "string" },
+	MoveCharacter = { character = "string", spot = "string", run = "boolean?" },
 	TeleportPlayer = { spot = "string" },
 	SetPropState = { prop = "string", state = "string" },
 	SetLighting = { preset = "string" },
@@ -103,8 +103,8 @@ end
 
 -- Whether `value` has the type `fieldType`.
 function Events.matches(fieldType: string, value: any): boolean
-	if fieldType == "string?" then
-		return value == nil or type(value) == "string"
+	if string.sub(fieldType, -1) == "?" then
+		return value == nil or Events.matches(string.sub(fieldType, 1, -2), value)
 	elseif fieldType == "lines" then
 		if type(value) ~= "table" or #value == 0 then
 			return false

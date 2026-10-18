@@ -404,8 +404,10 @@ function StoryHost.start()
 	PromptBridge.connect(CharacterHost.prompts(), zones, StoryHost.handle, playersToPoll)
 
 	Players.PlayerAdded:Connect(initPlayer)
+	Players.PlayerAdded:Connect(CharacterHost.dressPlayer)
 	for _, player in Players:GetPlayers() do
 		initPlayer(player)
+		CharacterHost.dressPlayer(player)
 	end
 	made.ClientReady.OnServerEvent:Connect(fromClient("ClientReady", StoryHost.onClientReady))
 	made.TitleChoice.OnServerEvent:Connect(fromClient("TitleChoice", StoryHost.onTitleChoice))
