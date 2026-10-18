@@ -15,18 +15,42 @@ concurrency:
 jobs:
   ci:
     name: Check, test, build
-    runs-on: ubuntu-latest
+    # Pinned with the playtest's sheets job: the tools/screens specs need
+    # ImageMagick 6 (docs/MAINTENANCE.md).
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     timeout-minutes: 15
+    outputs:
+      visual: ${{ steps.visual.outputs.visual }}
     steps:
+      # On a pull request, its merge commit and the base it merges into.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 2
           persist-credentials: false
 
       - name: Install the pinned toolchain
         id: tools
         uses: $/.github/actions/setup-tools
+
+      # For tools/screens' end-to-end specs, which fail in CI without it
+      # (Ubuntu 24.04's runner image has none).
+      - name: Install ImageMagick
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends imagemagick fonts-dejavu-core
+
+      # First, so the prompt is posted even when a later step fails.
+      - name: Find the changed paths that alter what is on screen
+        id: visual
+        if: github.event_name == 'pull_request'
+        run: |
+          CHANGED_FILES="$(git diff --no-renames --name-only HEAD^1 HEAD)"
+          export CHANGED_FILES
+          paths="$(lune run tools/visual-paths)"
+          if [ -n "$paths" ]; then
+            printf 'Changes what is on screen:\n%s\n' "$paths"
+            echo "visual=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Static checks
         env:
@@ -65,3 +89,39 @@ jobs:
           name: roblox-std
           path: build/roblox-std/roblox.yml
           if-no-files-found: error
+
+  # A pull request that changes a path in tools/lib/visual-paths.luau gets one
+  # comment, found by its marker and updated in place, asking for the owner's
+  # label (brief mac-003, Must A4). The job above, which runs the pull
+  # request's tools, holds no write token; this one runs only the
+  # post-comment action. A fork's token cannot comment, so for a fork this
+  # is skipped, not failed.
+  screen-prompt:
+    name: Ask for screenshots of a change to what is on screen
+    needs: ci
+    if: ${{ !cancelled() && needs.ci.outputs.visual == 'true' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # check out the post-comment action
+      pull-requests: write # the one prompt comment
+    timeout-minutes: 5
+    steps:
+      # The action is the workflow's own, from the pull request's merge
+      # commit; the checkout holds no credentials.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: .github/actions
+          persist-credentials: false
+
+      - name: Write the prompt
+        run: |
+          printf '%s\n' '<!-- screen-prompt -->' \
+            "This pull request changes what is on screen. The owner's \`needs-playtest\` label brings screenshots here." \
+            > "$RUNNER_TEMP/prompt.md"
+
+      - name: Post or update the prompt
+        uses: $/.github/actions/post-comment
+        with:
+          pr: ${{ github.event.pull_request.number }}
+          body-file: ${{ runner.temp }}/prompt.md
+          token: ${{ github.token }}

@@ -44,6 +44,13 @@ export type Bridge = {
 	press: (key: string) -> (),
 	-- During Play: walks the Player Character to `position`.
 	walkTo: (position: Vector) -> (),
+	-- During Play: a chat message, typed into Roblox's chat input bar as a
+	-- player types it ("/" to focus the bar, the text, Return).
+	chat: (text: string) -> (),
+	-- During Play: a left click on the GuiObject at `instancePath`
+	-- ("LocalPlayer.PlayerGui.StoryUI..."), as the player's mouse makes it.
+	-- Studio's device simulator passes no mouse input to the game's buttons.
+	click: (instancePath: string) -> (),
 	-- In Edit: inserts a Creator Store asset under `parentPath`, as Studio's
 	-- Toolbox does. Where it lands is found from the parent, never from the
 	-- name its creator gave it.

@@ -86,6 +86,25 @@ keeps read-only permissions and no secrets.
    "contact sheet" and "baselines change deliberately" lines point here;
    `docs/tasks/README.md` rows.
 
+6. **Commit status** (the owner's decision, 2026-10-16, added while A
+   was in review): the playtest runs on `main` from a dispatch, so GitHub
+   never ties it to the pull request's commit; a commit status under the
+   context "Studio playtest" does. `playtest-label.yml` sets it `pending`
+   on the pull request's head commit right after the dispatch
+   ("Asked the Mac to play this pull request", linking the workflow's
+   runs, since the run's id is not known yet), with `statuses: write` on
+   that job only. The `publish` job sets it `success` or `failure` when the
+   run ends, on the commit the place was built from (the one
+   `download-place` resolved, not the pull request's head now, so a push
+   during the run never gets a status for a place it was not built from),
+   with the outcome in a few words and a link to the run, with
+   `statuses: write` on that job only. A run of `main`'s place sets none.
+   The Mac job gains no permission and no secret. **The status is never a
+   required check in the ruleset** (it exists only on labelled pull
+   requests, so requiring it would block every other pull request); the
+   owner reads it in the merge box. A status is per commit: after a new
+   push the pull request shows no result until the owner labels it again.
+
 ### B. Mac session (after A is on `main`)
 
 6. **The title capture** in `tools/studio-playtest/playthrough.luau`: on

@@ -20,11 +20,15 @@ screen saver and lock settings are never touched, by script or by hand.
 | `tools/mac/vm.sh` | on the host, as the owner | Creates the VM from the pinned image; `start`, `stop`, `status`, `exec`, `push`, `seal`, `reset`. Never mounts a host directory into the guest. |
 | `tools/mac/setup.sh` | in the guest | `studio` installs Roblox Studio; `runner` installs the pinned runner (SHA-256 checked), registers it and installs its launchd agent. Refuses to run as root, and refuses to run outside a virtual machine. |
 | `tools/mac/check-repo.sh` | on the host, as the owner | Fails unless fork pull requests need approval for all external contributors, the `studio` environment allows `main` only, and no workflow with a job on a self-hosted runner starts from a pull request. |
-| `tools/lib/mac-workflows.luau` | in tier 0 (`tools/check.sh`), on every PR | The workflow half of that check: a job on anything but a GitHub-hosted runner must use `environment: studio`, and its workflow may start only from `workflow_dispatch`, `schedule` or a `push` to `main`. |
+| `tools/lib/mac-workflows.luau` | in tier 0 (`tools/check.sh`), on every PR | The workflow half of that check: a job on anything but a GitHub-hosted runner must use `environment: studio`, declare its own permissions with none beyond `read`, and name no secret, and its workflow may start only from `workflow_dispatch`, `schedule` or a `push` to `main`. A GitHub-hosted job in the same workflow may write (the playtest's `publish`). |
 | `tools/studio-playtest/` | in the guest, by the job | The bridge to Studio and what runs on it: `run.luau`, the smoke run (open a place, Play, run a script, capture, quit); `play.luau`, the playthrough (the Story from a fresh Save to the end card per device, a screenshot at every Shot, Chapter card and Scene entry); `fetch-model.luau`, a free Creator Store model saved as `.rbxm`. |
 | `.github/workflows/studio-smoke.yml` | started by hand | The proof that the runner and the bridge work, from the cloud. |
-| `.github/workflows/studio-playtest.yml` | started by hand, or by the `needs-playtest` label | The tier 3 playthrough of `main`'s place, or of a pull request's CI-built place. |
-| `.github/workflows/playtest-label.yml` | on GitHub's runners, when a pull request gets `needs-playtest` | Dispatches `studio-playtest.yml` on `main` with the pull request's number. Never runs on the Mac. |
+| `.github/workflows/studio-playtest.yml` | started by hand, or by the `needs-playtest` label | The tier 3 playthrough of `main`'s place, or of a pull request's CI-built place, on the Mac; then, on GitHub's runners, its contact sheets and baseline comparison (`sheets`) and the pull request's comment (`publish`). See "Screenshots on a pull request". |
+| `tools/screens.luau` | on GitHub's runners, by the `sheets` job and `baselines.yml` | The contact sheets and the comparison with `docs/screens/` through ImageMagick; the logic, and the comment, in `tools/lib/screens.luau`. |
+| `.github/workflows/playtest-cleanup.yml` | on GitHub's runners, when a pull request closes | Deletes its `playtest/pr-<N>` branch. |
+| `.github/workflows/baselines.yml` | started by hand, on GitHub's runners | Opens the "Baselines" pull request from a passing playtest of `main` ([`screens/README.md`](screens/README.md)). |
+| `.github/workflows/playtest-label.yml` | on GitHub's runners, when a pull request gets `needs-playtest` | Dispatches `studio-playtest.yml` on `main` with the pull request's number, and sets the commit status "Studio playtest" to `pending` on the pull request's head commit. Never runs on the Mac. |
+| The commit status "Studio playtest" | set by `playtest-label.yml` and the playtest's `publish` job | Ties a playtest, which runs on `main`, to the pull request's commit: `pending` when asked, then `success` or `failure` with the outcome in a few words and a link to the run. Never a required check (see "Screenshots on a pull request"). |
 
 ## The rules for every job on the Mac
 
@@ -79,6 +83,10 @@ The repository is public, so these hold for every workflow that targets
   `place` artifact. It never checks out or runs a pull request's source.
 - `permissions: contents: read, actions: read`, no secrets, a
   `timeout-minutes`, and `concurrency: studio` (one Studio, one screen).
+  Tier 0 fails a Mac job without its own permissions, with any permission
+  beyond `read`, or naming a secret. A write token may live only in a job
+  on GitHub's runners that runs nothing from the artifact (the playtest's
+  `publish`; see "Screenshots on a pull request").
 - Fork pull requests need the owner's approval before any workflow runs
   (Settings → Actions → General → "Require approval for all external
   contributors"). Keep it; `check-repo.sh` checks it.
@@ -147,7 +155,8 @@ Done once, on 2026-10-13. The host is an Apple silicon MacBook on macOS
 3. **The VM:** `tools/mac/vm.sh create` clones Tart's published macOS
    image, pinned by digest in the script
    (`ghcr.io/cirruslabs/macos-tahoe-base@sha256:87f3aa5c…`, macOS 26.6.2,
-   build 25G83), and gives it 4 cores, 8 GB of memory and a 60 GB disk.
+   build 25G83), and gives it 4 cores, 8 GB of memory, a 60 GB disk and a
+   1920 x 1200 pixel display (see "The frame" below).
    The first pull downloads about 25 GB. The image logs its user in
    automatically, never sleeps, and carries the Tart guest agent that
    `vm.sh exec` talks to, Homebrew, and the GitHub CLI (`gh`) the smoke
@@ -159,7 +168,8 @@ Done once, on 2026-10-13. The host is an Apple silicon MacBook on macOS
 5. **Studio:** `tools/mac/vm.sh exec /bin/sh -c 'cd ~/incoming && tools/mac/setup.sh studio'`.
    Roblox publishes only its current build and no checksum, so Studio
    cannot be pinned; the script checks that the download is signed and
-   notarised by Roblox Corporation.
+   notarised by Roblox Corporation. It also hides the guest's Dock, so
+   Studio's maximized window has the screen's full height.
 6. **By a person, in the VM's window** (`tools/mac/vm.sh stop`, then
    `tools/mac/vm.sh start window`): open Roblox Studio, sign in to the
    runner's Roblox account, and open any place once.
@@ -302,11 +312,62 @@ Two things about Studio that the wrapper works around:
 It only ever ends the Studio it launched, so it is safe on a Mac where
 another Studio is open.
 
+### The frame
+
+Every screenshot is Studio's whole window, so the window and Studio's
+panels decide how much of it is the game. Three settings make the game's
+viewport most of each capture (brief mac-003, Must 7):
+
+- **The guest's display is 1920 x 1200 pixels, at 1x** (`DISPLAY_SIZE` in
+  `vm.sh`). With the display in points, Tart's default, the guest ran a
+  1024 x 768 Retina mode it had saved, whatever size was set, and Studio's
+  window was 1024 x 680 points. In pixels the guest has one mode to
+  choose. At 2x the same screen would have four times the pixels in each
+  screenshot (about 2 MB each already, 22 a device) for no more of the
+  game. For an existing VM: `vm.sh stop`, `tart set amy-studio
+  --display 1920x1200px`, `vm.sh start`, then `stop` and `seal`.
+- **Studio's window is maximized and its panels share one column**, set
+  by the bridge before each launch (`frameTheViewport` in `studio.luau`),
+  only in a virtual machine (`kern.hv_vmm_present`, as `setup.sh` checks):
+  on a person's own Mac the layout is theirs and is left alone.
+  Studio keeps both in its preferences (`com.roblox.RobloxStudio`): the
+  window as Qt's saved geometry, the panels as a Qtitan dock layout in
+  XML. The bridge writes the geometry maximized for the guest's screen,
+  and moves every docked panel (Explorer, Properties, the Toolbox, the
+  Terrain Editor, the Assistant) into the first one's tab group, so they
+  take one column of about 280 pixels, their minimum, on the right.
+  Studio reads both at launch and never writes them back, since the
+  bridge ends it with `kill -9`. Two things that do not hold: a panel
+  marked closed in the layout is docked again by Studio at launch if it
+  is one of its default panels (only the Assistant stayed closed), and a
+  panel moved beside the place's own tab sends Play's game view into a
+  pane of its own, half the window's height. Nothing in Luau reaches
+  Studio's panels: the MCP server's `execute_luau` sees no plugin widgets.
+  If the layout is not what the bridge expects (a Studio update), it
+  warns and opens the place as it is.
+- **Roblox's player list is hidden in Play**, by the playthrough's
+  recorder (`INSTALL_SCRIPT`, on the client, so only in Play), so the
+  runner's account name is not in every frame. This is the one way the
+  screenshots differ from the game as players see it: the game itself
+  still shows the list. The recorder also hides Roblox's chat window and
+  input bar, which only Dev shows (`Config.chat`), so the screenshots are
+  as a Release player sees them; the bar shows only while the playthrough
+  types `/title` (see "The title").
+
 ## The playthrough
 
 ```sh
 lune run tools/studio-playtest/play --file build/AmyAndTheRainforest.rbxl --out build/studio-playtest [--devices pc,phone-landscape]
 ```
+
+**Before any manual run in the VM** (`vm.sh exec`), check that no Studio
+job is running or queued: `gh run list --workflow studio-playtest.yml`
+and `--workflow studio-smoke.yml` show none in progress, queued or
+waiting, and `pgrep -lf RobloxStudio` in the guest shows no Studio from
+`actions-runner-studio/_work`. The runner and a manual run share one
+guest, one screen and one MCP server, and `concurrency: studio` knows
+nothing of a manual run: on 2026-10-16 one cost an approved playtest
+(run 38925724410) its `pc` result.
 
 It plays the Story on a real client in Studio, from a fresh Save (Studio
 has no DataStores, so every Play is a new player) to the end card, as a
@@ -329,12 +390,14 @@ against a scripted fake client:
 - **Capturing,** before anything moves on: each Shot once it has eased
   in (0.8 s after it was framed), each Chapter card and the end card once
   faded in, and each Scene the first time Amy stands in one of its Zones
-  with nothing over the view. Screenshots are
-  `<out>/<device>/<nn>-<shot|card|scene>-<name>.png`.
+  with nothing over the view, and the Title screen once per device (see
+  "The title"). Screenshots are
+  `<out>/<device>/<nn>-<shot|card|scene|title>-<name>.png`.
 - **Failing** when the Story stops changing for 60 seconds (Amy moving or
   a Line still being written counts as change), takes over 10 minutes,
-  reaches a Quest kind it cannot play (only reach and talk today), or a
-  capture is black or nearly white, with what was on screen. A failed
+  reaches a Quest kind it cannot play (only reach and talk today), a
+  capture is black or nearly white, or the Title screen does not open on
+  `/title` or close on Continue within 15 seconds, with what was on screen. A failed
   device is reported and the next one still plays, with two exceptions:
   when the Story does not end on `pc` the rest are skipped (it will not
   end on a phone either), and when Stop Play fails the rest are skipped
@@ -355,6 +418,48 @@ against a scripted fake client:
   run still stops Play and quits Studio. `report.json` is written
   after every device with `"finished": false`, so a job cut short still
   uploads what it played, and the summary says it stopped before the end.
+
+### The title
+
+Brief mac-003, Must B6. Once per device, after the first Chapter card,
+when the Objective shows and nothing is over it (in the Garden, at the
+first Quest), the playthrough:
+
+1. **Types the Dev shortcut `/title` into Roblox's chat, as a person
+   testing Dev types it:** the chat input bar is shown for it
+   (`Playthrough.chatBarScript`), then the bridge's `chat` sends `/`
+   (the key that focuses the bar), the text and Return through Studio's
+   MCP `user_keyboard_input`, and the bar is hidden again. The server's
+   `TextChatCommand` runs `DevShortcuts.onCommand`, which offers the Title
+   screen at the current Progress (`StoryHost.offerTitle`).
+2. **Waits for the Title screen as the observe script reports it,** with
+   its buttons built (the client reports Continue's instance path), then 1
+   s for its picture, and **captures it** as `<nn>-title-title.png` (kind
+   `title`, which the `sheets` job puts in the title index).
+3. **Presses Continue.** On `pc` the bridge's `click` clicks it as a
+   player's mouse does (MCP `user_mouse_input`, moved to the button by its
+   instance path), then moves the pointer to the viewport's corner, out of
+   the following screenshots. In the device simulator no mouse input
+   reaches the game's buttons (a click by instance path, at the button's
+   centre, or at its centre plus the top bar's inset, all left the Title
+   screen open), so there the button is selected
+   (`GuiService.SelectedObject`, `Playthrough.selectScript`) and Return
+   pressed, as a keyboard player activates a selected button: the button's
+   own `Activated` handler makes the Title choice. Touch is not exercised.
+4. **Waits for the Title screen to close** and plays on from where the
+   Story was: Continue is a Resume at the same Quest.
+
+Typing into chat needed one fix to the place. `default.project.json` did
+not set `TextChatService.ChatVersion`, so a Rojo build had the legacy
+chat, in which no `TextChatCommand` fires: `/chapter`, `/quest` and
+`/title` typed in Studio did nothing, and `Config.chat`'s switch
+(`ChatWindowConfiguration`, `ChatInputBarConfiguration`) hid nothing. The
+place now sets `ChatVersion` to `TextChatService`, which
+`tests/lune/place/chat.spec.luau` checks in the built file. The other way
+the brief allowed, `DevShortcuts`' entry point called in the server
+DataModel, does not work: a `require` from the MCP server's
+`execute_luau` gets its own copy of the module, with no sessions (on
+2026-10-16 `StoryHost.activeQuest` from there returned nil mid-Story).
 
 The devices, one Play each, in order: `pc` (no simulation),
 `phone-landscape` (Studio's `iphone_16` preset, 852 x 393 units, the
@@ -388,16 +493,36 @@ once with "Studio exited while starting", the installer took about 15
 minutes in the guest, and the bridge then passed unchanged, so
 `studio-version.txt` moved to 0.743.0.7431133 and the VM was sealed again.
 
+Run in the VM on 2026-10-16 with the frame above (Studio 0.743.0.7431133,
+the place built from `main` at 226cf78): `pc` and `phone-landscape`
+passed, 13 Quests and 22 screenshots each, 385.3 s in all. Every
+screenshot is 1920 x 1170 pixels (2048 x 1362 before, at 2x), and the
+game has most of it:
+
+| Device | Seconds | The client played at | The game in each screenshot | Before |
+|---|---|---|---|---|
+| `pc` | 207 | 1630 x 900 | 1630 x 900 pixels | 541 x 414 points, 1082 x 828 pixels |
+| `phone-landscape` | 169 | 733 x 392, landscape | the phone drawn about 1590 pixels wide | the phone about 1020 pixels wide |
+
+The simulated devices' sizes in `report.json` are unchanged; only how
+large Studio draws them grows. A PC player's viewport at 1630 x 900 is
+also nearer a real desktop's than 541 x 414 was.
+
+Run in the VM on 2026-10-17 with the title (Studio 0.743.0.7431133, the
+place built from `main` at 496fd97 plus this branch, `ChatVersion`
+included): `pc` and `phone-landscape` passed, 13 Quests and 23 screenshots
+each, the third being the title, 352.9 s in all (173 s and 172 s). The
+first Chapter card on `pc` no longer has the chat window over it. With the
+pointer then parked after the click, `pc` passed again in 182 s.
+
 Limits today:
 
-- Studio's window in the guest is about 1024 x 680 points with its panels
-  open, so the game's viewport is about half of each screenshot (on a
-  simulated device, smaller again). A larger guest display, or the panels
-  closed, is the next improvement.
-- Roblox's own player name panel (`roblox_ci1234`) sits in the top right of
-  the viewport in every frame.
+- Studio's ribbon, its tab bar, the command bar and the column of panels
+  stay in each screenshot: the game is about two thirds of it. Cropping to
+  the viewport would need its position on screen, which nothing reports.
 - Level 1 assertions (plan section 4: text fits, safe areas, the camera
-  rule) and the baseline diffs are not part of it yet;
+  rule) are not part of it yet (the baseline diffs are: "Screenshots on a
+  pull request");
   `tests/studio/CameraRule.client.luau` and `DeviceLayout.client.luau` are
   the assertions to run inside it next.
 - A Shot is captured 0.8 s after it was framed, not when the camera has
@@ -409,7 +534,104 @@ Limits today:
   standing in one of the Scene's Zones, so a Scene without Zones (Village,
   Paradise) is never captured. A count against the Story's Chapters and a
   signal from the Scene change itself would close both.
-- Phone runs press E like a PC, so touch input is not exercised yet.
+- Phone runs press E like a PC, and select Continue and press Return, so
+  touch input is not exercised yet: Studio's MCP has keyboard and mouse
+  input, and the simulator takes no mouse input on the game's buttons.
+
+## Screenshots on a pull request
+
+Brief mac-003. A playtest's Captures go where they are reviewed: one
+comment on the pull request, with a **Contact sheet** per device and, for
+every Capture that differs from its **Baseline** in `docs/screens/`, the
+before, the after and the difference. The Mac keeps its read-only token.
+
+**When.** On the owner's `needs-playtest` label (`playtest-label.yml`
+dispatches `studio-playtest.yml` on `main` with the pull request's
+number), or by hand. CI prompts for it: a pull request that changes a path
+in `tools/lib/visual-paths.luau` (`src/client/`, `ScreenLayout.luau`,
+`palette.luau`, `title.luau`, `hints.luau`, `feel.md`, `assets/images/`)
+gets one comment from CI's `screen-prompt` job, updated in place: "This
+pull request changes what is on screen. The owner's `needs-playtest` label
+brings screenshots here." CI's own job finds the paths and holds no write
+token; `screen-prompt` runs only `.github/actions/post-comment`, which
+posts the comment or updates the one found by its first line, as
+`publish` does. A fork's pull
+request is skipped: its token cannot comment, and it is never played.
+
+**The three jobs of `studio-playtest.yml`.**
+
+| Job | Runs on | Token | Does |
+|---|---|---|---|
+| `playtest` | the Mac | `contents: read`, `actions: read` | Plays the place, uploads the `studio-playtest` artifact (`report.json` and the Captures) and gives its id and link as outputs. Its permissions are as before mac-003. |
+| `sheets` | GitHub's runners (`ubuntu-24.04`, ImageMagick installed by the job) | `contents: read` | Whenever the artifact was uploaded, whatever the playtest's result: `lune run tools/screens sheets` on the artifact and `main`'s `docs/screens/`. Makes `sheets/<device>.png` (ImageMagick `montage`, each Capture labelled with its name), `sheets/title.png` (the Title screen's Capture across devices), and, for each Capture that differs from its Baseline, `before/` and `diff/` (ImageMagick `compare`), and writes the comment. Uploads them as `studio-playtest-screens`. |
+| `publish` | GitHub's runners | `contents: write`, `pull-requests: write`, `statuses: write` | Runs nothing from the artifact, and of this repository only `main`'s `.github/actions/post-comment`: commits the images as one commit with no parent, force-pushes it to the branch `sheets` named, `playtest/pr-<N>` (`playtest/main` for a run of `main`), and posts the comment on pull request N, or updates the one already there (found by the marker `<!-- studio-playtest-screens -->`). A run of `main` writes the comment to its job summary instead. |
+
+The artifact holds what a pull request's place did in Studio, so it is
+read only where there is no write token, and nothing in it is trusted: a
+Capture whose file name is not `<device>/<nn>-<kind>-<name>.png` in lower
+case is left out and listed, and every text from `report.json` (warnings,
+failures, the Studio version) is shown in a code span, where Markdown,
+HTML and mentions do nothing.
+
+**The comment** has the playtest's result and time, the Studio version
+against the pin, a table of each device's Captures, changed, new and
+Baselines no Capture matched, the device warnings and failures, the title
+index, each device's Contact sheet, a row of before, after and difference
+for each changed Capture (at most 30; the rest are in the artifact), and
+links to the run and the artifact. Its images are raw file links into the
+`playtest/pr-<N>` branch, under a folder per run (`run-<id>/`), so a new
+run's images are never an old one's from a cache. The branch is
+force-pushed as one commit, so it never grows, and
+`playtest-cleanup.yml` deletes it when the pull request closes; the
+comment's images go with it. A run that finishes after the pull request
+closed pushes `playtest/pr-<N>` again after the cleanup; delete it by hand
+or leave it for the next close.
+
+**Changed** means more than 1% of the Capture's pixels moved by more than
+10% (ImageMagick's `-fuzz`), or its size changed. Plan section 4 asks for
+a structural-similarity measure; ImageMagick 6 on `ubuntu-latest` has
+none, so this stands in until the tolerance is tuned per Capture. A
+Capture is paired with the Baseline of the same device, kind and name, the
+number ignored, so a Capture added early does not unpair the rest.
+
+**Baselines** change only through a "Baselines" pull request, which
+`baselines.yml` opens from a passing playtest of `main` that played every
+device; the owner accepts them by merging it
+([`screens/README.md`](screens/README.md)). Until the first one merges,
+every Capture shows as new.
+
+**The commit status "Studio playtest"** (brief mac-003, A6). The
+playtest runs on `main` from a dispatch, so GitHub never ties it to the
+pull request's commit; this status does. `playtest-label.yml` sets it to
+`pending` on the pull request's head commit as soon as it dispatches
+("Asked the Mac to play this pull request", linking the workflow's runs,
+since the run's id is not known then). `publish` sets it to `success` or
+`failure` when the run ends ("5 devices, 111 screenshots, 2 changed", or
+"playthrough failed on phone-portrait"), linking the run, on the commit
+the place was built from, the one `download-place` resolved, not the
+pull request's head at that moment: a push during the run never gets a
+status for a place it was not built from. A run of `main`'s place sets
+none. `publish` runs whenever `sheets` succeeded, the playtest's result
+aside, and sets the status even when its push or comment failed. Nothing
+clears a `pending` status when: a queued run is cancelled by the
+`studio` concurrency group (three labels in a row: the middle one is
+replaced); the label is given before CI is green on the pull request's
+new head (the playtest plays the older CI build, and its result lands on
+that older commit, by design); or the Mac job uploaded no artifact, or
+`sheets` failed. Label again to play. Each job that sets it has
+`statuses: write` and no other job does; the Mac job gains nothing.
+**The status is never a required check in the ruleset**: it exists only
+on labelled pull requests, so requiring it would block every other pull
+request; the owner reads it in the merge box. A status belongs to one
+commit: after a new push the pull request shows no playtest result until
+the owner labels it again (the label event fires only on labelling, so
+remove and re-add `needs-playtest` to play the new commit).
+
+What only a real run proves (brief mac-003, Must B8): that
+`raw.githubusercontent.com` serves the branch's images inline in the
+comment, that the job token may push `playtest/*` (a branch ruleset that
+covers `playtest/*` would refuse it), and the comparison's noise on real
+Captures.
 
 ## Device emulation: scripted (spike, mac-002)
 
@@ -562,6 +784,8 @@ and the snapshot had to be discarded and the VM booted cold.
 | Studio cannot capture | "could not create image from window" | Step 9: Screen Recording for `node`. A runner update that replaces its Node.js may ask again. |
 | A future macOS drops `/usr/bin/perl` (Apple has called it deprecated since 10.15) | Every bridge command fails at once with "/usr/bin/perl" in the error | The wrapper's 30-second command timeout is a few lines of Perl (`TIMEOUT_SCRIPT` in `studio.luau`); install Perl in the guest or rewrite that wrapper. |
 | A job is refused at "Set up job" | "this runner runs only workflow files from main" or "does not run jobs started by …" | Intended: the workflow ran from a branch or an event the Mac does not take. Run it from `main`. |
+| `/title` does not open the Title screen, or Continue does not close it | The device fails: "/title did not show the Title screen with Continue within 15 seconds", or "Continue did not close the Title screen …" | Look at the device's last capture. Chat must be TextChatService (`chat.spec`); a Studio update may have moved the chat key or changed the MCP's input tools. |
+| A Studio update changes how it saves its layout | "Studio's panels and window were left as they are: …" as a warning; the screenshots show the panels again | Read the new layout (`defaults export com.roblox.RobloxStudio -`, the `LayoutSettings.Docking.*` keys) and fix `Studio.dockLayout`. |
 | A job left the guest in a bad state | Anything | `tools/mac/vm.sh reset`. |
 | Tart is updated by Homebrew | `vm.sh` warns that the version differs | If the VM still starts and the smoke job passes, bump `TART_VERSION` in `vm.sh`. |
 | Softnet is updated by Homebrew | `vm.sh start` fails with "root privileges are required" | Step 2 above, with the new path. |

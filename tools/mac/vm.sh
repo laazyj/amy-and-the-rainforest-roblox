@@ -37,8 +37,10 @@ CPUS=4
 MEMORY_MB=8192
 # The image's disk is 50 GB; the guest grows its volume to this at its next boot.
 DISK_GB=60
-# Studio's window, and so the screenshot, is at most this large.
-DISPLAY_SIZE="1440x900"
+# Studio's window, and so the screenshot, is at most this large. In pixels,
+# at 1x: in points (Tart's default) the guest chose a 1024 x 768 Retina mode,
+# and Studio's viewport was about half of each capture (docs/MAC_RUNNER.md).
+DISPLAY_SIZE="1920x1200px"
 
 LOG="$HOME/Library/Logs/$VM.log"
 

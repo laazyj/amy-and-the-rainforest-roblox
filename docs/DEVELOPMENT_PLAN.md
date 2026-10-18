@@ -198,7 +198,7 @@ actually needs reactive state; the Phase 1 screens do not.
 | Input | `ContextActionService` with touch buttons on phone and tablet; proximity prompts stay the universal "talk" affordance. UI scales via `UIScale` + safe-area insets with separate layouts for the three **device classes** below; a minimum dialogue text size on a 6-inch phone and a maximum line length on a 13-inch tablet are specified in `docs/design/feel.md`. |
 | Device classes | Three first-class targets, each with its own UI layout, touch-target rules and test coverage: **PC** (keyboard and mouse, gamepad later), **Phone** (small touch screen, landscape only), **Tablet** (large touch screen, landscape only; iPad and Android tablets). Tablet is not "a big phone": thumbs reach from the edges, so controls sit at the corners, dialogue is centred and wider than on a phone, up to the line-length cap in feel.md, and text is scaled to viewing distance rather than screen size. The client binder picks the class from screen size and input type, and every screen is laid out for all three. |
 | UI | Plain Roblox UI driven by the core view-model. Dialogue, objectives, chapter cards, journal, settings, pause. |
-| Audio | `AudioManager` with named cues from the manifest; music per scene with crossfades; SFX for prompts, pickups, footsteps. Narration (see section 7) as the largest quality lever for non-fluent readers. |
+| Audio | `client/Audio` plays named Cues from the manifest: `PlayCue` World commands from Beats and the collect Kind, and the Soundscape view-model (`core/Soundscape`): music and ambience per Scene with crossfades, the theme under the cards, footsteps; SFX for prompts, pickups, chapter cards. Narration (see section 7) as the largest quality lever for non-fluent readers, from the Narration table (`core/Narration`). |
 | World | Scenes as data (terrain instructions, placed models, zones, spawn points) built by `SceneBuilder`. Meshes and models checked in as `.rbxm` under `assets/meshes` and referenced by id in the manifest. |
 | Characters | Phase 1: R15 avatars from `HumanoidDescription` with Roblox's built-in animation set; Sam's catch is a `Humanoid:MoveTo` chase with the built-in run animation; animals from free Creator Store rigs that ship with animations. Custom rigs and keyframed animations are Phase 2 and are explicitly a human-in-Studio task. |
 | Companions | Animals as followers with simple state machines (idle, follow, react, lead to point of interest); logic in core, movement in adapter. |
@@ -329,7 +329,7 @@ end)
 | Scene, Spot, Zone, Prop | `content/scenes/<scene>.luau` | `core/SceneSchema` | `server/SceneBuilder` | tier 0 schema, tier 2 build + reachability |
 | Character, Companion, Bond | `content/characters.luau` | `core/Companion` | `server/CharacterHost` | tier 1 bond logic, tier 2 follow |
 | Pickup, Collectible, Journal | `content/collectibles.luau` | `core/Journal` | `server/PickupHost`, `client/JournalView` | tier 1 |
-| Cue, Shot, Lighting preset | `assets/manifest.json`, `content/presets.luau` | names only | `client/Audio`, `client/Camera`, `server/Lighting` | tier 0 manifest, tier 3 screenshots |
+| Cue, Shot, Lighting preset | `assets/manifest.json`, `content/presets.luau`, the Scenes' music and ambience | names only (`core/Cues`), `core/Soundscape` | `client/Audio`, `client/Camera`, `server/Lighting` | tier 0 manifest, tier 1 every Cue resolves, tier 3 screenshots |
 | Progress, Checkpoint | | `core/Save` (schema, migrations) | `server/Persist` (ProfileStore) | tier 1 migrations, tier 2 lock release |
 | Player events, Story events, World commands | | `core/Events` (types + payload schemas) | `shared/Net` | tier 2 remote contract |
 
@@ -493,7 +493,8 @@ Design notes:
   waits in GitHub's queue (up to 24 hours) rather than skipping. The
   release workflow refuses to promote a build that has no tier 3 result.
 - **Screenshots are review material and agent feedback.** Tier 3 uploads a
-  contact sheet to the PR. For perceptual tasks the agent reads it and
+  contact sheet to the PR (how: `docs/MAC_RUNNER.md`, "Screenshots on a
+  pull request"). For perceptual tasks the agent reads it and
   iterates against the per-scene checklist in `docs/design/feel.md`.
 - **Budgets are tests, measured where they can be.** Tier 2 checks instance
   and part counts, triangle counts from the mesh manifest and server
@@ -626,7 +627,10 @@ repeats, and you see the result once.
 - A full visual pass takes 5 to 10 minutes, so the agent batches scene
   changes and runs it per batch, not per edit.
 - Baselines change deliberately: a PR that changes a baseline shows the
-  before and after in its description and lists the rubric scores.
+  before and after in its description and lists the rubric scores. They
+  change only through a Baselines PR (`docs/screens/README.md`), and every
+  playtest's comment shows each changed Capture's before, after and
+  difference (`docs/MAC_RUNNER.md`, "Screenshots on a pull request").
 - All of it depends on the Mac being awake and on Studio not having
   auto-updated into a breaking change that week. A perceptual brief
   states up front that it needs the Mac on for its duration.

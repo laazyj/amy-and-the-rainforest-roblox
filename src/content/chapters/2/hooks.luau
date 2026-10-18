@@ -14,6 +14,7 @@ local beats: { [string]: Story.Beat } = {
 	},
 	-- Stepping through the gap: the parallel world turns the colour up.
 	paradise_reveal = {
+		{ kind = "PlayCue", cue = "cue:paradise_shimmer" },
 		{ kind = "SetLighting", preset = "paradise" },
 	},
 }

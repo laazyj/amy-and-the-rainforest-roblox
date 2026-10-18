@@ -4,8 +4,11 @@
 	Must 3 and 7; docs/MAC_RUNNER.md): a workflow with a job on a self-hosted
 	runner starts only from the triggers in ALLOWED, and every such job uses
 	the `studio` environment, which only `main` may deploy to, so a branch
-	cannot run its own copy of a Mac workflow. The repository is
-	public, so this fails closed: a `runs-on` this file cannot prove is a
+	cannot run its own copy of a Mac workflow. Every such job also
+	declares its own permissions, none beyond `read`, and names no
+	secret: a GitHub-hosted job in the same workflow may hold a write token
+	(the publishing job of studio-playtest.yml), the Mac job never. The
+	repository is public, so this fails closed: a `runs-on` this file cannot prove is a
 	GitHub-hosted runner counts as the Mac, and a trigger that is not listed
 	is refused, `pull_request`, `pull_request_target` and `workflow_call`
 	(which inherits its caller's trigger) among them.
@@ -87,6 +90,39 @@ function MacWorkflows.explicit(yaml: string): string
 	return table.concat(lines, "\n")
 end
 
+-- Whether `value`, or any string inside it, names a secret.
+local function namesSecret(value: any): boolean
+	if type(value) == "string" then
+		-- `secrets.KEY`, `secrets['KEY']`, `toJSON(secrets)`
+		return string.find(value, "%f[%w_]secrets%f[^%w_]") ~= nil
+	elseif type(value) == "table" then
+		for key, each in value do
+			if namesSecret(key) or namesSecret(each) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+-- What is wrong with a Mac job's own permissions: it must declare them,
+-- each `read` or `none`.
+local function permissionProblems(path: string, name: string, permissions: any): { string }
+	if type(permissions) ~= "table" then
+		return { `{path}: job '{name}' runs on the Mac without its own read-only 'permissions'` }
+	end
+	local problems = {}
+	for scope, level in permissions do
+		if level ~= "read" and level ~= "none" then
+			table.insert(
+				problems,
+				`{path}: job '{name}' runs on the Mac with '{scope}: {level}'; a Mac job may only read`
+			)
+		end
+	end
+	return problems
+end
+
 -- What is wrong with a parsed workflow file, as sentences starting with
 -- `path`. Empty when it has no job on the Mac or follows the rule.
 function MacWorkflows.check(path: string, workflow: any): { string }
@@ -109,6 +145,11 @@ function MacWorkflows.check(path: string, workflow: any): { string }
 					problems,
 					`{path}: job '{name}' runs on the Mac without 'environment: {MacWorkflows.ENVIRONMENT}'`
 				)
+			end
+			local found = permissionProblems(path, name, job.permissions)
+			table.move(found, 1, #found, #problems + 1, problems)
+			if namesSecret(job) then
+				table.insert(problems, `{path}: job '{name}' runs on the Mac and names a secret`)
 			end
 		end
 	end

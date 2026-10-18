@@ -12,6 +12,10 @@
 	                     advance, in src/content/hints
 	  FrameShot       -> Camera (src/client/Camera, over CameraModel): the
 	                     Shot, framed from behind Amy
+	  PlayCue, and    -> Audio (src/client/Audio): Cues played once, and the
+	  every frame        Soundscape (the Scene's music and ambience, the
+	                     theme under the cards and the Title screen,
+	                     footsteps); a Line's Narration while it shows
 	  ApplySettings   -> Settings: the player's Settings, applied to the
 	                     volume, the dialogue box, the fonts and the layout
 	  the pause button -> PauseScreen: the Pause screen and its Settings
@@ -52,21 +56,25 @@ local Workspace = game:GetService("Workspace")
 -- The camera first, before anything here yields: every frame is its own.
 local Camera = require(script.Parent:WaitForChild("Camera"))
 Camera.start()
+local Audio = require(script.Parent:WaitForChild("Audio"))
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 local Core = ReplicatedStorage:WaitForChild("core")
 local ChapterCardTimeline = require(Core:WaitForChild("ChapterCardTimeline"))
+local Cues = require(Core:WaitForChild("Cues"))
 local DeviceClass = require(Core:WaitForChild("DeviceClass"))
 local DialogueViewModel = require(Core:WaitForChild("DialogueViewModel"))
 local Events = require(Core:WaitForChild("Events"))
 local ObjectiveText = require(Core:WaitForChild("ObjectiveText"))
 local Story = require(Core:WaitForChild("Story"))
+local Narration = require(Core:WaitForChild("Narration"))
 local Net = require(Core:WaitForChild("Net"))
 local Onboarding = require(Core:WaitForChild("Onboarding"))
 local PauseScreen = require(Core:WaitForChild("PauseScreen"))
 local ScreenLayout = require(Core:WaitForChild("ScreenLayout"))
+local Soundscape = require(Core:WaitForChild("Soundscape"))
 local Settings = require(Core:WaitForChild("Settings"))
 local TalkAndAdvance = require(Core:WaitForChild("TalkAndAdvance"))
 local TitleScreen = require(Core:WaitForChild("TitleScreen"))
@@ -74,6 +82,7 @@ local ContentFolder = ReplicatedStorage:WaitForChild("content")
 local palette = require(ContentFolder:WaitForChild("palette")).colours
 local hints = require(ContentFolder:WaitForChild("hints"))
 local lettering = require(ContentFolder:WaitForChild("title"))
+local narration = Narration.index(require(ContentFolder:WaitForChild("narration")))
 local Content = require(ContentFolder:WaitForChild("Story"))
 local Shared = ReplicatedStorage:WaitForChild("shared")
 local AssetIds = require(Shared:WaitForChild("AssetIds"))
@@ -92,12 +101,15 @@ local FrameShot = remotes.FrameShot
 local ApplySettings = remotes.ApplySettings
 local ChangeSettings = remotes.ChangeSettings
 local SetPaused = remotes.SetPaused
+local PlayCue = remotes.PlayCue
 -- whether the server was last told the Pause screen is open
 local sentPaused = false
 
 -- Every sound plays through this SoundGroup (default.project.json), whose
--- volume is the volume Setting; brief 013's Cues set their SoundGroup to it.
+-- volume is the volume Setting.
 local masterVolume = SoundService:WaitForChild("Master") :: SoundGroup
+local audio = Audio.new(masterVolume)
+local soundscape = Soundscape.new()
 
 -- The view-model's colours are a few frozen tables; each becomes a Color3 once.
 local colours: { [Story.RGB]: Color3 } = {}
@@ -659,6 +671,7 @@ local function renderDialogue()
 		bodyLabel.Text = view.text
 	end
 	bodyLabel.MaxVisibleGraphemes = view.visibleGraphemes
+	audio.narrate(Narration.reading(narration, view, card ~= nil or titleScreen.Visible))
 end
 
 local function advance()
@@ -848,6 +861,9 @@ ProximityPromptService.PromptShown:Connect(function(prompt: ProximityPrompt)
 	Onboarding.promptShown(onboarding, true)
 	renderTouch()
 end)
+ProximityPromptService.PromptTriggered:Connect(function()
+	audio.play(Cues.PROMPT)
+end)
 ProximityPromptService.PromptHidden:Connect(function(prompt: ProximityPrompt)
 	prompts[prompt] = nil
 	Onboarding.promptShown(onboarding, next(prompts) ~= nil)
@@ -896,6 +912,7 @@ local function showCard(ending: boolean): (title: string, subtitle: string) -> (
 		titleLabel.Text = title
 		subtitleLabel.Text = subtitle
 		card, cardStarted = ChapterCardTimeline.new(ending), os.clock()
+		audio.play(Cues.CHAPTER_CARD)
 		if not ending then
 			Onboarding.chapterShown(onboarding, title)
 		end
@@ -912,6 +929,34 @@ ShowEnding.OnClientEvent:Connect(Net.guard("ShowEnding", showCard(true), warn))
 -- The Shots the camera frames
 ----------------------------------------------------------------
 FrameShot.OnClientEvent:Connect(Net.guard("FrameShot", Camera.frameShot, warn))
+
+----------------------------------------------------------------
+-- Sound: the Cues the server plays, the Soundscape, footsteps
+----------------------------------------------------------------
+PlayCue.OnClientEvent:Connect(Net.guard("PlayCue", audio.play, warn))
+
+-- The Soundscape for this frame: the Scene Amy is in, the theme while a
+-- screen or card shows, and a footstep while she walks on the ground
+-- (not while the Pause screen holds her).
+local function renderSound(seconds: number, paused: boolean)
+	local character = player.Character
+	local amy = character and character:FindFirstChild("HumanoidRootPart")
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if amy and amy:IsA("BasePart") then
+		local at = amy.Position
+		Soundscape.moved(soundscape, Content.scenes, { x = at.X, y = at.Y, z = at.Z })
+	end
+	Soundscape.screen(soundscape, card ~= nil or titleScreen.Visible)
+	local walking = not paused
+		and humanoid ~= nil
+		and humanoid.MoveDirection.Magnitude > 0.1
+		and humanoid.FloorMaterial ~= Enum.Material.Air
+	if Soundscape.step(soundscape, seconds, walking) then
+		audio.play(Cues.FOOTSTEP)
+	end
+	audio.render(Soundscape.view(soundscape))
+	audio.hold(paused)
+end
 
 ----------------------------------------------------------------
 -- The Title screen
@@ -1380,7 +1425,9 @@ end
 ----------------------------------------------------------------
 local wasTeaching = false
 RunService.RenderStepped:Connect(function(seconds)
-	if PauseScreen.paused(pause) then
+	local paused = PauseScreen.paused(pause)
+	renderSound(seconds, paused)
+	if paused then
 		cardStarted += seconds -- a Chapter card holds; nothing else moves on
 		return
 	end

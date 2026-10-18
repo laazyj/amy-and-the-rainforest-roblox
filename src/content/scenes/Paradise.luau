@@ -6,7 +6,7 @@ local Story = require("../../core/Story")
 local layout = require("../layout")
 local palette = require("../palette")
 
-local spot, rgb = layout.spot, layout.rgb
+local spot, zone, at, rgb = layout.spot, layout.zone, layout.at, layout.rgb
 local HOME = layout.TOWARD_HOME
 local colours = palette.colours
 
@@ -21,6 +21,10 @@ return {
 	spots = spots,
 	zones = {},
 	props = {},
+	music = "music:paradise",
+	ambience = "cue:ambience_paradise",
+	-- beyond the trunks to the far end
+	bounds = zone(at(0, 40, 292.5), at(190, 100, 255)),
 	endZ = 420,
 	grassTufts = 120,
 	trees = 90,

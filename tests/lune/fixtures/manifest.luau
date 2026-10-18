@@ -28,6 +28,19 @@ Fixtures.FONT = table.freeze({
 	licence = "creator-store-free",
 })
 
+-- The fields that make an entry a track from Roblox's audio library on the
+-- Creator Store, referenced by its id (a made-up one).
+Fixtures.LIBRARY_AUDIO = table.freeze({
+	name = "music:paradise",
+	kind = "library-audio",
+	path = Fixtures.REMOVE,
+	amy = Fixtures.REMOVE,
+	assetId = "1234567890",
+	moderation = "approved",
+	upload = false,
+	licence = "creator-store-free",
+})
+
 -- A valid image entry, not yet uploaded, with each `overrides` table applied in turn.
 function Fixtures.entry(...: { [string]: any }): Manifest.Entry
 	local e: { [string]: any } = {

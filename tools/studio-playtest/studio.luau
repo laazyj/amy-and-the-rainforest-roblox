@@ -47,6 +47,9 @@ local COMMAND_TIMEOUT = 30
 -- The square in the middle of the screenshot whose brightness is measured, in
 -- pixels: inside the viewport in Studio's default layout.
 local LUMINANCE_SQUARE = "400"
+-- Between the keys of a chat message: time for the input bar to take focus,
+-- and the text, before Return sends it.
+local CHAT_PAUSE_MS = 300
 
 -- Both run with `osascript -l JavaScript` and print JSON.
 -- Why this login session cannot render Studio, or null when it can.
@@ -70,6 +73,25 @@ function run(argv) {
 	return JSON.stringify(windows.length > 0 ? windows[0].kCGWindowNumber : null);
 }
 ]]
+
+-- Studio's saved dock layouts (Qtitan XML, one per preference key, in the
+-- preferences domain argv[0]) and the main screen's size in points.
+local PREFS_SCRIPT = [[
+ObjC.import("AppKit");
+function run(argv) {
+	const prefs = $.NSUserDefaults.alloc.initWithSuiteName(argv[0]);
+	const layouts = {};
+	for (const key of ObjC.deepUnwrap(prefs.dictionaryRepresentation.allKeys)) {
+		const data = key.startsWith("LayoutSettings.Docking.") ? prefs.dataForKey(key) : $();
+		if (!data.isNil()) layouts[key] = ObjC.unwrap($.NSString.alloc.initWithDataEncoding(data, $.NSUTF8StringEncoding));
+	}
+	const size = $.NSScreen.mainScreen.frame.size;
+	return JSON.stringify({ layouts, screen: { width: size.width, height: size.height } });
+}
+]]
+local PREFS_DOMAIN = "com.roblox.RobloxStudio"
+-- Qt's saveGeometry of Studio's main window.
+local GEOMETRY_KEY = "LayoutSettings.window_geometry_ribbon"
 
 -- Runs argv[2..] in its own process group and kills the group after argv[1]
 -- seconds, exiting 124 (macOS has no timeout command). A signal becomes a failing exit code: Lune reports a
@@ -118,6 +140,11 @@ function Studio.refuseDryRun(dryRun: boolean)
 	end
 end
 
+-- A warning in the log, and a GitHub annotation in Actions.
+local function warn(ctx: Cli.Context, title: string, message: string)
+	ctx.log(if ctx.env.GITHUB_ACTIONS then `::warning title={title}::{message}` else `warning: {message}`)
+end
+
 -- Writes <out>/report.json.
 function Studio.writeReport(ctx: Cli.Context, out: string, report: any)
 	ctx.writeFile(`{out}/report.json`, serde.encode("json", report, true) .. "\n")
@@ -130,9 +157,10 @@ end
 function Studio.finish(ctx: Cli.Context, out: string, report: any)
 	Studio.writeReport(ctx, out, report)
 	if report.studioVersionDrift then
-		local message = `Studio is {report.studioVersion}, the bridge was last proven on {report.pinnedStudioVersion}`
-		ctx.log(
-			if ctx.env.GITHUB_ACTIONS then `::warning title=Studio version drift::{message}` else `warning: {message}`
+		warn(
+			ctx,
+			"Studio version drift",
+			`Studio is {report.studioVersion}, the bridge was last proven on {report.pinnedStudioVersion}`
 		)
 	end
 	if report.result ~= "pass" then
@@ -176,6 +204,104 @@ return game:GetService("HttpService"):JSONEncode({
 })]]
 	)
 	return table.concat(lines, "\n")
+end
+
+-- For `defaults write <domain> <key> -data`.
+function Studio.hex(text: string): string
+	return (string.gsub(text, ".", function(byte: string)
+		return string.format("%02x", string.byte(byte))
+	end))
+end
+
+-- The dock layout with the `<Panels>` list of the layout panel `id`
+-- changed by `edit`, which is given the ids it holds.
+local function editPanelList(xml: string, id: string, edit: ({ string }) -> ()): string
+	local at = string.find(xml, `<Panel ID="{id}" `, 1, true) or error(`the dock layout has no panel {id}`, 0)
+	local first = string.find(xml, "<Panels ", at, true) or error(`the dock layout's panel {id} lists nothing`, 0)
+	local _, last = string.find(xml, '^<Panels Count="%d+"/>', first)
+	if not last then
+		last = select(2, string.find(xml, "</Panels>", first, true)) or error(`the dock layout's {id} is not closed`, 0)
+	end
+	local ids = {}
+	for child in string.gmatch(string.sub(xml, first, last), '<Panel ID="([^"]+)"/>') do
+		table.insert(ids, child)
+	end
+	edit(ids)
+	local list = `<Panels Count="{#ids}"/>`
+	if #ids > 0 then
+		local lines = { `<Panels Count="{#ids}">` }
+		for _, child in ids do
+			table.insert(lines, `                <Panel ID="{child}"/>`)
+		end
+		table.insert(lines, "            </Panels>")
+		list = table.concat(lines, "\n")
+	end
+	return string.sub(xml, 1, first - 1) .. list .. string.sub(xml, (last :: number) + 1)
+end
+
+-- Studio's dock layout with every docked panel (Explorer, Properties, the
+-- Toolbox...) moved into one tab group, the first one's, so they take one
+-- column beside the game's viewport instead of one on each side. Closing a
+-- panel does not hold: Studio docks its default panels again at launch
+-- when they are in no layout. Nor does a tab beside the place's: Play then
+-- opens the game in a pane of its own. Returns the layout and the ids moved.
+function Studio.dockLayout(xml: string): (string, { string })
+	local group: string? = nil
+	local moved = {}
+	for id, attributes, layouts in
+		string.gmatch(xml, '<Panel ID="([^"]+)" Type="Qtitan::DockWidgetPanel"([^>]*)>%s*<Layouts>(.-)</Layouts>')
+	do
+		-- Closed panels, and floating ones in a window of their own, stay.
+		local from = string.match(layouts :: string, '<DockingLayout ID="([^"]+)"/>')
+		if not from or not string.find(attributes :: string, 'Active="True"', 1, true) then
+			continue
+		end
+		local to: string = group or from
+		group = to
+		if from ~= to then
+			table.insert(moved, id)
+			xml = editPanelList(xml, from, function(ids)
+				table.remove(ids, table.find(ids, id) or error(`{from} does not list {id}`, 0))
+			end)
+			xml = editPanelList(xml, to, function(ids)
+				table.insert(ids, id)
+			end)
+			-- The panel's own record of where it is docked.
+			local start = string.find(xml, `<Panel ID="{id}" Type="Qtitan::DockWidgetPanel"`, 1, true) :: number
+			local _, stop = string.find(xml, "</Layouts>", start, true)
+			local panel = string.gsub(string.sub(xml, start, stop), `<(%a+Layout) ID="{from}"/>`, `<%1 ID="{to}"/>`)
+			xml = string.sub(xml, 1, start - 1) .. panel .. string.sub(xml, (stop :: number) + 1)
+		end
+	end
+	return xml, moved
+end
+
+-- Studio's window maximized on a screen of `width` x `height` points, as
+-- Qt's saveGeometry (version 3) writes it.
+function Studio.windowGeometry(width: number, height: number): string
+	local right, bottom = width - 1, height - 1
+	return string.pack(
+		">I4I2I2 i4i4i4i4 i4i4i4i4 i4BB i4 i4i4i4i4",
+		0x01D9D0CB, -- Qt's magic number
+		3,
+		0,
+		0, -- the frame
+		0,
+		right,
+		bottom,
+		0, -- the normal geometry
+		0,
+		right,
+		bottom,
+		0, -- the screen
+		2, -- maximized (Qt::WindowMaximized)
+		0, -- not full screen
+		width,
+		0, -- the restored geometry
+		0,
+		right,
+		bottom
+	)
 end
 
 function Studio.bridge(options: Options): Smoke.Bridge
@@ -222,6 +348,35 @@ function Studio.bridge(options: Options): Smoke.Bridge
 			end
 		end
 		return false
+	end
+
+	-- Before launch: Studio's panels in one column and its window maximized,
+	-- so the game fills most of each capture. Studio reads both at launch
+	-- and never writes them back, since `close` kills it. Only in a virtual
+	-- machine (the runner's): on a person's own Mac they are theirs.
+	local function frameTheViewport()
+		if exec("sysctl", { "-n", "kern.hv_vmm_present" }) ~= "1" then
+			ctx.log("not a virtual machine: Studio's panels and window are left as they are")
+			return
+		end
+		local prefs = serde.decode("json", exec("osascript", { "-l", "JavaScript", "-e", PREFS_SCRIPT, PREFS_DOMAIN }))
+		local screen = prefs.screen
+		exec("defaults", {
+			"write",
+			PREFS_DOMAIN,
+			GEOMETRY_KEY,
+			"-data",
+			Studio.hex(Studio.windowGeometry(math.round(screen.width), math.round(screen.height))),
+		})
+		local moved = 0
+		for key, xml in prefs.layouts do
+			local layout, ids = Studio.dockLayout(xml)
+			if #ids > 0 then
+				exec("defaults", { "write", PREFS_DOMAIN, key, "-data", Studio.hex(layout) })
+				moved += #ids
+			end
+		end
+		ctx.log(`Studio's window maximized on {screen.width}x{screen.height}; panels moved into one column: {moved}`)
 	end
 
 	local client: Mcp.Client? = nil
@@ -293,6 +448,12 @@ function Studio.bridge(options: Options): Smoke.Bridge
 						.. "'Studio as MCP server'; see docs/MAC_RUNNER.md",
 					0
 				)
+			end
+			-- A frame that cannot be set (a Studio update changed the layout's
+			-- format) costs the captures' size, not the run.
+			local framed, why = pcall(frameTheViewport)
+			if not framed then
+				warn(ctx, "Studio frame", `Studio's panels and window were left as they are: {why}`)
 			end
 			local before = studioIds()
 			-- Studio runs in the background and the shell prints its pid; `close`
@@ -393,6 +554,33 @@ function Studio.bridge(options: Options): Smoke.Bridge
 
 		walkTo = function(position)
 			tool("character_navigation", { datamodel_type = "Client", x = position.x, y = position.y, z = position.z })
+		end,
+
+		chat = function(text)
+			tool("user_keyboard_input", {
+				datamodel_type = "Client",
+				actions = {
+					-- "/" is the key that focuses Roblox's chat input bar.
+					{ action = "keyPress", key_code = "Slash" },
+					{ action = "wait", wait_time_ms = CHAT_PAUSE_MS },
+					{ action = "textInput", text_inputs = text },
+					{ action = "wait", wait_time_ms = CHAT_PAUSE_MS },
+					{ action = "keyPress", key_code = "Return" },
+				} :: { { [string]: any } },
+			})
+		end,
+
+		click = function(instancePath)
+			tool("user_mouse_input", {
+				datamodel_type = "Client",
+				actions = {
+					{ action = "moveTo", instance_path = instancePath },
+					{ action = "mouseButtonClick", mouse_button = "left" },
+					-- Then into the viewport's corner, so the pointer is not
+					-- in the middle of the screenshots that follow.
+					{ action = "moveTo", x = 1, y = 1 },
+				} :: { { [string]: any } },
+			})
 		end,
 
 		insertAsset = function(assetId, parentPath)

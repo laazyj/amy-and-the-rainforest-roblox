@@ -1,0 +1,46 @@
+# Posts one comment on a pull request, or updates the one already there:
+# the github-actions bot's comment whose body starts with the same first
+# line, the marker (an HTML comment such as <!-- screen-prompt -->). So a
+# pull request has one comment per marker however often a job runs. Used by
+# ci.yml's screen-prompt and studio-playtest.yml's publish (brief mac-003).
+name: Post a comment
+description: Post, or update in place, the one comment on a pull request found by the body's first line.
+
+inputs:
+  pr:
+    description: "The pull request number."
+    required: true
+  body-file:
+    description: "The comment's body; its first line is the marker."
+    required: true
+  token:
+    description: "A token with pull-requests: write."
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Post or update the comment
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        PR: ${{ inputs.pr }}
+        BODY_FILE: ${{ inputs.body-file }}
+      run: |
+        case "$PR" in
+        "" | *[!0-9]*) echo "::error::pr must be a pull request number"; exit 1 ;;
+        esac
+        MARKER=$(head -n 1 "$BODY_FILE")
+        export MARKER
+        ids=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
+          --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith(env.MARKER))) | .id')
+        comment=${ids%%[!0-9]*}
+        request="$RUNNER_TEMP/comment-$$.json"
+        jq -n --rawfile body "$BODY_FILE" '{body: $body}' > "$request"
+        if [ -n "$comment" ]; then
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment" --input "$request" > /dev/null
+          echo "Updated the comment on #$PR." >> "$GITHUB_STEP_SUMMARY"
+        else
+          gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --input "$request" > /dev/null
+          echo "Posted the comment on #$PR." >> "$GITHUB_STEP_SUMMARY"
+        fi

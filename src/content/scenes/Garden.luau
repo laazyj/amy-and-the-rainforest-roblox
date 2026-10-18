@@ -33,6 +33,10 @@ return {
 	spots = spots,
 	zones = zones,
 	props = {},
+	music = "music:home",
+	ambience = "cue:ambience_home",
+	-- inside the fence, and the gate
+	bounds = zone(at(0, 40, -32.5), at(32, 100, 45)),
 	-- Amy's house: red like her jumper in the drawing, with a bark roof
 	house = { at = at(0, 0, -44), walls = layout.rgb(206, 92, 74), roof = palette.colours.bark, scale = 1 },
 	-- the fence: front line with the gate in the middle, sides, and back

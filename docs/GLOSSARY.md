@@ -48,13 +48,13 @@ Scene (look + sound)                     Player
 | **Kind** (of Quest) | How a Quest is completed. One small module in core per Kind. See [enumeration](#quest-kinds). | `reach` |
 | **Objective** | The one short instruction shown on screen while a Quest is active. Standard spelling, imperative, written for the player. | "Ask Dad if you can go outside" |
 | **Dialogue** | An ordered list of Lines shown together. A Quest has up to three: `intro` (on start), `dialogue` (on `TalkedTo`, `talk` Quests only) and `outro` (on complete). | the five Lines when Amy asks Dad |
-| **Line** | One thing said: Speaker, text, optional narration audio, and a `canon` flag. | Narrator: "She tryed again but Sam brang her back." |
+| **Line** | One thing said: Speaker, text, and a `canon` flag; a canon Line may be narrated (see Narration). | Narrator: "She tryed again but Sam brang her back." |
 | **Canon** | A property of a Line: the text is Clara's exact words and is locked. Every canon Line is checked byte for byte against [`story/canon.md`](story/canon.md). New Lines in Clara's voice are not canon until she says so. | |
 | **Speaker** | Who says a Line: the Narrator, Amy, or another Character. Stored as a Character id, displayed by the Character's display name. See [enumeration](#characters-and-speakers). | `Narrator` |
 | **Narrator** | The storyteller's voice. Canon Lines are almost always the Narrator's; a Narrator Line is not canon unless marked. | |
 | **Beat** | A named, staged moment: a fixed list of World commands, with optional waits, played at a Hook. Beats are how the story moves the world. See [enumeration](#beats). | `beat:sam_catches` |
 | **Hook** | A point in a Quest's life where Beats run. Declared in the Chapter's `hooks.luau`. See [enumeration](#hook-names). | `chapter1.sneak_out_1.onComplete → sam_catches` |
-| **Scene** | A part of the world with its own look and sound: terrain, Props, Spots, Zones, ambience, music. See [enumeration](#scenes). | `scene:ForestWall` |
+| **Scene** | A part of the world with its own look and sound: terrain, Props, Spots, Zones, and the music and ambience Cues that play while Amy is inside its **bounds**, a box in the Scene's file. See [enumeration](#scenes). | `scene:ForestWall` |
 | **Spot** | A named position and facing inside a Scene. Content never holds raw coordinates; it names Spots. | `spot:GardenGateInside` |
 | **Zone** | A named invisible volume the player can enter. Entering one is the Player event `EnteredZone`. See [enumeration](#zones). | `zone:ForestGap` |
 | **Prop** | A placed object with named states. See [enumeration](#props). | `prop:Machine` |
@@ -67,8 +67,10 @@ Scene (look + sound)                     Player
 | **Pickup** | A Quest-bound thing to touch, spawned at Spots for a `collect` Quest and removed when touched or when the Quest ends. Its id is the Spot it spawned at. | three glowing flowers |
 | **Collectible** | A persistent discoverable with a Journal entry. Found once, remembered forever. | `collectible:maroon_acorn` |
 | **Journal** | The player's record of Collectibles found and Characters met, with entries in Clara's voice. | |
-| **Cue** | A named sound, music track or effect, resolved to an Asset through the Manifest. | `cue:sam_bark`, `music:paradise_theme` |
-| **Asset** | An image, sound, model or font the game or its store page uses, listed in the Manifest and uploaded to Roblox by CI when the game shows it (a font is a Creator Store family, referenced by its id and never uploaded). Known by its Asset name, an id of the forms in [Ids](#6-ids). See [`ASSETS.md`](ASSETS.md). | `card:chapter2` |
+| **Cue** | A named sound, music track or effect, resolved to an Asset through the Manifest; a Cue with no asset id yet is silent, never an error. Content names Scenes' music and ambience and the Cues Beats play; `src/core/Cues.luau` names the rest. See [enumeration](#cues). | `cue:sam_bark`, `music:paradise` |
+| **Soundscape** | What plays under the Story: the music and ambience of the Scene Amy is in (the one with the smallest bounds that hold her), the theme instead while the Title screen or a card shows, and her footsteps. A view-model (`src/core/Soundscape.luau`) rendered by the client's Audio adapter (`src/client/Audio.luau`), which crossfades each change. | the Garden's `music:home` under `cue:ambience_home` |
+| **Narration** | Canon Lines read aloud: each Chapter's in one recorded file, `narration:<chapter id>` (the last Chapter's reads the Ending's too), played while the dialogue box shows the Line. The **Narration table** (`src/content/narration.luau`) gives each Line's part of its file in seconds. A Line with no part, or whose file has no id yet, is shown as text only; narration never advances a Dialogue. | `narration:chapter1` |
+| **Asset** | An image, sound, model or font the game or its store page uses, listed in the Manifest and uploaded to Roblox by CI when the game shows it (a font, or a track from Roblox's audio library, is on the Creator Store, referenced by its id and never uploaded). Known by its Asset name, an id of the forms in [Ids](#6-ids). See [`ASSETS.md`](ASSETS.md). | `card:chapter2` |
 | **Manifest** | `assets/manifest.json`: every Asset with its file, Roblox asset id, creator, licence, origin and Moderation status. | |
 | **Moderation status** | Where Roblox moderation is with an Asset. See [Lifecycles](#5-lifecycles). | `approved` |
 | **Placeholder** | A plain palette-coloured stand-in with no text for an illustration not drawn yet, until the real piece replaces it. | `card:chapter1` |
@@ -95,7 +97,7 @@ Scene (look + sound)                     Player
 | **Client binder** | The client script (`src/client`): it builds the UI, renders the view-model and forwards the player's input. It holds no logic. | `StoryClient.client.luau` |
 | **View-model** | The client's logic as plain data in core, which the client binder renders: the Dialogue as it types out and advances (`DialogueViewModel`), the Objective tracker (`ObjectiveText`), how a Chapter card plays over time (`ChapterCardTimeline`), the Title screen (`TitleScreen`), the Onboarding (`Onboarding`), the Talk-and-advance button (`TalkAndAdvance`), the Pause screen (`PauseScreen`) and the Settings page (`Settings`); the Screen layout (`ScreenLayout`) says where they go. Tested in tier 1, no client needed. | `DialogueViewModel.view(vm)` |
 | **Grapheme** | One character as a reader sees it, which may be several code points: "♥️", "👍🏽". Dialogue types out one grapheme at a time. | `DialogueViewModel.graphemes("♥️") == 1` |
-| **Dev shortcut** | A Dev-only way to reach any point of the Story in seconds: the chat commands `/chapter N` and `/quest <id>`, and the jump-to-Quest entry point (`DevShortcuts.jumpTo`). A jump is a Resume at the Progress of a player who has just started the Quest, and is saved: the Save holds that Progress and the Checkpoints of every Chapter up to it. Release builds have none: the release job strips them when it publishes. | `/chapter 3` |
+| **Dev shortcut** | A Dev-only way to reach any point of the Story in seconds: the chat commands `/chapter N` and `/quest <id>`, and the jump-to-Quest entry point (`DevShortcuts.jumpTo`). A jump is a Resume at the Progress of a player who has just started the Quest, and is saved: the Save holds that Progress and the Checkpoints of every Chapter up to it. `/title` offers the Title screen at the current Progress, as to a returning player; the Story waits for the Title choice, and Continue carries on where the player was (a jump instead, `/title` then `/chapter N`, leaves the Title screen showing until a button is pressed). Release builds have none: the release job strips them when it publishes. | `/chapter 3` |
 | **Device class** | One of the three first-class targets, each with its own layout and touch rules: `PC`, `Phone`, `Tablet`. Defined in [`design/feel.md`](design/feel.md). Picked by `src/core/DeviceClass.luau` from the Input kind and the viewport's shorter side (under 600 units is a Phone), again on every viewport change. | `Tablet` |
 | **Input kind** | What the player last used: `pointer` (a keyboard or a mouse), `touch` or `gamepad`. A Device class is picked from it. | `touch` |
 | **Screen layout** | Where everything on screen goes and how big its text is, for one Device class (landscape only), safe area and Text scale (`src/core/ScreenLayout.luau`): the dialogue box and its 60-character column, the Objective tracker, the touch control zones, the Chapter card and the Title screen. Tier 1 holds feel.md's rules on it. Not the content's `layout.luau`, which places things in the world. | `ScreenLayout.new(screen)` |
@@ -111,6 +113,9 @@ Scene (look + sound)                     Player
 | **Walkthrough** | A test that plays the Story, or one Chapter, from start to end by driving a player's inputs, and checks what the server sends back. | `tests/engine/walkthrough.luau` |
 | **Fake player** | A stand-in for a Player in a test, where there is no client: a Character to move, plus the identity fields a Player has. | `tests/engine/_fakeplayer.luau` |
 | **Golden file** | The recorded, deterministic output of a Walkthrough: every message the server sends, in order, with the active Quest. A behaviour change shows as a diff to it. | `tests/fixtures/golden/walkthrough.json` |
+| **Capture** | One screenshot the Studio playtest takes on one device: at a Shot, a Chapter card, a Scene entry or the Title screen, named `<device>/<nn>-<kind>-<name>.png`. | `pc/03-shot-gate-wide.png` |
+| **Contact sheet** | One image of every Capture of one device, each labelled with its name, posted on the pull request the playtest played. | `sheets/pc.png` |
+| **Baseline** | The accepted Capture a new one is compared with: one per Capture per device in `docs/screens/`, changed only by merging a Baselines pull request, never by hand. | `docs/screens/pc/03-shot-gate-wide.png` |
 
 ## 3. The verbs
 
@@ -169,7 +174,7 @@ of all three lists below are in `src/core/Events.luau`.
 | `MoveCharacter` | `character`, `spot` | Puts a Character at a Spot |
 | `TeleportPlayer` | `spot` | Puts the Player Character at a Spot |
 | `SetPropState` | `prop`, `state` | Moves a Prop to one of its declared states |
-| `PlayCue` *later* | `cue` | Plays a Cue |
+| `PlayCue` | `cue` | Plays a sound Cue (`cue:`) once on the client; music and ambience follow the Soundscape |
 | `SetLighting` | `preset` | Applies a Lighting preset |
 | `FrameShot` | `shot`, `character` or none | Frames a Shot, of the Character when the Shot takes one; the follow camera returns when the Shot ends |
 | `OfferTalk` | `character`, `label` | Offers the Character's talk affordance, with its Talk label |
@@ -187,7 +192,7 @@ grows by one named command, recorded here in the same PR. *Later*:
 reserved, not yet implemented.
 
 **On the wire.** `src/core/Net.luau` is the contract between server and
-client. Four World commands reach the client: `FrameShot`, and three
+client. Five World commands reach the client: `FrameShot`, `PlayCue`, and three
 over remotes whose names predate this glossary and are kept so the
 golden file still matches: `ShowDialogue`, `SetObjective`, and
 `ShowChapterCard` as `ShowChapter` (or `ShowEnding` for the end card).
@@ -259,16 +264,16 @@ its `hooks.luau`.
 
 | Beat | Hook | Does |
 |---|---|---|
-| `beat:sam_catches` | `chapter1.sneak_out_1.onComplete`, `chapter1.sneak_out_2.onComplete` | Sam runs to the gate and brings Amy back into the garden |
+| `beat:sam_catches` | `chapter1.sneak_out_1.onComplete`, `chapter1.sneak_out_2.onComplete` | `PlayCue(cue:sam_bark)`; Sam runs to the gate and brings Amy back into the garden |
 | `beat:sam_goes_to_farm` | `chapter2.walk_to_forest.onStart` | Sam leaves for the farm |
 | `beat:forest_wall_reveal` | `chapter2.walk_to_forest.onComplete` | `FrameShot(shot:ForestWallReveal)`: the wall of trees, the gap centred |
-| `beat:paradise_reveal` | `chapter2.enter_forest.onComplete` | `SetLighting(lighting:paradise)` |
+| `beat:paradise_reveal` | `chapter2.enter_forest.onComplete` | `PlayCue(cue:paradise_shimmer)`, `SetLighting(lighting:paradise)` |
 | `beat:meet_squirrel` | `chapter3.meet_squirrel.onTalkedTo` | `FrameShot(shot:MeetCharacter, character:Squirrel)` |
 | `beat:meet_fox` | `chapter3.meet_fox.onTalkedTo` | `FrameShot(shot:MeetCharacter, character:Fox)` |
 | `beat:meet_lion` | `chapter3.meet_lion.onTalkedTo` | `FrameShot(shot:MeetCharacter, character:Lion)` |
 | `beat:ordinary_world` | `chapter3.rush_home.onComplete` | `SetLighting(lighting:ordinary)` |
-| `beat:machine_arrives` | `chapter3.tell_mum.onComplete` | The machine and villagers arrive; Dad, Mum and Sam move to the field |
-| `beat:machine_stops` | `chapter4.explain.onComplete` | Framed by `shot:MachineFinale`, which holds through the Ending's Lines: the blade stops, sparkles over the crowd, the machine reverses away |
+| `beat:machine_arrives` | `chapter3.tell_mum.onComplete` | `PlayCue(cue:machine_rumble)`; the machine and villagers arrive; Dad, Mum and Sam move to the field |
+| `beat:machine_stops` | `chapter4.explain.onComplete` | Framed by `shot:MachineFinale`, which holds through the Ending's Lines: the blade stops (`PlayCue(cue:machine_stop)`), sparkles over the crowd, the machine reverses away |
 
 ### Spots
 
@@ -358,8 +363,29 @@ In order; specified in [`design/feel.md`](design/feel.md#6-onboarding-the-first-
 
 ### Cues
 
-None yet. Cue names (`cue:<name>` for sounds, `music:<name>` for music)
-are added here with their manifest entry.
+Each is an Asset in the Manifest (`cue:<name>` for sounds, `music:<name>`
+for music), a synthesised placeholder until the owner's pick replaces it
+([`ASSETS.md`](ASSETS.md#cues-the-placeholders-and-the-shopping-list)).
+Tier 1 holds every Cue named in content and `src/core/Cues.luau` to this
+table and to the Manifest.
+
+| Cue | Layer | Plays |
+|---|---|---|
+| `music:theme` | music | While the Title screen, a Chapter card or the end card shows |
+| `music:home` | music | `scene:Garden`, `scene:Village` |
+| `music:field` | music | `scene:Field`, `scene:ForestWall` |
+| `music:paradise` | music | `scene:Paradise`, `scene:HeartGlade` |
+| `cue:ambience_home` | ambience | `scene:Garden`, `scene:Village` |
+| `cue:ambience_field` | ambience | `scene:Field`, `scene:ForestWall` |
+| `cue:ambience_paradise` | ambience | `scene:Paradise`, `scene:HeartGlade` |
+| `cue:chapter_card` | effect | A Chapter card or the end card appears |
+| `cue:prompt` | effect | The player uses a talk affordance |
+| `cue:pickup` | effect | `TouchedPickup` in a `collect` Quest |
+| `cue:footstep` | effect | Each of Amy's steps on the ground |
+| `cue:sam_bark` | effect | `beat:sam_catches` |
+| `cue:paradise_shimmer` | effect | `beat:paradise_reveal` |
+| `cue:machine_rumble` | effect | `beat:machine_arrives` |
+| `cue:machine_stop` | effect | `beat:machine_stops` |
 
 ### Settings
 
@@ -424,6 +450,7 @@ position or raw coordinate.
 | Asset: reference for building a Character or Prop | `ref:<the Character's or Prop's PascalCase name>` | `ref:Sam`, `ref:Machine` |
 | Asset: a Prop's model or a Cue's sound | the Prop's or Cue's own id | `prop:Machine`, `cue:sam_bark` |
 | Asset: a Creator Store font family | `font:<snake_case>` | `font:dancing_script` |
+| Asset: a Chapter's narration file | `narration:<chapter id>` | `narration:chapter1` |
 | Collectible | `collectible:<snake_case>` | `collectible:maroon_acorn` |
 
 Inside content files the prefix is dropped where the field already says

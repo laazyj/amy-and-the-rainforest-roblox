@@ -199,8 +199,9 @@ return function(t: any)
 			expect(playable.world.objective).toBe("Pick flowers  (0/2)")
 		end)
 
-		it("removes each Pickup touched and counts it in the Objective", function()
+		it("plays cue:pickup, removes each Pickup touched and counts it in the Objective", function()
 			expect(touches[1].commands).toEqual({
+				{ kind = "PlayCue", cue = "cue:pickup" },
 				{ kind = "RemovePickup", pickup = "FlowerA" },
 				{ kind = "SetObjective", text = "Pick flowers  (1/2)" },
 			} :: { any })
@@ -209,12 +210,13 @@ return function(t: any)
 		it("completes at the count, clears the Objective and shows the Ending's Dialogue", function()
 			expect(#touches).toBe(2)
 			expect(Walker.kinds(touches[2].commands)).toEqual({
+				"PlayCue",
 				"RemovePickup",
 				"SetObjective",
 				"SetObjective",
 				"ShowDialogue",
 			})
-			expect(touches[2].commands[3]).toEqual({ kind = "SetObjective", text = nil })
+			expect(touches[2].commands[4]).toEqual({ kind = "SetObjective", text = nil })
 			expect(touches[2].quest).toBeNil()
 		end)
 
