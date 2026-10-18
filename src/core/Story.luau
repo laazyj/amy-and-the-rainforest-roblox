@@ -158,15 +158,16 @@ export type Kind = {
 
 local Story = {}
 
--- Each Catalog slot: the kind of avatar accessory it holds, and whether it
--- is layered clothing (worn over the body) or a rigid accessory.
+-- Each Catalog slot: the kind of avatar accessory it holds, and for
+-- layered clothing (worn over the body) its order, innermost first; a slot
+-- with no order is a rigid accessory.
 Story.CATALOG_SLOTS = table.freeze({
-	hair = { accessory = "Hair", layered = false },
-	shirt = { accessory = "Shirt", layered = true },
-	skirt = { accessory = "DressSkirt", layered = true },
-	leftShoe = { accessory = "LeftShoe", layered = true },
-	rightShoe = { accessory = "RightShoe", layered = true },
-} :: { [string]: { accessory: string, layered: boolean } })
+	hair = { accessory = "Hair" },
+	leftShoe = { accessory = "LeftShoe", order = 1 },
+	rightShoe = { accessory = "RightShoe", order = 1 },
+	skirt = { accessory = "DressSkirt", order = 2 },
+	shirt = { accessory = "Shirt", order = 3 },
+} :: { [string]: { accessory: string, order: number? } })
 
 Story.NARRATOR = "Narrator"
 

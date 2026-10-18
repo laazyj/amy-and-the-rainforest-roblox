@@ -18,13 +18,26 @@ local story = Story.story
 local manifest = Manifest.decode(bootstrap.readSource(Manifest.PATH))
 local project = serde.decode("json", bootstrap.readSource("default.project.json"))
 
--- The Character models the manifest has, by Character id.
+-- The manifest's entries by Asset name, and its Character models by Character id.
+local byName: { [string]: Manifest.Entry } = {}
 local characterModels: { [string]: Manifest.Entry } = {}
 for _, entry in manifest.assets do
+	byName[entry.name] = entry
 	local id = string.match(entry.name, "^character:(.+)$")
 	if id then
 		characterModels[id] = entry
 	end
+end
+
+-- Every Description in the content: the Characters' and the villagers'.
+local descriptions: { [string]: StoryTypes.Description } = {}
+for _, character in story.characters do
+	if character.description then
+		descriptions[`character:{character.id}`] = character.description
+	end
+end
+for k, description in (story.props.Villagers :: any).descriptions do
+	descriptions[`prop:Villagers[{k}]`] = description
 end
 
 return function(t: any)
@@ -57,6 +70,17 @@ return function(t: any)
 				expect(StoryTypes.CATALOG_SLOTS[slot]).never.toBeNil()
 			end
 		end)
+
+		for whose, description in descriptions do
+			it(`names a Catalog item in the manifest in each of {whose}'s Catalog slots`, function()
+				for slot, name in (description.catalog or {}) :: { [string]: string } do
+					local entry = byName[name]
+					if not entry or entry.kind ~= Manifest.CATALOG then
+						error(`{whose}'s {slot} slot names {name}, which is no Catalog item in the manifest`)
+					end
+				end
+			end)
+		end
 
 		it("names a Character that is not a human with every Character model in the manifest", function()
 			for id in characterModels do

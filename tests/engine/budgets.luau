@@ -23,7 +23,8 @@ local SAMPLE_SECONDS = 5
 -- descendants, BaseParts among them, and the mean Stats.HeartbeatTime of an
 -- idle server (worst frame 0.27 ms); instances and parts again on Saved Dev
 -- version 118 (PR #63, 2026-10-18), where the humans became Roblox's R15
--- body (its joints and attachments) and the animals gained a Humanoid.
+-- body (its joints and attachments) and the animals gained a Humanoid
+-- (and a WeldConstraint for each part of a Placeholder).
 -- Budgets round up to 0.01, and never go below their FLOOR.
 local MEASURED = {
 	instances = 2081,

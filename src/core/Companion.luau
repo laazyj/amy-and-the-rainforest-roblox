@@ -2,8 +2,10 @@
 --[[
 	Companion: how a Companion goes about with Amy, as plain data (plan
 	section 2.3): a small state machine the adapter steps with what it
-	senses, which answers with where the Companion goes. Moving it there is
-	the adapter's (src/server/CharacterHost).
+	senses, which answers with where the Companion goes. Moving it there will
+	be the adapter's (src/server/CharacterHost). Nothing uses it yet: it is
+	the logic in core first, dormant until a Companion Beat or a `follow`
+	Quest uses it.
 
 	  idle    stands where it is; while following, sets off once Amy is
 	          further than FOLLOW_FROM

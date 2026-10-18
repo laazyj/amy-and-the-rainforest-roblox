@@ -98,6 +98,21 @@ return function(t: any)
 			expect(Manifest.validate(manifest(item), readFile)).toEqual({})
 		end)
 
+		it("accepts a Catalog item not picked yet: no id, pending, a placeholder", function()
+			local slot = entry(FONT, {
+				name = "catalog:amy_hair",
+				kind = "catalog",
+				assetId = REMOVE,
+				moderation = "pending",
+				placeholder = true,
+			})
+			expect(Manifest.validate(manifest(slot), readFile)).toEqual({})
+			slot.placeholder = false
+			expect(Manifest.validate(manifest(slot), readFile)).toEqual({
+				'catalog:amy_hair: a Catalog item not picked yet has upload false, moderation "pending" and placeholder true',
+			})
+		end)
+
 		it("holds a Catalog item to its name and a font's rules", function()
 			local problems = Manifest.validate(
 				manifest(entry(FONT, { name = "catalog:amy_hair", kind = "catalog", upload = true })),

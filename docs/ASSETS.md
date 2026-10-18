@@ -189,11 +189,14 @@ named slot. Amy's Description (`src/content/characters.luau`), from Clara's
 Until a slot's Asset has an id, Amy is built without it: her light skin
 (`#dba97e`) on head, arms and legs, and her red jumper on the torso.
 
-**Recording one is one Manifest entry**, as for a [font](#fonts): kind
-`catalog`, the name above, no `path` and no `sha256`, `upload` false, the
-item's `assetId` from its Marketplace page, `moderation` `approved`,
-`placeholder` false, licence `creator-store-free`, `creator` the item's
-creator and `origin` its title and page. Then run
+**Each slot already has its Manifest entry**, waiting for the pick: kind
+`catalog`, no `assetId`, `moderation` `pending`, `placeholder` true, and
+the search in its `origin`. Tier 1 holds every slot a Description names to
+an entry. **Recording a pick is filling that entry in**, as for a
+[font](#fonts): the item's `assetId` from its Marketplace page,
+`moderation` `approved`, `placeholder` false, `creator` the item's creator
+and `origin` its title and page (still no `path`, no `sha256`, `upload`
+false, licence `creator-store-free`). Then run
 `lune run tools/check-assets --write-ids`, which writes the id into
 `src/shared/AssetIds.luau`. `server/CharacterHost` reads the slot's id
 there and Amy wears the item from her next spawn. Tier 0 holds the entry

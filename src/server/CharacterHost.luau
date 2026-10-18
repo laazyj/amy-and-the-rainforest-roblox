@@ -91,7 +91,10 @@ function CharacterHost.humanoidDescription(description: Story.Description): Huma
 		local kind = Story.CATALOG_SLOTS[slot]
 		if id and kind then
 			local accessory = (Enum.AccessoryType :: any)[kind.accessory]
-			table.insert(accessories, { AssetId = id, AccessoryType = accessory, IsLayered = kind.layered })
+			table.insert(
+				accessories,
+				{ AssetId = id, AccessoryType = accessory, IsLayered = kind.order ~= nil, Order = kind.order }
+			)
 		end
 	end
 	made:SetAccessories(accessories, true)
@@ -186,6 +189,8 @@ local function stand(model: Model, display: string, spot: Story.Spot, parent: In
 	if not humanoid or not root or not root:IsA("BasePart") then
 		return nil
 	end
+	-- the pivot is the root's, whatever pivot a Character model came with
+	model.PrimaryPart = root
 	model:PivotTo(Convert.standing(spot, humanoid.HipHeight + root.Size.Y / 2))
 	local head = model:FindFirstChild("Head")
 	addNameTag(if head and head:IsA("BasePart") then head else root, display, 2.2)
@@ -667,7 +672,10 @@ function CharacterHost.dress(character: Model)
 	if not amy or not humanoid or not humanoid:IsA("Humanoid") then
 		return
 	end
-	local ok, problem = pcall(humanoid.ApplyDescriptionAsync, humanoid, CharacterHost.humanoidDescription(amy))
+	-- the description is built inside the pcall, so its errors are caught too
+	local ok, problem = pcall(function()
+		humanoid:ApplyDescriptionAsync(CharacterHost.humanoidDescription(amy))
+	end)
 	if not ok then
 		warn(`[CharacterHost] could not dress {character.Name} as Amy: {problem}`)
 	end

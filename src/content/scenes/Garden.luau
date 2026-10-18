@@ -14,7 +14,7 @@ local spots: { [string]: Story.Spot } = {
 	DadHome = spot(6, -26, HOME),
 	MumHome = spot(-6, -33, FOREST),
 	SamHome = spot(3, -20, HOME),
-	-- Sam's catch: he bounds to just outside the gate, Amy lands back in the
+	-- Sam's catch: he runs to just outside the gate, Amy lands back in the
 	-- garden, and Sam settles beside her
 	GateOutside = spot(2, -14, HOME),
 	GardenInside = spot(0, -28, FOREST),
