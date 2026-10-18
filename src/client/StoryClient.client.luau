@@ -525,7 +525,7 @@ titleText(
 
 -- The choices sit at the bottom, above the safe area, and grow upwards:
 -- the note (the Chapter, or the confirmation's question), then the buttons
--- in a row that wraps, so they fit a phone in landscape or portrait.
+-- in a row that wraps, so they fit a phone.
 local function list(parent: Instance, direction: Enum.FillDirection, padding: number): UIListLayout
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection = direction

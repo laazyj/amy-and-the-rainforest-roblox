@@ -1,7 +1,7 @@
 # Tier 3 playthrough on the Mac (brief mac-002): on the self-hosted runner
 # inside the Mac's virtual machine, play a CI-built place in Roblox Studio
 # from a fresh Save to the end card, once per device (PC, and a phone and a
-# tablet preset in both orientations), with a screenshot at every Shot,
+# tablet preset, landscape), with a screenshot at every Shot,
 # Chapter card and Scene entry (tools/studio-playtest/play.luau). Uploads the
 # screenshots and report.json, which holds the Studio version against the one
 # the bridge was proven on. See docs/MAC_RUNNER.md.

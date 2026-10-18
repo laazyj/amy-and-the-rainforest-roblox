@@ -15,7 +15,7 @@ local function simulating(device: any): any
 	local size = SIZES[device.simulator]
 	return {
 		device = device.simulator,
-		orientation = if device.orientation == "Portrait" then "Portrait" else "LandscapeRight",
+		orientation = "LandscapeRight",
 		scaling = "FitToWindow",
 		width = size[1],
 		height = size[2],
@@ -148,7 +148,7 @@ local function play(
 	return Playthrough.run(bridge, options)
 end
 
-local PHONE, PHONE_PORTRAIT, TABLET = Playthrough.DEVICES[2], Playthrough.DEVICES[3], Playthrough.DEVICES[4]
+local PHONE, TABLET = Playthrough.DEVICES[2], Playthrough.DEVICES[3]
 
 local function only(calls: { string }, prefix: string): { string }
 	local found = {}
@@ -424,23 +424,6 @@ return function(t: any)
 				.toBe("phone-landscape: the client's viewport is 541x414, not the iphone_16's 852x393")
 		end)
 
-		t.it("records portrait played as landscape as a warning in the report and the summary", function()
-			local landscape = table.clone(THE_END)
-			landscape.screen = { viewport = "733x392", orientation = "LandscapeRight" }
-			local bridge, _, clock, sleep = fakeStudio({ landscape })
-			local report = play(bridge, clock, sleep, { PHONE_PORTRAIT })
-			t.expect(report.result).toBe("pass")
-			t.expect(report.devices[1].warnings).toEqual({ "asked for portrait, the place plays LandscapeRight" })
-			t.expect(
-				string.find(
-					Playthrough.summary(report),
-					"Warning, phone-portrait: asked for portrait, the place plays LandscapeRight",
-					1,
-					true
-				) ~= nil
-			).toBe(true)
-		end)
-
 		t.it("stops playing devices when Stop Play fails, and leaves the simulator alone", function()
 			local bridge, calls, clock, sleep = fakeStudio({ THE_END }, {
 				stopPlay = function()
@@ -559,7 +542,7 @@ return function(t: any)
 			t.expect(string.find(summary, "| 1 | 4 |", 1, true) ~= nil).toBe(true)
 		end)
 
-		t.it("lists PC, then a phone and a tablet in both orientations", function()
+		t.it("lists PC, then a phone and a tablet, landscape only", function()
 			local names = {}
 			for _, run in Playthrough.DEVICES do
 				table.insert(names, `{run.class}:{run.name}`)
@@ -567,9 +550,7 @@ return function(t: any)
 			t.expect(names).toEqual({
 				"PC:pc",
 				"Phone:phone-landscape",
-				"Phone:phone-portrait",
 				"Tablet:tablet-landscape",
-				"Tablet:tablet-portrait",
 			})
 		end)
 	end)
