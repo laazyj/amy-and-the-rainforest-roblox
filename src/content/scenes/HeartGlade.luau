@@ -16,6 +16,10 @@ return {
 	spots = {},
 	zones = zones,
 	props = {},
+	music = "music:paradise",
+	ambience = "cue:ambience_paradise",
+	-- the ring of flowers and the clear ground round it
+	bounds = layout.zone(at(0, 40, 255), at(50, 100, 50)),
 	centre = at(0, 0, 255),
 	ring = { radius = 20, flowers = 9 },
 	-- no trees or stray flowers this close to the centre

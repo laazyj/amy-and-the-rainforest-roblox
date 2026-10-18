@@ -9,6 +9,7 @@ local beats: { [string]: Story.Beat } = {
 	machine_stops = {
 		{ kind = "FrameShot", shot = "MachineFinale" },
 		{ kind = "SetPropState", prop = "Machine", state = "stopped" },
+		{ kind = "PlayCue", cue = "cue:machine_stop" },
 		{ kind = "SetPropState", prop = "Villagers", state = "cheering" },
 		{ kind = "SetPropState", prop = "Machine", state = "retreating" },
 	},

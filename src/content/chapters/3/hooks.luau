@@ -20,6 +20,7 @@ local beats: { [string]: Story.Beat } = {
 	},
 	-- The village arrives with the machine; Dad, Mum and Sam go to the field.
 	machine_arrives = {
+		{ kind = "PlayCue", cue = "cue:machine_rumble" },
 		{ kind = "SetPropState", prop = "Machine", state = "advancing" },
 		{ kind = "SetPropState", prop = "Villagers", state = "gathered" },
 		{ kind = "MoveCharacter", character = "Dad", spot = "DadAtMachine" },

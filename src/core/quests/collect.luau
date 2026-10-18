@@ -2,8 +2,10 @@
 -- Quest Kind `collect`: TouchedPickup for `count` of the Quest's Pickups,
 -- which spawn at its `pickups` Spots once the intro is done. A Pickup's id
 -- is the Spot it spawned at. The Objective counts them: "Find them  (1/3)".
--- On a Resume, the Pickups already touched are removed again.
+-- Each touch plays Cue cue:pickup. On a Resume, the Pickups already touched
+-- are removed again.
 
+local Cues = require("../Cues")
 local Events = require("../Events")
 local Story = require("../Story")
 
@@ -32,6 +34,7 @@ collect = {
 		table.insert(now, event.pickup)
 		return {
 			commands = {
+				{ kind = "PlayCue", cue = Cues.PICKUP },
 				{ kind = "RemovePickup", pickup = event.pickup },
 				{ kind = "SetObjective", text = collect.objective(quest, now) },
 			},

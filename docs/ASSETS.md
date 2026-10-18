@@ -42,7 +42,7 @@ the rest.
 | Field | Meaning |
 |---|---|
 | `name` | The Asset name the game uses; see [Asset names](#asset-names). Unique. |
-| `kind` | `image`, `audio` or `model`. The file's extension must be one the Assets API takes for that kind (`tools/opencloud.luau`, `ASSET_CONTENT_TYPES`). Or `font`, a Creator Store family with no file; see [Fonts](#fonts). |
+| `kind` | `image`, `audio` or `model`. The file's extension must be one the Assets API takes for that kind (`tools/opencloud.luau`, `ASSET_CONTENT_TYPES`). Or, with no file, `font`, a Creator Store family (see [Fonts](#fonts)), or `library-audio`, a track from Roblox's audio library (see [Cues](#cues-the-placeholders-and-the-shopping-list)). |
 | `path` | The file, under `assets/`. Two entries may share a file (a thumbnail that is a Chapter card). None for a font. |
 | `assetId` | The Roblox asset id as a string of digits, or `null` until uploaded. Written by the uploader only, except a font's, which is its Creator Store id and is required. |
 | `sha256` | The SHA-256 of the file that was uploaded. Written by the uploader only. None for a font. |
@@ -61,11 +61,12 @@ An Asset name is a prefix saying what the Asset is for, then a name, in
 the forms of the [glossary's Ids](GLOSSARY.md#6-ids): `card:` (Chapter
 cards and the end card), `ui:` (frames, motifs, screens), `store:`
 (store page art), `ref:` (references, never shown), `cue:` and `music:`
-(Cues), `prop:` (Prop models), `font:` (Creator Store font families). The game looks an Asset up by its name in
+(Cues), `narration:` (a Chapter's narration file), `prop:` (Prop models),
+`font:` (Creator Store font families). The game looks an Asset up by its name in
 `AssetIds.luau`; a name with no id yet is absent, and the game is to fall
 back to plain UI (or silence, for a Cue). The client binder reads
 `AssetIds.luau` for the Chapter cards, the UI frames, the Title screen and
-its font; brief 013 adds the Cues.
+its font, and `src/client/Audio.luau` for the Cues and narration.
 
 ## How to add an asset
 
@@ -117,6 +118,73 @@ designer and the publisher, and `origin` the listing and the font's
 licence. Tier 0 holds all of that. `tools/upload-assets` skips it, and
 `AssetIds.luau` lists it, so code names the Asset (`font:dancing_script`)
 and looks its id up there, as for any other Asset.
+
+### Cues: the placeholders and the shopping list
+
+Every Cue in the [glossary](GLOSSARY.md#cues) starts as a synthesised
+placeholder, so the game is never silent where it should not be: gentle,
+quiet, a few seconds each, the music and ambience looping seamlessly.
+`lune run tools/synth-cues` writes them under `assets/audio/` from
+`tools/lib/synth.luau`, and tier 1 checks each committed file is what its
+recipe renders. They are clearly placeholders: plain tones and filtered
+noise, no instruments, no voice.
+
+The real Cues come from **Roblox's own audio library** on the Creator
+Store: free, already approved, and never uploaded, so they cost none of
+the monthly audio uploads. The library is the owner's to browse (a cloud
+session cannot reach roblox.com). To find one: in Studio, **Toolbox →
+Creator Store → Audio** (or create.roblox.com, Creator Store, Audio),
+choose **Music** or **Sound Effects**, set the length, search, and listen.
+Copy the asset id from the listing.
+
+**Replacing a placeholder is one manifest change.** Its entry becomes a
+`library-audio` entry, as a [font](#fonts) is: kind `library-audio`, no
+`path` and no `sha256`, `upload` false, the library `assetId`,
+`moderation` `approved`, `placeholder` false, licence
+`creator-store-free`, `creator` the listing's artist and publisher and
+`origin` its title and id. Then delete the WAV and run
+`lune run tools/check-assets --write-ids`, which writes the id into
+`src/shared/AssetIds.luau`. Tier 0 holds all of that; the uploader skips
+the entry.
+
+The shopping list, in Clara's palette of feeling: gentle and warm,
+nothing scary, nothing loud. Music sits under the Lines, so pick tracks
+without vocals and without big drums.
+
+| Cue | Search for | Length | Loop |
+|---|---|---|---|
+| `music:theme` | Gentle, hopeful, whimsical; piano or music box with soft strings; "children's story", "fairy tale", "lullaby" | 1–3 min | yes. The original theme tune (GitHub issue "Original theme tune for the game") replaces it if delivered |
+| `music:home` | Calm, cosy, pastoral; acoustic guitar or light piano; "sunday morning", "countryside", "cosy home" | 1–3 min | yes |
+| `music:field` | Curious, airy, open; flute or light woodwinds; "adventure begins", "meadow", "exploration" (light) | 1–3 min | yes |
+| `music:paradise` | Magical, wondrous, shimmering; harp, celesta, soft pads; "enchanted forest", "fantasy", "magic garden" | 1–3 min | yes |
+| `cue:ambience_home` | A garden on a sunny day: birdsong, a light breeze, no traffic or people; "garden ambience", "birds daytime" | 30 s or more | yes |
+| `cue:ambience_field` | An open field: wind through grass, distant birds; "meadow ambience", "field wind" | 30 s or more | yes |
+| `cue:ambience_paradise` | A gentle rainforest: soft insects, far birds, leaves, no thunder or heavy rain; "jungle ambience calm", "rainforest day" | 30 s or more | yes |
+| `cue:chapter_card` | A soft chime or harp flourish; "magic chime", "harp glissando short" | 1–3 s | no |
+| `cue:prompt` | A soft, friendly UI click or pop; "UI select soft", "bubble pop" | under 0.5 s | no |
+| `cue:pickup` | A small sparkle or twinkle; "collect sparkle", "magic twinkle" | under 1 s | no |
+| `cue:footstep` | One soft step on grass; "footstep grass" (one step, not a walk loop) | under 0.3 s | no |
+| `cue:sam_bark` | A friendly medium dog's bark, not aggressive; "dog bark friendly", "small dog woof" | under 1 s | no |
+| `cue:paradise_shimmer` | A rising magical shimmer; "magic reveal", "sparkle swell" | 1–3 s | no |
+| `cue:machine_rumble` | A big machine's engine rumbling closer, not menacing; "tractor engine", "bulldozer idle" | 2–5 s | no |
+| `cue:machine_stop` | An engine winding down and switching off; "engine shut off", "machine power down" | 1–3 s | no |
+
+A Cue with no asset id is silent, never an error, so a placeholder can
+be replaced one at a time. If the library has nothing suitable for a Cue,
+the alternatives are, in order: a free-licence (`cc0` or `cc-by`) file
+uploaded as `audio`, then keeping the synthesised one.
+
+**Narration** (plan section 7) is the owner's recording, uploaded: one
+file per Chapter, `narration:<chapter id>` (the last Chapter's also reads
+the Ending), with each canon Line's start and end in the Narration table,
+`src/content/narration.luau`. Tier 1 holds the table to the canon Lines.
+
+**Uploads, planned.** This brief's placeholders are 15 audio uploads in
+one run; narration is 4 more, one a Chapter, run when the recordings
+arrive. Both fit the 100 a month an ID-verified account has; without
+verification (10 a month) the run stops part way, keeping the ids it got,
+and the next month's run does the rest. Every Cue replaced by a library
+pick needs no upload at all.
 
 ### What the tier 0 scan catches
 
@@ -170,7 +238,9 @@ From the Roblox Assets API guide, as checked in
 
 Every file is at most 20 MB (tier 0 checks it). Because of the audio
 cap, narration is batched one file per Chapter (plan section 7), and
-the account must be ID-verified before brief 013.
+the account must be ID-verified before brief 013. The Cues come from
+Roblox's audio library where it can, which needs no upload; see
+[the upload plan](#cues-the-placeholders-and-the-shopping-list).
 
 ## Moderation
 

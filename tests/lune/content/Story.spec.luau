@@ -135,9 +135,14 @@ return function(t: any)
 				expect(resumed).toEqual(Walker.withoutPlayer(playable.world))
 			end)
 
-			it("frames no Shot, so none is left on screen after a jump or a Resume", function()
-				expect(table.find(Walker.kinds(StoryEngine.resume(story, playable.progress)), "FrameShot")).toBeNil()
-			end)
+			it(
+				"frames no Shot and plays no Cue, so none is left on screen or replayed after a jump or a Resume",
+				function()
+					local kinds = Walker.kinds(StoryEngine.resume(story, playable.progress))
+					expect(table.find(kinds, "FrameShot")).toBeNil()
+					expect(table.find(kinds, "PlayCue")).toBeNil()
+				end
+			)
 
 			it("completes the Story from there", function()
 				expect(Walker.walk(story, playable.progress, Walker.deepCopy(resumed)).progress.ended).toBe(true)

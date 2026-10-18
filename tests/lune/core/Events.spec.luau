@@ -45,6 +45,7 @@ return function(t: any)
 				"FrameShot",
 				"MoveCharacter",
 				"OfferTalk",
+				"PlayCue",
 				"RemovePickup",
 				"SetLighting",
 				"SetObjective",

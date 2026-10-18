@@ -85,7 +85,11 @@ local fixture: Story.Story = {
 		dusk = { saturation = 0.2, contrast = 0.1, tint = { r = 255, g = 220, b = 200 }, seconds = 1 },
 	},
 	initialLighting = "day",
-	ending = { lines = { { speaker = "Narrator", text = "The end." } }, title = "The end", subtitle = "Fixture" },
+	ending = {
+		lines = { { speaker = "Narrator", text = "The end.", canon = true } },
+		title = "The end",
+		subtitle = "Fixture",
+	},
 }
 
 return fixture

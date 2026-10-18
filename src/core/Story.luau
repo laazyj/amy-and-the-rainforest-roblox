@@ -60,13 +60,18 @@ export type Chapter = {
 	beats: { [string]: Beat },
 }
 
--- A Scene's Spots, Zones and Props (src/content/scenes/<Scene>.luau). The
--- scene files also hold the layout SceneBuilder builds from.
+-- A Scene's Spots, Zones and Props (src/content/scenes/<Scene>.luau), and
+-- its sound: the music and ambience Cues that play while Amy is inside its
+-- bounds (src/core/Soundscape). The scene files also hold the layout
+-- SceneBuilder builds from.
 export type Scene = {
 	id: string,
 	spots: { [string]: Spot },
 	zones: { [string]: Zone },
 	props: { [string]: Prop },
+	music: string,
+	ambience: string,
+	bounds: Box,
 }
 
 export type Character = {
@@ -81,8 +86,10 @@ export type Character = {
 
 -- A named position on the ground and the direction it faces.
 export type Spot = { at: Vec3, facing: Vec3 }
--- A named invisible box, by its centre and size.
-export type Zone = { centre: Vec3, size: Vec3 }
+-- A box, by its centre and size.
+export type Box = { centre: Vec3, size: Vec3 }
+-- A named invisible box the player can enter.
+export type Zone = Box
 -- A Prop's states in lifecycle order; the first is the state it starts in.
 export type Prop = { states: { string } }
 export type LightingPreset = { saturation: number, contrast: number, tint: RGB, seconds: number }

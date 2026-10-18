@@ -118,6 +118,13 @@ return function(t: any)
 			expect(args).toEqual(table.pack("ForestWallReveal", nil))
 		end)
 
+		it("carries PlayCue to the client by the Cue's name", function()
+			local remote, args = Net.message({ kind = "PlayCue", cue = "cue:sam_bark" })
+			expect(remote).toBe("PlayCue")
+			expect(args).toEqual(table.pack("cue:sam_bark"))
+			expect(Net.check("PlayCue", table.pack(7))).toBe(false)
+		end)
+
 		it("keeps the other World commands on the server", function()
 			expect(Net.message({ kind = "MoveCharacter", character = "Sam", spot = "Farm" })).toBeNil()
 			expect(Net.message({ kind = "Wait", seconds = 3.2 })).toBeNil()
@@ -132,6 +139,7 @@ return function(t: any)
 					{ kind = "ShowChapterCard", title = "a", subtitle = "b", ending = true },
 					{ kind = "FrameShot", shot = "Dialogue", character = "Dad" },
 					{ kind = "FrameShot", shot = "MachineFinale" },
+					{ kind = "PlayCue", cue = "cue:machine_stop" },
 				} :: { any }
 			do
 				local remote, args = Net.message(command)

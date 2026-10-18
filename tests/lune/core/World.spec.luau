@@ -24,6 +24,7 @@ return function(t: any)
 		{ { kind = "TeleportPlayer", spot = "GardenInside" }, "teleportPlayer" },
 		{ { kind = "SetPropState", prop = "Machine", state = "advancing" }, "setPropState" },
 		{ { kind = "SetLighting", preset = "paradise" }, "setLighting" },
+		{ { kind = "PlayCue", cue = "cue:sam_bark" }, "playCue" },
 		{ { kind = "FrameShot", shot = "MeetCharacter", character = "Fox" }, "frameShot" },
 		{ { kind = "SpawnPickups", quest = "chapter9.pick" }, "spawnPickups" },
 		{ { kind = "RemovePickup", pickup = "FlowerA" }, "removePickup" },

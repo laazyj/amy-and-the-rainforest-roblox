@@ -59,6 +59,10 @@ return {
 	spots = spots,
 	zones = zones,
 	props = props,
+	music = "music:field",
+	ambience = "cue:ambience_field",
+	-- from the garden's front fence to just short of the trunks
+	bounds = zone(at(0, 40, 65), at(190, 100, 160)),
 	-- the playable world: from behind the village to the far end of the
 	-- paradise (scene:Paradise), this wide
 	ground = { y = 0, startZ = -75, halfWidth = 95 },
