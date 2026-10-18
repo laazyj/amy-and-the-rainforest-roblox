@@ -16,7 +16,6 @@
 	  starting(preferred, touch, keyboard)
 	                               the Input kind before any input
 	  pick(input, width, height)   the Device class
-	  portrait(width, height)      whether the viewport is taller than wide
 ]]
 
 export type DeviceClass = "PC" | "Phone" | "Tablet"
@@ -64,10 +63,6 @@ function DeviceClass.pick(input: InputKind, width: number, height: number): Devi
 		return "PC"
 	end
 	return if math.min(width, height) < DeviceClass.PHONE_SHORTER_SIDE then "Phone" else "Tablet"
-end
-
-function DeviceClass.portrait(width: number, height: number): boolean
-	return height > width
 end
 
 return DeviceClass

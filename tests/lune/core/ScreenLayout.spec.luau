@@ -25,23 +25,9 @@ local DEVICES: { ScreenLayout.Screen } = {
 	},
 	{
 		class = "Phone",
-		width = 390,
-		height = 844,
-		insets = { left = 0, top = 105, right = 0, bottom = 34 },
-		textScale = 1,
-	},
-	{
-		class = "Phone",
 		width = 667,
 		height = 375,
 		insets = { left = 0, top = 58, right = 0, bottom = 0 },
-		textScale = 1,
-	},
-	{
-		class = "Phone",
-		width = 375,
-		height = 667,
-		insets = { left = 0, top = 78, right = 0, bottom = 0 },
 		textScale = 1,
 	},
 	{
@@ -53,33 +39,12 @@ local DEVICES: { ScreenLayout.Screen } = {
 	},
 	{
 		class = "Tablet",
-		width = 1032,
-		height = 1376,
-		insets = { left = 0, top = 82, right = 0, bottom = 20 },
-		textScale = 1,
-	},
-	{
-		class = "Tablet",
 		width = 1180,
 		height = 820,
 		insets = { left = 0, top = 82, right = 0, bottom = 20 },
 		textScale = 1,
 	},
-	{
-		class = "Tablet",
-		width = 820,
-		height = 1180,
-		insets = { left = 0, top = 82, right = 0, bottom = 20 },
-		textScale = 1,
-	},
-	-- the most common Android phone, both ways, and a small landscape one
-	{
-		class = "Phone",
-		width = 360,
-		height = 800,
-		insets = { left = 0, top = 82, right = 0, bottom = 24 },
-		textScale = 1,
-	},
+	-- two small landscape phones
 	{
 		class = "Phone",
 		width = 800,
@@ -134,8 +99,7 @@ local function at(device: ScreenLayout.Screen, textScale: number): Layout
 end
 
 local function describeScreen(device: ScreenLayout.Screen, textScale: number): string
-	local orientation = if device.height > device.width then "portrait" else "landscape"
-	return `{device.class} {device.width}x{device.height} {orientation} at Text scale {textScale}`
+	return `{device.class} {device.width}x{device.height} at Text scale {textScale}`
 end
 
 local function inside(inner: Rect, outer: Rect): boolean
@@ -186,7 +150,7 @@ return function(t: any)
 
 	describe("ScreenLayout text sizes", function()
 		it("are feel.md's for each class at Text scale 1: body, speaker, Objective, hint", function()
-			local phone, tablet, pc = at(DEVICES[1], 1), at(DEVICES[5], 1), at(DEVICES[12], 1)
+			local phone, tablet, pc = at(DEVICES[1], 1), at(DEVICES[3], 1), at(DEVICES[7], 1)
 			expect(phone.text).toEqual({ body = 20, speaker = 18, objective = 18, hint = 14 })
 			expect(tablet.text).toEqual({ body = 24, speaker = 20, objective = 20, hint = 16 })
 			expect(pc.text).toEqual({ body = 24, speaker = 20, objective = 20, hint = 16 })
@@ -194,7 +158,7 @@ return function(t: any)
 
 		it("scale with the Text scale, which stays between 1 and 1.5", function()
 			expect(at(DEVICES[1], 1.5).text).toEqual({ body = 30, speaker = 27, objective = 27, hint = 21 })
-			expect(at(DEVICES[12], 1.5).text).toEqual({ body = 36, speaker = 30, objective = 30, hint = 24 })
+			expect(at(DEVICES[7], 1.5).text).toEqual({ body = 36, speaker = 30, objective = 30, hint = 24 })
 			expect(at(DEVICES[1], 3).text).toEqual(at(DEVICES[1], 1.5).text)
 			expect(at(DEVICES[1], 0.5).text).toEqual(at(DEVICES[1], 1).text)
 		end)
@@ -223,21 +187,10 @@ return function(t: any)
 			end
 		end)
 
-		each("in phone portrait it grows to at most 40% of the height", function(layout, device)
-			if layout.class == "Phone" and layout.portrait then
-				expect(layout.dialogue.maxHeight <= 0.4 * device.height).toBe(true)
-			end
-		end)
-
 		it("is as wide as the 60-character cap on a 13-inch tablet: 720 units in a 768-unit box", function()
-			local tablet = at(DEVICES[5], 1)
+			local tablet = at(DEVICES[3], 1)
 			expect(tablet.dialogue.column).toBe(720)
 			expect(tablet.dialogue.width).toBe(768)
-		end)
-
-		it("is the space minus 24 units each side where that is under the cap: a phone in portrait", function()
-			local phone = at(DEVICES[2], 1)
-			expect(phone.dialogue.column).toBe(390 - 2 * 24)
 		end)
 	end)
 
@@ -252,19 +205,16 @@ return function(t: any)
 			near(phone[1], { x = 0, y = 390 * 0.6, width = 844 * 0.35, height = 390 * 0.4 })
 			near(phone[2], { x = 844 * 0.65, y = 390 * 0.6, width = 844 * 0.35, height = 390 * 0.4 })
 			near(
-				at(DEVICES[5], 1).zones[2],
+				at(DEVICES[3], 1).zones[2],
 				{ x = 1376 * 0.75, y = 1032 * 0.65, width = 1376 * 0.25, height = 1032 * 0.35 }
 			)
-			expect(at(DEVICES[12], 1).zones).toEqual({})
-			expect(at(DEVICES[12], 1).ring).toBeNil()
+			expect(at(DEVICES[7], 1).zones).toEqual({})
+			expect(at(DEVICES[7], 1).ring).toBeNil()
 		end)
 
-		it("follow a rotation: a phone turned to portrait has its zones and box laid out again", function()
-			local landscape, portrait = at(DEVICES[1], 1), at(DEVICES[2], 1)
-			expect(portrait.portrait).toBe(true)
-			expect(portrait.zones[1].height).toBe(844 * 0.4)
-			expect(landscape.dialogue.bottom > (landscape.talk :: Rect).y).toBe(true) -- beside the buttons
-			expect(portrait.dialogue.bottom < (portrait.talk :: Rect).y).toBe(true) -- above it
+		it("leave the box beside the buttons, not over them", function()
+			local landscape = at(DEVICES[1], 1)
+			expect(landscape.dialogue.bottom > (landscape.talk :: Rect).y).toBe(true)
 		end)
 
 		each("the Talk-and-advance and Skip buttons sit in the right zone, the ring in the left", function(layout)
@@ -299,9 +249,8 @@ return function(t: any)
 			expect(round.x + round.width / 2).toBe(stick.x + 45)
 			expect(round.y + round.height / 2).toBe(stick.y + 45)
 			-- the dynamic thumbstick's touch area, as the player module lays
-			-- it out (40% x 2/3 in landscape, all the width x 40% in
-			-- portrait): its bottom-left corner, never its middle
-			local share = if layout.portrait then { 1, 0.4 } else { 0.4, 2 / 3 }
+			-- it out (40% x 2/3): its bottom-left corner, never its middle
+			local share = { 0.4, 2 / 3 }
 			local width, height = left.width / ScreenLayout.ZONES[layout.class].width, left.y + left.height
 			local area = { x = 0, y = height * (1 - share[2]), width = width * share[1], height = height * share[2] }
 			local corner = ScreenLayout.ringAround(layout, area, true) :: Rect
@@ -338,7 +287,7 @@ return function(t: any)
 		end)
 
 		it("is a row beside each other on a PC and a phone in landscape", function()
-			for _, device in { DEVICES[1], DEVICES[12], DEVICES[14] } do
+			for _, device in { DEVICES[1], DEVICES[7], DEVICES[9] } do
 				local layout = at(device, 1)
 				expect(layout.skip.y + layout.skip.height).toBe(layout.talk.y + layout.talk.height)
 			end
@@ -519,7 +468,7 @@ return function(t: any)
 		end)
 
 		it("is sized to its words on a PC, not to the screen", function()
-			local small, large = at(DEVICES[12], 1).title.pill, at(DEVICES[14], 1).title.pill
+			local small, large = at(DEVICES[7], 1).title.pill, at(DEVICES[9], 1).title.pill
 			expect(small.width).toBe(large.width)
 			expect(small.width < 1280 / 2).toBe(true)
 		end)

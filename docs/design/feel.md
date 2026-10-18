@@ -39,13 +39,24 @@ not show her face) but never break it.
 ## 1. Device classes
 
 The client binder picks the class when it starts and again whenever the
-viewport size changes (rotation, window resize):
+viewport size changes (window resize, the device turned in the hand):
 
-| Class | Detected when | Designed for | Viewing distance | Orientations |
+| Class | Detected when | Designed for | Viewing distance | Orientation |
 |---|---|---|---|---|
 | **PC** | Keyboard or mouse is the last input used | 1280 × 720 to 2560 × 1440 window | 60 cm | landscape |
-| **Phone** | Touch, and the viewport's shorter side is under 600 units | 6-inch phone, about 844 × 390 units | 30 cm | landscape and portrait |
-| **Tablet** | Touch, and the shorter side is 600 units or more | 11- to 13-inch tablet, up to about 1376 × 1032 units | 40 cm | landscape first; portrait works |
+| **Phone** | Touch, and the viewport's shorter side is under 600 units | 6-inch phone, about 844 × 390 units | 30 cm | landscape |
+| **Tablet** | Touch, and the shorter side is 600 units or more | 11- to 13-inch tablet, up to about 1376 × 1032 units | 40 cm | landscape |
+
+The game is landscape only. The place keeps Roblox's default
+`StarterGui.ScreenOrientation`, `LandscapeSensor`: a phone or tablet
+renders the game in landscape whichever way it is held, and the device
+rotates in the player's hands, as in most 3D Roblox experiences.
+
+*Decision, 2026-10-17 (owner, on PR #56):* portrait support is dropped.
+The over-the-shoulder camera and the camera rule need width; the phone
+playtest in portrait cut Mum off at one edge, Sam's label at the other and
+left Dad's talk prompt off screen at spawn, and portrait would need layout
+rules of its own; children rotate the phone for every other 3D game.
 
 Gamepad is later; when it arrives it uses the PC layout with on-screen
 button glyphs.
@@ -75,13 +86,12 @@ The same rules apply to every class; only the numbers differ.
   included: the talk-and-advance button ("Talk", or "Next" while a
   Dialogue shows) in the corner, and the Onboarding's Skip button beside
   it while a Hint shows in free play (above it where a row would leave
-  the right zone, in portrait). The talk-and-advance button shows only
+  the right zone). The talk-and-advance button shows only
   while a Dialogue shows or a prompt is within reach.
 - **While a Dialogue shows on touch**, Amy listens: the player's controls
   are disabled (as the old full-screen click catcher already took every
   touch), so the dialogue box may cover the left zone. On every class it
-  keeps clear of the talk-and-advance button: beside it in landscape and
-  on a PC, above it in portrait. The box and the talk-and-advance button both advance. Every
+  keeps clear of the talk-and-advance button, beside it. The box and the talk-and-advance button both advance. Every
   way a Dialogue ends gives the controls back.
 - **The pause button** sits at the top right of the safe area on every
   class, a 48 × 48 touch target, clear of Roblox's own buttons at the top
@@ -173,8 +183,7 @@ box, centred. Today's box at 62% of a 1376-unit-wide tablet holds about
 
 ### Other text rules
 
-- A Line never scrolls: the dialogue box grows to fit (at most 40% of
-  the screen height in phone portrait) and `TextFits` must be true. The
+- A Line never scrolls: the dialogue box grows to fit and `TextFits` must be true. The
   [style guide](../story/style-guide.md#3-reading-level-ages-7-to-12)
   keeps Lines short and untimed so this holds.
 - Contrast between text and its background is at least 4.5:1, and 7:1 in
