@@ -63,7 +63,7 @@ cards and the end card), `ui:` (frames, motifs, screens), `store:`
 (store page art), `ref:` (references, never shown), `cue:` and `music:`
 (Cues), `narration:` (a Chapter's narration file), `prop:` (Prop models),
 `character:` ([Character models](#character-models)), `font:` (Creator
-Store font families). The game looks an Asset up by its name in
+Store font families), `catalog:` ([Catalog items](#catalog-items)). The game looks an Asset up by its name in
 `AssetIds.luau`; a name with no id yet is absent, and the game is to fall
 back to plain UI (or silence, for a Cue). The client binder reads
 `AssetIds.luau` for the Chapter cards, the UI frames, the Title screen and
@@ -171,15 +171,38 @@ What the Mac agent does for each animal:
    against `design/feel.md`. Then the Placeholder can stay in content as
    the fallback, or go with the owner's say-so.
 
-**Catalog items for the humans.** Amy, Dad, Mum and the villagers are
-body colours only so far: no hair, no clothes. Free catalog items (hair
-first: Amy's long brown hair is what the camera sees most, as in
-`ref:Amy`) are chosen in the Avatar Shop by the owner or the Mac agent;
-each becomes a Manifest entry referenced by its id, as a font is, and its
-slot is added to the Description (`src/core/Story.luau`) and to
-`CharacterHost.humanoidDescription`. The slots to fill: Amy's hair (long,
-brown, `#5a3016` or near), a red jumper and a blue skirt (or keep the body
-colours for them); Dad's and Mum's hair; the villagers' hair.
+### Catalog items
+
+The humans are Roblox's R15 body in the colours of their Description.
+What colours cannot do (hair, sleeves, a skirt, shoes) is a Catalog item:
+a free avatar item from the Marketplace that a Description wears in a
+named slot. Amy's Description (`src/content/characters.luau`), from Clara's
+`ref:Amy`, names five, each by its Asset name:
+
+| Slot | Asset | Search the Marketplace (Avatar Shop) for, free only | Look |
+|---|---|---|---|
+| `hair` | `catalog:amy_hair` | Hair: "long brown hair", "long straight hair" | Long, dark brown, past the shoulders, covering the back of the head: what the camera sees most |
+| `shirt` | `catalog:amy_shirt` | Clothing, Shirts (layered): "red sweater", "red long sleeve" | A red long-sleeved top, close to `#c2402f` |
+| `skirt` | `catalog:amy_skirt` | Clothing, Dresses & Skirts (layered): "blue skirt" | A mid-blue skirt, about `#2f6fb5` |
+| `leftShoe`, `rightShoe` | `catalog:amy_left_shoe`, `catalog:amy_right_shoe` | Clothing, Shoes (layered; a pair is two items): "brown shoes" | Plain brown shoes, about `#7a4a2a` |
+
+Until a slot's Asset has an id, Amy is built without it: her light skin
+(`#dba97e`) on head, arms and legs, and her red jumper on the torso.
+
+**Recording one is one Manifest entry**, as for a [font](#fonts): kind
+`catalog`, the name above, no `path` and no `sha256`, `upload` false, the
+item's `assetId` from its Marketplace page, `moderation` `approved`,
+`placeholder` false, licence `creator-store-free`, `creator` the item's
+creator and `origin` its title and page. Then run
+`lune run tools/check-assets --write-ids`, which writes the id into
+`src/shared/AssetIds.luau`. `server/CharacterHost` reads the slot's id
+there and Amy wears the item from her next spawn. Tier 0 holds the entry
+to these rules. Pick items with no face and nothing on the face, and check
+on Dev that the hair covers the back of her head (the camera never sees her
+face, so nothing in front matters). Only the Player Character wears
+Catalog items so far: Dad, Mum and the villagers are copies of one R15
+body in their colours, and giving them slots means applying their
+HumanoidDescription in `CharacterHost.buildHuman` too.
 
 ### Cues: the placeholders and the shopping list
 

@@ -46,6 +46,18 @@ return function(t: any)
 			end
 		end
 
+		it("gives Amy's Description every Catalog slot", function()
+			local amy = assert(StoryTypes.character(story, "Amy"))
+			local description = assert(amy.description, "Amy has a Description")
+			local catalog = assert(description.catalog, "Amy has Catalog slots") :: { [string]: string }
+			for slot in StoryTypes.CATALOG_SLOTS do
+				expect(catalog[slot]).never.toBeNil()
+			end
+			for slot in catalog do
+				expect(StoryTypes.CATALOG_SLOTS[slot]).never.toBeNil()
+			end
+		end)
+
 		it("names a Character that is not a human with every Character model in the manifest", function()
 			for id in characterModels do
 				local character = StoryTypes.character(story, id)

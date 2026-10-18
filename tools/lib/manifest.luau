@@ -45,17 +45,26 @@ Manifest.NAME_PREFIXES = table.freeze({
 	prop = true, -- a Prop's model
 	character = true, -- a Character model: a Character with its Humanoid and animations
 	font = true, -- a Creator Store font family, referenced by id
+	catalog = true, -- a free Catalog item a Description wears, referenced by id
 })
 
 -- The kinds referenced by their Creator Store id, never uploaded, so with
--- no file: a font family, and a track from Roblox's audio library.
+-- no file: a font family, a track from Roblox's audio library, and a free
+-- avatar item from the Marketplace (a Catalog item).
 Manifest.FONT = "font"
 Manifest.LIBRARY_AUDIO = "library-audio"
-Manifest.REFERENCED = table.freeze({ [Manifest.FONT] = true, [Manifest.LIBRARY_AUDIO] = true })
+Manifest.CATALOG = "catalog"
+Manifest.REFERENCED = table.freeze({
+	[Manifest.FONT] = "a font",
+	[Manifest.LIBRARY_AUDIO] = "a library-audio track",
+	[Manifest.CATALOG] = "a Catalog item",
+})
+-- The kinds whose Asset names have a prefix of their own, and that prefix.
+Manifest.KIND_PREFIXES = table.freeze({ [Manifest.FONT] = "font", [Manifest.CATALOG] = "catalog" })
 
 Manifest.LICENCES = table.freeze({
 	owner = true, -- made for this game by the owner's family (Clara's work), or generated here
-	["creator-store-free"] = true, -- free on the Creator Store
+	["creator-store-free"] = true, -- free on the Creator Store (or the Marketplace, for a Catalog item)
 	cc0 = true,
 	["cc-by"] = true, -- needs `attribution`
 	synthesised = true, -- audio generated for this game
@@ -170,7 +179,7 @@ end
 -- references it by its id: it has no file, is never uploaded, and Roblox
 -- published it, so it is approved.
 local function referencedProblems(entry: any, bad: (string) -> ())
-	local a = if entry.kind == Manifest.FONT then "a font" else "a library-audio track"
+	local a = Manifest.REFERENCED[entry.kind]
 	if entry.path ~= nil or entry.sha256 ~= nil or entry.amy ~= nil then
 		bad(`{a} has no path, sha256 or amy: it is referenced, not uploaded`)
 	end
@@ -226,6 +235,11 @@ function Manifest.validate(manifest: any, readFile: (string) -> string?): { stri
 			bad(`licence must be one of {keys(Manifest.LICENCES)}`)
 		elseif entry.licence == "cc-by" and not nonEmpty(entry.attribution) then
 			bad("a cc-by licence needs an attribution")
+		end
+		for kind, kindPrefix in Manifest.KIND_PREFIXES do
+			if (prefix == kindPrefix) ~= (entry.kind == kind) then
+				bad(`{Manifest.REFERENCED[kind]} is named {kindPrefix}:<name> and has kind "{kind}"`)
+			end
 		end
 		if Manifest.REFERENCED[entry.kind] then
 			referencedProblems(entry, bad)

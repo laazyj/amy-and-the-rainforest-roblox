@@ -93,6 +93,23 @@ return function(t: any)
 			expect(Manifest.validate(manifest(entry(M.LIBRARY_AUDIO)), readFile)).toEqual({})
 		end)
 
+		it("accepts a Catalog item: an id with no file, never uploaded, as a font", function()
+			local item = entry(FONT, { name = "catalog:amy_hair", kind = "catalog" })
+			expect(Manifest.validate(manifest(item), readFile)).toEqual({})
+		end)
+
+		it("holds a Catalog item to its name and a font's rules", function()
+			local problems = Manifest.validate(
+				manifest(entry(FONT, { name = "catalog:amy_hair", kind = "catalog", upload = true })),
+				readFile
+			)
+			expect(problems).toEqual({
+				'catalog:amy_hair: a Catalog item has upload false and moderation "approved"',
+			})
+			local misnamed = Manifest.validate(manifest(entry(FONT, { kind = "catalog" })), readFile)
+			expect(misnamed[1]).toContain('a Catalog item is named catalog:<name> and has kind "catalog"')
+		end)
+
 		it("holds a library-audio track to a font's rules", function()
 			local problems =
 				Manifest.validate(manifest(entry(M.LIBRARY_AUDIO, { path = M.PNG_PATH, upload = true })), readFile)

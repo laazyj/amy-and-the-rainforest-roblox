@@ -59,7 +59,8 @@ Scene (look + sound)                     Player
 | **Zone** | A named invisible volume the player can enter. Entering one is the Player event `EnteredZone`. See [enumeration](#zones). | `zone:ForestGap` |
 | **Prop** | A placed object with named states. See [enumeration](#props). | `prop:Machine` |
 | **Character** | A named being in the world with a kind, a display name and a home Spot. A human is built from its Description; any other Character from its Character model, or as its Placeholder until it has one (`Story.build`). Every Character has a Humanoid and plays its `idle` animation, and its `run` one while it runs. See [enumeration](#characters-and-speakers). | `character:Sam` "Sam the Dog" |
-| **Description** | How a human Character looks: the colour of each part of its R15 body (head, torso, arms, legs), from Clara's palette, in `src/content/characters.luau` (the villagers' in `scene:Field`'s file). `server/CharacterHost` makes it a HumanoidDescription; the Player Character wears hers from the moment she spawns. Catalog items (hair, clothes) are to be added to it once chosen. | Amy: the red jumper, the blue skirt |
+| **Description** | How a human Character looks: the colour of each part of its R15 body (head, torso, arms, legs), from Clara's palette, and the Catalog items it wears by slot (`hair`, `shirt`, `skirt`, `leftShoe`, `rightShoe`), in `src/content/characters.luau` (the villagers' in `scene:Field`'s file). `server/CharacterHost` makes it a HumanoidDescription; the Player Character wears hers from the moment she spawns. | Amy, from `ref:Amy`: light skin and the red jumper, and `catalog:amy_hair` in her `hair` slot |
+| **Catalog item** | A free avatar item from the Marketplace (hair, a shirt, a skirt, a shoe) a Description wears in one of its slots: an Asset of kind `catalog`, named `catalog:<name>`, referenced by its id as a font is and never uploaded. A slot whose Asset has no id yet is left off. See [`ASSETS.md`](ASSETS.md#catalog-items). | `catalog:amy_hair` |
 | **Character model** | A free Creator Store model a Character is built from, with its Humanoid and its animations (an Animations folder holding `idle`, `walk` and `run`): an Asset of kind `model`, named for its Character (`character:Sam`), at `assets/meshes/characters/<id>.rbxm`, which the place file holds in `ServerStorage.CharacterModels`. Fetched on the Mac ([`ASSETS.md`](ASSETS.md#character-models)). | `character:Sam` |
 | **Player Character** | The Character the player controls. The player **is Amy**. | `character:Amy` |
 | **Talk affordance** | How the player talks to a Character: a prompt on the Character, offered while a `talk` Quest waits for `TalkedTo` (World commands `OfferTalk`, `WithdrawTalk`). | "Say hello (bravely)" on the Lion |
@@ -466,6 +467,7 @@ position or raw coordinate.
 | Asset: reference for building a Character or Prop | `ref:<the Character's or Prop's PascalCase name>` | `ref:Sam`, `ref:Machine` |
 | Asset: a Character model, a Prop's model or a Cue's sound | the Character's, Prop's or Cue's own id | `character:Sam`, `prop:Machine`, `cue:sam_bark` |
 | Asset: a Creator Store font family | `font:<snake_case>` | `font:dancing_script` |
+| Asset: a Catalog item | `catalog:<snake_case>` | `catalog:amy_hair` |
 | Asset: a Chapter's narration file | `narration:<chapter id>` | `narration:chapter1` |
 | Collectible | `collectible:<snake_case>` | `collectible:maroon_acorn` |
 

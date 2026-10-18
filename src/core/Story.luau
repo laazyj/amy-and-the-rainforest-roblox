@@ -74,9 +74,20 @@ export type Scene = {
 	bounds: Box,
 }
 
+-- The Catalog items a Description wears, by slot, each by its Asset name
+-- (`catalog:<name>`). A slot is worn once the Manifest has its id.
+export type Catalog = {
+	hair: string?,
+	shirt: string?,
+	skirt: string?,
+	leftShoe: string?,
+	rightShoe: string?,
+}
+
 -- How a human Character looks: the colour of each part of an R15 body,
--- from Clara's palette, made into a HumanoidDescription by the adapter.
-export type Description = { head: RGB, torso: RGB, arms: RGB, legs: RGB }
+-- from Clara's palette, and the Catalog items it wears, made into a
+-- HumanoidDescription by the adapter.
+export type Description = { head: RGB, torso: RGB, arms: RGB, legs: RGB, catalog: Catalog? }
 
 -- How any other Character is drawn, out of parts, until its Character model
 -- is in the place: its colours, its size against the dog's, and its tail.
@@ -146,6 +157,16 @@ export type Kind = {
 }
 
 local Story = {}
+
+-- Each Catalog slot: the kind of avatar accessory it holds, and whether it
+-- is layered clothing (worn over the body) or a rigid accessory.
+Story.CATALOG_SLOTS = table.freeze({
+	hair = { accessory = "Hair", layered = false },
+	shirt = { accessory = "Shirt", layered = true },
+	skirt = { accessory = "DressSkirt", layered = true },
+	leftShoe = { accessory = "LeftShoe", layered = true },
+	rightShoe = { accessory = "RightShoe", layered = true },
+} :: { [string]: { accessory: string, layered: boolean } })
 
 Story.NARRATOR = "Narrator"
 

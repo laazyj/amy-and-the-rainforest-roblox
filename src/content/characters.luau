@@ -12,6 +12,7 @@ local rgb, dressed = layout.rgb, layout.dressed
 local colours = palette.colours
 
 local SKIN, TROUSERS = colours.skin, colours.trousers
+local AMY_SKIN = rgb(219, 169, 126) -- #dba97e
 
 local characters: { Story.Character } = {
 	{
@@ -20,8 +21,23 @@ local characters: { Story.Character } = {
 		kind = "human",
 		home = "AmySpawn",
 		player = true,
-		-- as Clara drew her (ref:Amy): the red jumper and the blue skirt
-		description = dressed(rgb(214, 170, 125), colours.red, rgb(62, 111, 176)),
+		-- as Clara drew her (ref:Amy): light skin, bare legs and the red
+		-- jumper; her long dark brown hair, the jumper's long sleeves, the
+		-- blue skirt and the brown shoes are Catalog items, worn once the
+		-- Manifest has their ids
+		description = {
+			head = AMY_SKIN,
+			torso = colours.red,
+			arms = AMY_SKIN,
+			legs = AMY_SKIN,
+			catalog = {
+				hair = "catalog:amy_hair",
+				shirt = "catalog:amy_shirt",
+				skirt = "catalog:amy_skirt",
+				leftShoe = "catalog:amy_left_shoe",
+				rightShoe = "catalog:amy_right_shoe",
+			},
+		},
 	},
 	{
 		id = "Dad",

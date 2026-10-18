@@ -23,6 +23,7 @@ local ServerStorage = game:GetService("ServerStorage")
 local Workspace = game:GetService("Workspace")
 
 local Story = require(ReplicatedStorage:WaitForChild("core"):WaitForChild("Story"))
+local AssetIds = require(ReplicatedStorage:WaitForChild("shared"):WaitForChild("AssetIds"))
 local Convert = require(script.Parent.Convert)
 local Parts = require(script.Parent.Parts)
 
@@ -75,7 +76,8 @@ local function addNameTag(rootPart: BasePart, displayName: string, offsetY: numb
 	billboard.Parent = rootPart
 end
 
--- A Description as a HumanoidDescription.
+-- A Description as a HumanoidDescription: its colours, and each Catalog
+-- item whose id the Manifest has (AssetIds); an empty slot is left off.
 function CharacterHost.humanoidDescription(description: Story.Description): HumanoidDescription
 	local made = Instance.new("HumanoidDescription")
 	local arms, legs = Convert.colour(description.arms), Convert.colour(description.legs)
@@ -83,6 +85,16 @@ function CharacterHost.humanoidDescription(description: Story.Description): Huma
 	made.TorsoColor = Convert.colour(description.torso)
 	made.LeftArmColor, made.RightArmColor = arms, arms
 	made.LeftLegColor, made.RightLegColor = legs, legs
+	local accessories = {}
+	for slot, name in (description.catalog or {}) :: { [string]: string } do
+		local id = tonumber(string.match(AssetIds[name] or "", "%d+$"))
+		local kind = Story.CATALOG_SLOTS[slot]
+		if id and kind then
+			local accessory = (Enum.AccessoryType :: any)[kind.accessory]
+			table.insert(accessories, { AssetId = id, AccessoryType = accessory, IsLayered = kind.layered })
+		end
+	end
+	made:SetAccessories(accessories, true)
 	return made
 end
 
