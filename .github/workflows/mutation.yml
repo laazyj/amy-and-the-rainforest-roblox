@@ -20,7 +20,9 @@ concurrency:
 jobs:
   mutation:
     name: Every canned fault fails tier 1
-    runs-on: ubuntu-latest
+    # Pinned with ci.yml: the baseline tier 1 runs the tools/screens specs,
+    # which need ImageMagick 6 (docs/MAINTENANCE.md).
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -31,6 +33,11 @@ jobs:
 
       - name: Install the pinned toolchain
         uses: $/.github/actions/setup-tools
+
+      # For tools/screens' end-to-end specs, which fail the baseline tier 1
+      # without it (Ubuntu 24.04's runner image has none).
+      - name: Install ImageMagick
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends imagemagick fonts-dejavu-core
 
       # The report (stdout) goes to the job summary. An explicit
       # `shell: bash` runs with `-eo pipefail`, so the step fails when the
