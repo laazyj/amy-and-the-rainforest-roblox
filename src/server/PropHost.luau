@@ -256,16 +256,17 @@ local function gather()
 	end
 	local crowd = Instance.new("Model")
 	crowd.Name = "Villagers"
+	-- in the world first, so each villager's animations load
+	crowd.Parent = Workspace
 	for k, spotId in villagersData.spots do
 		CharacterHost.buildHuman(
 			"Villager" .. k,
 			"Villager",
-			Convert.colour(villagersData.shirts[k]),
+			villagersData.descriptions[k],
 			(assert(spots[spotId], spotId)),
 			crowd
 		)
 	end
-	crowd.Parent = Workspace
 	villagers = crowd
 end
 

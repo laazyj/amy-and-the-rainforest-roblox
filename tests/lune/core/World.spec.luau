@@ -62,12 +62,18 @@ return function(t: any)
 			expect(calls[2]).toEqual({ "moveCharacter", "Sam", "Farm" })
 			World.execute(recording, { kind = "FrameShot", shot = "MeetCharacter", character = "Fox" })
 			expect(calls[3]).toEqual({ "frameShot", "MeetCharacter", "Fox" })
+			World.execute(recording, { kind = "MoveCharacter", character = "Sam", spot = "GateOutside", run = true })
+			expect(calls[4]).toEqual({ "moveCharacter", "Sam", "GateOutside", true :: any })
 		end)
 
 		for _, case in
 			{
 				{ { kind = "Shout" }, "unknown kind Shout" },
 				{ { kind = "MoveCharacter", character = "Sam" }, "MoveCharacter.spot must be string" },
+				{
+					{ kind = "MoveCharacter", character = "Sam", spot = "Farm", run = "yes" },
+					"MoveCharacter.run must be boolean?, got string",
+				},
 				{ { kind = "ShowDialogue", lines = {} }, "ShowDialogue.lines must be lines" },
 				{ { kind = "Wait", seconds = 1, extra = true }, "Wait has no field extra" },
 			} :: { { any } }

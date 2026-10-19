@@ -7,7 +7,7 @@ local Story = require("../../core/Story")
 local layout = require("../layout")
 local palette = require("../palette")
 
-local spot, zone, at, rgb = layout.spot, layout.zone, layout.at, layout.rgb
+local spot, zone, at, rgb, dressed = layout.spot, layout.zone, layout.at, layout.rgb, layout.dressed
 local FOREST = layout.TOWARD_FOREST
 local colours = palette.colours
 
@@ -30,8 +30,9 @@ local zones: { [string]: Story.Zone } = {
 }
 
 -- Each Prop's states, and how PropHost places it: prop:Machine parks at
--- its Spot and reverses away; prop:Villagers stand at theirs, in these
--- shirts, and cheer with sparkles over the crowd.
+-- its Spot and reverses away; prop:Villagers stand at theirs, each with
+-- the Description at the same place in the list, and cheer with sparkles
+-- over the crowd.
 local machine = {
 	states = { "absent", "advancing", "stopped", "retreating" },
 	spot = "MachineBay",
@@ -41,7 +42,12 @@ local machine = {
 local villagers = {
 	states = { "absent", "gathered", "cheering" },
 	spots = { "Villager1", "Villager2", "Villager3", "Villager4" },
-	shirts = { rgb(180, 120, 70), rgb(96, 130, 170), rgb(170, 96, 96), rgb(120, 150, 96) },
+	descriptions = {
+		dressed(colours.skin, rgb(180, 120, 70), colours.trousers),
+		dressed(rgb(141, 85, 54), rgb(96, 130, 170), rgb(88, 70, 56)),
+		dressed(rgb(198, 152, 110), rgb(170, 96, 96), colours.trousers),
+		dressed(rgb(240, 208, 180), rgb(120, 150, 96), rgb(88, 70, 56)),
+	},
 	sparkles = {
 		{ at = at(-10, 12, 100), colour = colours.bubblegum },
 		{ at = at(0, 12, 100), colour = colours.gold },

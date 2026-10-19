@@ -106,7 +106,7 @@ return function(t: any)
 		end)
 
 		it("give each World command in use its arguments", function()
-			expect(schema.commands.MoveCharacter).toEqual({ character = true, spot = true })
+			expect(schema.commands.MoveCharacter).toEqual({ character = true, spot = true, run = true })
 			expect(schema.commands.SetObjective).toEqual({ text = true })
 			expect(schema.commands.PlayCue).toEqual({ cue = true })
 			expect(schema.commands.FrameShot).toEqual({ shot = true, character = true })
@@ -193,6 +193,16 @@ return function(t: any)
 			characters[4].display = "Sam"
 			expect(Schema.check(schema, "characters.luau", characters)).toEqual({
 				'src/content/characters.luau: [4].display character:Sam has display "Sam the Dog" in docs/GLOSSARY.md, not "Sam"',
+			})
+		end)
+
+		it("fails: a Character with both a Description and a Placeholder, or a Placeholder's unknown tail", function()
+			local characters = copy(content["characters.luau"])
+			characters[2].placeholder = copy(characters[4].placeholder)
+			characters[5].placeholder.tail = "curly"
+			expect(Schema.check(schema, "characters.luau", characters)).toEqual({
+				"src/content/characters.luau: [2] has a Description (a human's look) or a Placeholder (any other's), not both",
+				'src/content/characters.luau: [5].placeholder.tail "curly" is not a Placeholder tail in docs/GLOSSARY.md',
 			})
 		end)
 

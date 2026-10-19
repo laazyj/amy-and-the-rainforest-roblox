@@ -43,6 +43,11 @@ local WIRING: { { file: string, label: string, code: string } } = {
 	},
 	{
 		file = "StoryHost.luau",
+		label = "a joining player's Character is dressed as Amy",
+		code = "Players.PlayerAdded:Connect(CharacterHost.dressPlayer)",
+	},
+	{
+		file = "StoryHost.luau",
 		label = "a leaving player's session ends",
 		code = "Players.PlayerRemoving:Connect(StoryHost.onPlayerRemoving)",
 	},

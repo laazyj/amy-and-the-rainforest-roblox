@@ -11,7 +11,8 @@ export type World = {
 	showDialogue: (lines: { Events.ShownLine }) -> (),
 	setObjective: (text: string?) -> (),
 	showChapterCard: (title: string, subtitle: string, ending: boolean) -> (),
-	moveCharacter: (character: string, spot: string) -> (),
+	-- with `run`, the Character sets off running there; a Wait gives it time
+	moveCharacter: (character: string, spot: string, run: boolean?) -> (),
 	teleportPlayer: (spot: string) -> (),
 	setPropState: (prop: string, state: string) -> (),
 	setLighting: (preset: string) -> (),
@@ -48,7 +49,7 @@ function World.execute(world: World, command: Events.WorldCommand)
 	elseif command.kind == "ShowChapterCard" then
 		world.showChapterCard(command.title, command.subtitle, command.ending)
 	elseif command.kind == "MoveCharacter" then
-		world.moveCharacter(command.character, command.spot)
+		world.moveCharacter(command.character, command.spot, command.run)
 	elseif command.kind == "TeleportPlayer" then
 		world.teleportPlayer(command.spot)
 	elseif command.kind == "SetPropState" then

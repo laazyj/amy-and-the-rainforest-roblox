@@ -25,6 +25,7 @@
 local Events = require("../../src/core/Events")
 local Files = require("./files")
 local Glossary = require("./glossary")
+local StoryCore = require("../../src/core/Story")
 
 type Set = { [string]: boolean }
 
@@ -382,17 +383,45 @@ local function scene(schema: Schema, file: string): Check
 	}, true) -- the rest is the layout SceneBuilder builds from
 end
 
+-- A Catalog item's Asset name.
+local function catalogItem(value: any, where: string, report: Report)
+	if type(value) ~= "string" or not string.match(value, "^catalog:[a-z0-9_]+$") then
+		report(where, `must read catalog:<snake_case>, got {show(value)}`)
+	end
+end
+
+-- A Description's Catalog slots (src/core/Story), each holding a Catalog item.
+local catalogSlots: { [string]: Check } = {}
+for slot in StoryCore.CATALOG_SLOTS do
+	catalogSlots[slot] = optional(catalogItem)
+end
+
 local function characters(schema: Schema): Check
 	local character = record({
 		id = oneOf(schema.characters, "Character"),
 		display = text,
 		kind = text,
 		home = oneOf(schema.spots, "Spot"),
-		shirt = optional(rgb),
 		player = optional(isTrue),
+		description = optional(record({
+			head = rgb,
+			torso = rgb,
+			arms = rgb,
+			legs = rgb,
+			catalog = optional(record(catalogSlots)),
+		})),
+		placeholder = optional(record({
+			body = rgb,
+			belly = rgb,
+			scale = number,
+			tail = oneOf({ up = true, fluff = true, brush = true, tuft = true }, "Placeholder tail"),
+		})),
 	})
 	return list(function(value, where, report)
 		character(value, where, report)
+		if type(value) == "table" and value.description ~= nil and value.placeholder ~= nil then
+			report(where, "has a Description (a human's look) or a Placeholder (any other's), not both")
+		end
 		local listed = type(value) == "table" and schema.characters[value.id]
 		if not listed then
 			return

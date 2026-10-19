@@ -513,6 +513,61 @@
       "creator": "This repository",
       "licence": "synthesised",
       "origin": "Placeholder for brief 013, synthesised by tools/synth-cues (tools/lib/synth.luau): an engine winding down, then a soft clunk; 1.5 s, mono 16-bit 16000 Hz, peak 0.35. Replaced by the owner's Creator Store pick (docs/ASSETS.md, the shopping list)."
+    },
+    {
+      "name": "catalog:amy_hair",
+      "kind": "catalog",
+      "assetId": null,
+      "moderation": "pending",
+      "upload": false,
+      "placeholder": true,
+      "creator": "to be picked by the owner",
+      "licence": "creator-store-free",
+      "origin": "Amy's hair slot on Amy's Description (src/content/characters.luau, from ref:Amy), not picked yet. Search the Marketplace (Avatar Shop) for Hair, free: \"long brown hair\", \"long straight hair\"; long, dark brown, past the shoulders, covering the back of her head. Record the item's id, creator and page here (docs/ASSETS.md, \"Catalog items\")."
+    },
+    {
+      "name": "catalog:amy_shirt",
+      "kind": "catalog",
+      "assetId": null,
+      "moderation": "pending",
+      "upload": false,
+      "placeholder": true,
+      "creator": "to be picked by the owner",
+      "licence": "creator-store-free",
+      "origin": "Amy's shirt slot on Amy's Description (src/content/characters.luau, from ref:Amy), not picked yet. Search the Marketplace (Avatar Shop) for Clothing, Shirts (layered), free: \"red sweater\", \"red long sleeve\"; a red long-sleeved top near #c2402f. Record the item's id, creator and page here (docs/ASSETS.md, \"Catalog items\")."
+    },
+    {
+      "name": "catalog:amy_skirt",
+      "kind": "catalog",
+      "assetId": null,
+      "moderation": "pending",
+      "upload": false,
+      "placeholder": true,
+      "creator": "to be picked by the owner",
+      "licence": "creator-store-free",
+      "origin": "Amy's skirt slot on Amy's Description (src/content/characters.luau, from ref:Amy), not picked yet. Search the Marketplace (Avatar Shop) for Clothing, Dresses & Skirts (layered), free: \"blue skirt\"; a mid-blue skirt near #2f6fb5. Record the item's id, creator and page here (docs/ASSETS.md, \"Catalog items\")."
+    },
+    {
+      "name": "catalog:amy_left_shoe",
+      "kind": "catalog",
+      "assetId": null,
+      "moderation": "pending",
+      "upload": false,
+      "placeholder": true,
+      "creator": "to be picked by the owner",
+      "licence": "creator-store-free",
+      "origin": "Amy's left shoe slot on Amy's Description (src/content/characters.luau, from ref:Amy), not picked yet. Search the Marketplace (Avatar Shop) for Clothing, Shoes (layered), free: \"brown shoes\", the left of the pair; plain brown near #7a4a2a. Record the item's id, creator and page here (docs/ASSETS.md, \"Catalog items\")."
+    },
+    {
+      "name": "catalog:amy_right_shoe",
+      "kind": "catalog",
+      "assetId": null,
+      "moderation": "pending",
+      "upload": false,
+      "placeholder": true,
+      "creator": "to be picked by the owner",
+      "licence": "creator-store-free",
+      "origin": "Amy's right shoe slot on Amy's Description (src/content/characters.luau, from ref:Amy), not picked yet. Search the Marketplace (Avatar Shop) for Clothing, Shoes (layered), free: \"brown shoes\", the right of the pair; plain brown near #7a4a2a. Record the item's id, creator and page here (docs/ASSETS.md, \"Catalog items\")."
     }
   ]
 }

@@ -41,8 +41,20 @@
         "ChatVersion": "TextChatService"
       }
     },
+    "ServerStorage": {
+      "$className": "ServerStorage",
+      "CharacterModels": {
+        "$className": "Folder",
+        "$path": {
+          "optional": "assets/meshes/characters"
+        }
+      }
+    },
     "StarterPlayer": {
       "$className": "StarterPlayer",
+      "$properties": {
+        "LoadCharacterAppearance": false
+      },
       "StarterPlayerScripts": {
         "$className": "StarterPlayerScripts",
         "$path": "src/client"

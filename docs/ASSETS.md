@@ -62,7 +62,8 @@ the forms of the [glossary's Ids](GLOSSARY.md#6-ids): `card:` (Chapter
 cards and the end card), `ui:` (frames, motifs, screens), `store:`
 (store page art), `ref:` (references, never shown), `cue:` and `music:`
 (Cues), `narration:` (a Chapter's narration file), `prop:` (Prop models),
-`font:` (Creator Store font families). The game looks an Asset up by its name in
+`character:` ([Character models](#character-models)), `font:` (Creator
+Store font families), `catalog:` ([Catalog items](#catalog-items)). The game looks an Asset up by its name in
 `AssetIds.luau`; a name with no id yet is absent, and the game is to fall
 back to plain UI (or silence, for a Cue). The client binder reads
 `AssetIds.luau` for the Chapter cards, the UI frames, the Title screen and
@@ -118,6 +119,93 @@ designer and the publisher, and `origin` the listing and the font's
 licence. Tier 0 holds all of that. `tools/upload-assets` skips it, and
 `AssetIds.luau` lists it, so code names the Asset (`font:dancing_script`)
 and looks its id up there, as for any other Asset.
+
+### Character models
+
+The animals (Sam, the Squirrel, the Fox, the Lion) are to be built from
+free Creator Store models that ship with animations (plan sections 2.3 and
+5.5). Until a Character has one it is drawn as its Placeholder, the
+figure of parts whose colours, size and tail are in
+`src/content/characters.luau`; the humans need none, being Roblox's R15
+body made from their Description. The game picks which with `Story.build`:
+`server/CharacterHost` looks for `ServerStorage.CharacterModels.<id>`, and
+the place file holds that folder from `assets/meshes/characters/`
+(`default.project.json`), so **committing the file is what brings a
+Character model into the game**; nothing is uploaded.
+
+What the Mac agent does for each animal:
+
+1. Find a free model in Studio's Toolbox (Creator Store, Models) that
+   reads as Clara's animal: the white dog, the maroon squirrel with a
+   giant tail, the orangest fox, the golden lion, gentle and never
+   menacing (`design/feel.md`). It must have a `Humanoid`, a part named
+   `HumanoidRootPart` whose front faces the model's front (the root's
+   look vector), and no scripts.
+2. Fetch it:
+   `lune run tools/studio-playtest/fetch-model --asset <id> --name character:Sam --out assets/meshes/characters/Sam.rbxm`.
+   The tool refuses a model with scripts, so a model whose animations
+   live in an `Animate` script is refused; take one whose animations are
+   `Animation` objects.
+3. The model's animations are to be `Animation` objects in a folder
+   named `Animations` under the model, named `idle`, `walk` and `run` (any
+   may be missing; the Character then stands still for it). If the model
+   does not come that way, arrange it so in Studio and save it over the
+   file the same way (`SerializationService`); `fetch-model` cannot yet do
+   that step itself. CharacterHost loads these and plays `idle`, and
+   `run` while the Character runs (`MoveCharacter` with `run`, as in
+   `beat:sam_catches`).
+4. Check each animation plays in the game on Dev. Roblox plays an
+   animation in an experience only if the experience's owner (or Roblox)
+   owns it, so another creator's animation ids may load and not play;
+   then the owner uploads the model's animation (its KeyframeSequence) to
+   their account and the folder's `Animation` takes that id. Record what
+   was done in `origin`.
+5. Add the entry the tool prints: kind `model`, the path above, `upload`
+   false, licence `creator-store-free`, `creator` and `origin` as
+   printed. Tier 0 holds a `character:` entry to that path and to
+   `upload` false. Its mesh and animation ids stay inside the `.rbxm`,
+   where the tier 0 scan cannot see them; review checks them.
+6. Run the tier 2 suite (`tests/engine/characters.luau` loads each
+   animation) and the tier 3 playtest: animation tracks playing, no
+   T-pose, the speaker facing Amy, and screenshots of each Character
+   against `design/feel.md`. Then the Placeholder can stay in content as
+   the fallback, or go with the owner's say-so.
+
+### Catalog items
+
+The humans are Roblox's R15 body in the colours of their Description.
+What colours cannot do (hair, sleeves, a skirt, shoes) is a Catalog item:
+a free avatar item from the Marketplace that a Description wears in a
+named slot. Amy's Description (`src/content/characters.luau`), from Clara's
+`ref:Amy`, names five, each by its Asset name:
+
+| Slot | Asset | Search the Marketplace (Avatar Shop) for, free only | Look |
+|---|---|---|---|
+| `hair` | `catalog:amy_hair` | Hair: "long brown hair", "long straight hair" | Long, dark brown, past the shoulders, covering the back of the head: what the camera sees most |
+| `shirt` | `catalog:amy_shirt` | Clothing, Shirts (layered): "red sweater", "red long sleeve" | A red long-sleeved top, close to `#c2402f` |
+| `skirt` | `catalog:amy_skirt` | Clothing, Dresses & Skirts (layered): "blue skirt" | A mid-blue skirt, about `#2f6fb5` |
+| `leftShoe`, `rightShoe` | `catalog:amy_left_shoe`, `catalog:amy_right_shoe` | Clothing, Shoes (layered; a pair is two items): "brown shoes" | Plain brown shoes, about `#7a4a2a` |
+
+Until a slot's Asset has an id, Amy is built without it: her light skin
+(`#dba97e`) on head, arms and legs, and her red jumper on the torso.
+
+**Each slot already has its Manifest entry**, waiting for the pick: kind
+`catalog`, no `assetId`, `moderation` `pending`, `placeholder` true, and
+the search in its `origin`. Tier 1 holds every slot a Description names to
+an entry. **Recording a pick is filling that entry in**, as for a
+[font](#fonts): the item's `assetId` from its Marketplace page,
+`moderation` `approved`, `placeholder` false, `creator` the item's creator
+and `origin` its title and page (still no `path`, no `sha256`, `upload`
+false, licence `creator-store-free`). Then run
+`lune run tools/check-assets --write-ids`, which writes the id into
+`src/shared/AssetIds.luau`. `server/CharacterHost` reads the slot's id
+there and Amy wears the item from her next spawn. Tier 0 holds the entry
+to these rules. Pick items with no face and nothing on the face, and check
+on Dev that the hair covers the back of her head (the camera never sees her
+face, so nothing in front matters). Only the Player Character wears
+Catalog items so far: Dad, Mum and the villagers are copies of one R15
+body in their colours, and giving them slots means applying their
+HumanoidDescription in `CharacterHost.buildHuman` too.
 
 ### Cues: the placeholders and the shopping list
 

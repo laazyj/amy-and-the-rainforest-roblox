@@ -7,8 +7,9 @@ local bootstrap = require("../bootstrap")
 local PNG, HASH, UPLOADED, REMOVE, FONT = M.PNG, M.HASH, M.UPLOADED, M.REMOVE, M.FONT
 local entry, manifest = M.entry, M.manifest
 
+-- The PNG fixture, and any model as a few bytes.
 local function readFile(path: string): string?
-	return if path == M.PNG_PATH then PNG else nil
+	return if path == M.PNG_PATH then PNG elseif string.match(path, "%.rbxm$") then "<roblox!" else nil
 end
 
 -- A repository with this manifest, its generated AssetIds, and `files`.
@@ -92,6 +93,38 @@ return function(t: any)
 			expect(Manifest.validate(manifest(entry(M.LIBRARY_AUDIO)), readFile)).toEqual({})
 		end)
 
+		it("accepts a Catalog item: an id with no file, never uploaded, as a font", function()
+			local item = entry(FONT, { name = "catalog:amy_hair", kind = "catalog" })
+			expect(Manifest.validate(manifest(item), readFile)).toEqual({})
+		end)
+
+		it("accepts a Catalog item not picked yet: no id, pending, a placeholder", function()
+			local slot = entry(FONT, {
+				name = "catalog:amy_hair",
+				kind = "catalog",
+				assetId = REMOVE,
+				moderation = "pending",
+				placeholder = true,
+			})
+			expect(Manifest.validate(manifest(slot), readFile)).toEqual({})
+			slot.placeholder = false
+			expect(Manifest.validate(manifest(slot), readFile)).toEqual({
+				'catalog:amy_hair: a Catalog item not picked yet has upload false, moderation "pending" and placeholder true',
+			})
+		end)
+
+		it("holds a Catalog item to its name and a font's rules", function()
+			local problems = Manifest.validate(
+				manifest(entry(FONT, { name = "catalog:amy_hair", kind = "catalog", upload = true })),
+				readFile
+			)
+			expect(problems).toEqual({
+				'catalog:amy_hair: a Catalog item has upload false and moderation "approved"',
+			})
+			local misnamed = Manifest.validate(manifest(entry(FONT, { kind = "catalog" })), readFile)
+			expect(misnamed[1]).toContain('a Catalog item is named catalog:<name> and has kind "catalog"')
+		end)
+
 		it("holds a library-audio track to a font's rules", function()
 			local problems =
 				Manifest.validate(manifest(entry(M.LIBRARY_AUDIO, { path = M.PNG_PATH, upload = true })), readFile)
@@ -100,6 +133,35 @@ return function(t: any)
 				'music:paradise: a library-audio track has upload false and moderation "approved"',
 			})
 		end)
+
+		-- Sam's Character model, as the Mac agent records it.
+		local SAM = {
+			name = "character:Sam",
+			kind = "model",
+			path = "assets/meshes/characters/Sam.rbxm",
+			upload = false,
+			amy = REMOVE,
+			licence = "creator-store-free",
+		}
+
+		it("accepts a Character model in the place's folder of them, never uploaded", function()
+			expect(Manifest.validate(manifest(entry(SAM)), readFile)).toEqual({})
+		end)
+
+		for _, case in
+			{
+				{ "named for another Character", { path = "assets/meshes/characters/Fox.rbxm" } },
+				{ "outside the folder", { path = "assets/meshes/Sam.rbxm" } },
+				{ "to upload", { upload = true } },
+			} :: { { any } }
+		do
+			it(`rejects a Character model {case[1]}`, function()
+				local problems = Manifest.validate(manifest(entry(SAM, case[2])), readFile)
+				expect(problems).toEqual({
+					'character:Sam: a Character model is kind "model" at assets/meshes/characters/Sam.rbxm with upload false: the place file holds it',
+				})
+			end)
+		end
 
 		it("rejects a name listed twice", function()
 			local problems = Manifest.validate(manifest(entry(), entry()), readFile)
