@@ -378,3 +378,36 @@ mistakes and would "correct" or mistranslate them, which breaks the
 [canon rule](../story/canon.md#the-rule) for every player who sees the
 game in another language. Translations, if they ever come, are written
 by people and approved like any other new text.
+
+## 9. Amy's body (spike, 2026-10-19)
+
+Layered clothing wraps the body it is on. Amy is on Roblox's default
+blocky R15, so her jumper, skirt and shoes balloon; the Marketplace
+previews them on a slim mannequin. Her Description was tried in variants,
+each with her five Catalog items, seen from behind and 40 degrees off
+behind ([the frames](https://github.com/laazyj/amy-and-the-rainforest-roblox/tree/010b15d2b180e068be0c6ab2f4377c7807dd1ea6), named below):
+
+| Variant | Body | Against `ref:Amy` |
+|---|---|---|
+| A, today | default R15 | Chunky: the jumper balloons, the skirt bulges, the shoes are clogs (`A-today-*`) |
+| B, scales | default R15 with BodyTypeScale, ProportionScale and Height, Width and Depth tried | No better: the scales barely change the blocky parts (`B1-*` to `B3-*`) |
+| C1 | "City Life Woman" (bundle 337) | Slim, but its legs are dark leggings and boots, and its head (a dynamic head) shows her face at 40°: out (`C1-*`) |
+| C2, C3 | "ROBLOX Girl" (108), "Woman" (239) | Bare legs, but not much slimmer than A (`C2-*`, `C3-*`) |
+| **C4** | City Life Woman's torso and arms, Woman's legs, Roblox's default head | **Closest**: a slim child, the jumper and skirt fitted, bare legs, the face out of camera (`C4-*`, with the Hime hair) |
+
+**Recommendation: C4, with the hair the owner suggested**, "Long Dark
+Straight Popular Trendy Girl Hime Hair" (93224865230753): long, straight
+and dark past the shoulders, as Clara drew it. The body parts are by
+Roblox and come free in their bundles (none is sold alone): torso
+2492674027, left arm 2492667589, right arm 2492669375 (City Life Woman),
+left leg 86499753, right leg 86499793 (Woman). What it costs:
+
+- **New slots:** five body-part Catalog items on Amy's Description,
+  recorded as [ASSETS.md](../ASSETS.md#catalog-items) says. Their slot
+  names must differ from the Description's colour keys (`torso`, `arms`,
+  `legs`), and the glossary's Description and Catalog item change with
+  them.
+- **Re-picks:** the hair, to the Hime hair (65 Robux, by the group "Trendy
+  Hair", on sale: a paid item, under the `marketplace` licence PR #68
+  proposes); and the shoes, since "brown mary janes" still read as clogs
+  on the slim legs. The jumper ("Red Sweater") and the skirt stay.
