@@ -175,14 +175,14 @@ What the Mac agent does for each animal:
 
 The humans are Roblox's R15 body in the colours of their Description.
 What colours cannot do (hair, sleeves, a skirt, shoes) is a Catalog item:
-a free avatar item from the Marketplace that a Description wears in a
-named slot. Amy's Description (`src/content/characters.luau`), from Clara's
+an avatar item from the Marketplace that a Description wears in a
+named slot, free or (under the [`marketplace` licence](#licences)) paid. Amy's Description (`src/content/characters.luau`), from Clara's
 `ref:Amy`, names five, each by its Asset name:
 
-| Slot | Asset | Search the Marketplace (Avatar Shop) for, free only | Look |
+| Slot | Asset | Search the Marketplace (Avatar Shop) for | Look |
 |---|---|---|---|
 | `hair` | `catalog:amy_hair` | Hair: "long brown hair", "long straight hair" | Long, dark brown, past the shoulders, covering the back of the head: what the camera sees most |
-| `shirt` | `catalog:amy_shirt` | Clothing, Shirts (layered): "red sweater", "red long sleeve" | A red long-sleeved top, close to `#c2402f` |
+| `shirt` | `catalog:amy_shirt` | Clothing, Sweaters (layered; the slot holds a Sweater): "red sweater", "red long sleeve" | A red long-sleeved top, close to `#c2402f` |
 | `skirt` | `catalog:amy_skirt` | Clothing, Dresses & Skirts (layered): "blue skirt" | A mid-blue skirt, about `#2f6fb5` |
 | `leftShoe`, `rightShoe` | `catalog:amy_left_shoe`, `catalog:amy_right_shoe` | Clothing, Shoes (layered; a pair is two items): "brown shoes" | Plain brown shoes, about `#7a4a2a` |
 
@@ -195,8 +195,8 @@ the search in its `origin`. Tier 1 holds every slot a Description names to
 an entry. **Recording a pick is filling that entry in**, as for a
 [font](#fonts): the item's `assetId` from its Marketplace page,
 `moderation` `approved`, `placeholder` false, `creator` the item's creator
-and `origin` its title and page (still no `path`, no `sha256`, `upload`
-false, licence `creator-store-free`). Then run
+and `origin` its title, page and price (still no `path`, no `sha256`, `upload`
+false, licence `creator-store-free`, or `marketplace` for a paid item). Then run
 `lune run tools/check-assets --write-ids`, which writes the id into
 `src/shared/AssetIds.luau`. `server/CharacterHost` reads the slot's id
 there and Amy wears the item from her next spawn. Tier 0 holds the entry
@@ -305,12 +305,13 @@ in the "Asset ids" PR the workflow opens.
 | `licence` | Use for | Rules |
 |---|---|---|
 | `owner` | Clara's illustrations (the owner's family's work, used with the owner's permission), and placeholders generated in this repository | Record in `origin` which original it came from. |
-| `creator-store-free` | Free models, sounds and fonts from the Creator Store | Fetched as the plan's section 5.5 says. Record the Creator Store asset id and creator in `origin`. Only items marked free. |
+| `creator-store-free` | Free models, sounds and fonts from the Creator Store, and free Catalog items from the Marketplace | Fetched as the plan's section 5.5 says. Record the Creator Store asset id and creator in `origin`. Only items marked free. |
+| `marketplace` | A paid Catalog item from the Marketplace | The game dresses Amy in it through a server HumanoidDescription; nothing is bought, and the player need not own it. Record the price in `origin`. The one risk: the creator can take it off sale, and then Amy loses it. Only kind `catalog` (tier 0). |
 | `cc0` | Public-domain sounds or images | Record the source URL in `origin`. |
 | `cc-by` | Free-licence sounds or images that need credit | `attribution` is required and goes in the credits. |
 | `synthesised` | Audio generated for this game | Record the tool and settings in `origin`. |
 
-Nothing else: no paid assets, nothing "found online" without a licence,
+Nothing else: no paid assets but a `marketplace` Catalog item, nothing "found online" without a licence,
 and no audio from commercial music.
 
 ## Upload limits

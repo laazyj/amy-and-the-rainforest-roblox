@@ -160,13 +160,14 @@ local Story = {}
 
 -- Each Catalog slot: the kind of avatar accessory it holds, and for
 -- layered clothing (worn over the body) its order, innermost first; a slot
--- with no order is a rigid accessory.
+-- with no order is a rigid accessory. The `shirt` slot holds a sweater:
+-- the item picked for Amy's red jumper is a SweaterAccessory.
 Story.CATALOG_SLOTS = table.freeze({
 	hair = { accessory = "Hair" },
 	leftShoe = { accessory = "LeftShoe", order = 1 },
 	rightShoe = { accessory = "RightShoe", order = 1 },
 	skirt = { accessory = "DressSkirt", order = 2 },
-	shirt = { accessory = "Shirt", order = 3 },
+	shirt = { accessory = "Sweater", order = 3 },
 } :: { [string]: { accessory: string, order: number? } })
 
 Story.NARRATOR = "Narrator"

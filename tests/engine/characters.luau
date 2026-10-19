@@ -91,13 +91,16 @@ describe("the Characters", function()
 end)
 
 describe("the Player Character", function()
-	it("is dressed as Amy: her Description on Roblox's body", function()
+	it("is dressed as Amy, her Description on Roblox's body, once in the Workspace as on a spawn", function()
 		local amy = assert(world.Story.character(story, "Amy")).description :: any
 		local body =
 			game:GetService("Players")
 				:CreateHumanoidModelFromDescriptionAsync(Instance.new("HumanoidDescription"), Enum.HumanoidRigType.R15)
 		body.Name = "FakeAmy"
-		body.Parent = Workspace
+		-- parented after dressing starts, as CharacterAdded fires before it is
+		task.defer(function()
+			body.Parent = Workspace
+		end)
 		CharacterHost.dress(body)
 		expect(part(body, "UpperTorso").Color:ToHex()).toBe(Convert.colour(amy.torso):ToHex())
 		expect(part(body, "LeftLowerLeg").Color:ToHex()).toBe(Convert.colour(amy.legs):ToHex())

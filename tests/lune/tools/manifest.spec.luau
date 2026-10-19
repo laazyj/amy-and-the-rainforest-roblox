@@ -113,6 +113,14 @@ return function(t: any)
 			})
 		end)
 
+		it("accepts a paid Catalog item under the marketplace licence, and nothing else under it", function()
+			local item = entry(FONT, { name = "catalog:amy_shirt", kind = "catalog", licence = "marketplace" })
+			expect(Manifest.validate(manifest(item), readFile)).toEqual({})
+			expect(Manifest.validate(manifest(entry(FONT, { licence = "marketplace" })), readFile)).toEqual({
+				`{FONT.name}: only a Catalog item has the marketplace licence`,
+			})
+		end)
+
 		it("holds a Catalog item to its name and a font's rules", function()
 			local problems = Manifest.validate(
 				manifest(entry(FONT, { name = "catalog:amy_hair", kind = "catalog", upload = true })),

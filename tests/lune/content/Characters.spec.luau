@@ -11,6 +11,7 @@ local Manifest = require("../../../tools/lib/manifest")
 local Story = require("../../../src/content/Story")
 local StoryTypes = require("../../../src/core/Story")
 local bootstrap = require("../bootstrap")
+local roblox = require("@lune/roblox") :: any
 local serde = require("@lune/serde")
 
 local story = Story.story
@@ -69,6 +70,21 @@ return function(t: any)
 			for slot in catalog do
 				expect(StoryTypes.CATALOG_SLOTS[slot]).never.toBeNil()
 			end
+		end)
+
+		it("names an avatar accessory type in each Catalog slot, a sweater in the shirt slot", function()
+			local types: { [string]: boolean } = {}
+			for _, item in roblox.Enum.AccessoryType:GetEnumItems() do
+				types[item.Name] = true
+			end
+			for slot, kind in StoryTypes.CATALOG_SLOTS do
+				if not types[kind.accessory] then
+					error(`the {slot} slot holds {kind.accessory}, which is no Enum.AccessoryType`)
+				end
+			end
+			-- "Red Sweater" (catalog:amy_shirt) is a SweaterAccessory, and a
+			-- slot of another type would not wear it
+			expect(StoryTypes.CATALOG_SLOTS.shirt.accessory).toBe("Sweater")
 		end)
 
 		for whose, description in descriptions do

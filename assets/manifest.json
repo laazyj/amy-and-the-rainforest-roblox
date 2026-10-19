@@ -532,57 +532,57 @@
     {
       "name": "catalog:amy_hair",
       "kind": "catalog",
-      "assetId": null,
-      "moderation": "pending",
+      "assetId": "7193449810",
+      "moderation": "approved",
       "upload": false,
-      "placeholder": true,
-      "creator": "to be picked by the owner",
+      "placeholder": false,
+      "creator": "Roblox",
       "licence": "creator-store-free",
-      "origin": "Amy's hair slot on Amy's Description (src/content/characters.luau, from ref:Amy), not picked yet. Search the Marketplace (Avatar Shop) for Hair, free: \"long brown hair\", \"long straight hair\"; long, dark brown, past the shoulders, covering the back of her head. Record the item's id, creator and page here (docs/ASSETS.md, \"Catalog items\")."
+      "origin": "Marketplace item \"Straight Bangs - Brown\" (HairAccessory) by Roblox, free, https://www.roblox.com/catalog/7193449810/Straight-Bangs-Brown; the owner's pick for Amy's hair slot (ref:Amy), 2026-10-19."
     },
     {
       "name": "catalog:amy_shirt",
       "kind": "catalog",
-      "assetId": null,
-      "moderation": "pending",
+      "assetId": "132947714306205",
+      "moderation": "approved",
       "upload": false,
-      "placeholder": true,
-      "creator": "to be picked by the owner",
-      "licence": "creator-store-free",
-      "origin": "Amy's shirt slot on Amy's Description (src/content/characters.luau, from ref:Amy), not picked yet. Search the Marketplace (Avatar Shop) for Clothing, Shirts (layered), free: \"red sweater\", \"red long sleeve\"; a red long-sleeved top near #c2402f. Record the item's id, creator and page here (docs/ASSETS.md, \"Catalog items\")."
+      "placeholder": false,
+      "creator": "DuckXander (group)",
+      "licence": "marketplace",
+      "origin": "Marketplace item \"Red Sweater\" (SweaterAccessory, so the shirt slot holds a Sweater) by DuckXander, 70 Robux, on sale, https://www.roblox.com/catalog/132947714306205/Red-Sweater; the owner's pick for Amy's red jumper (ref:Amy), 2026-10-19. Worn, not bought."
     },
     {
       "name": "catalog:amy_skirt",
       "kind": "catalog",
-      "assetId": null,
-      "moderation": "pending",
+      "assetId": "90528089289381",
+      "moderation": "approved",
       "upload": false,
-      "placeholder": true,
-      "creator": "to be picked by the owner",
-      "licence": "creator-store-free",
-      "origin": "Amy's skirt slot on Amy's Description (src/content/characters.luau, from ref:Amy), not picked yet. Search the Marketplace (Avatar Shop) for Clothing, Dresses & Skirts (layered), free: \"blue skirt\"; a mid-blue skirt near #2f6fb5. Record the item's id, creator and page here (docs/ASSETS.md, \"Catalog items\")."
+      "placeholder": false,
+      "creator": "Pasa closet (group)",
+      "licence": "marketplace",
+      "origin": "Marketplace item \"Blue Skirt\" (DressSkirtAccessory) by Pasa closet, 65 Robux, on sale, https://www.roblox.com/catalog/90528089289381/Blue-Skirt; the owner's pick for Amy's blue skirt (ref:Amy), 2026-10-19. Worn, not bought."
     },
     {
       "name": "catalog:amy_left_shoe",
       "kind": "catalog",
-      "assetId": null,
-      "moderation": "pending",
+      "assetId": "115439091093836",
+      "moderation": "approved",
       "upload": false,
-      "placeholder": true,
-      "creator": "to be picked by the owner",
-      "licence": "creator-store-free",
-      "origin": "Amy's left shoe slot on Amy's Description (src/content/characters.luau, from ref:Amy), not picked yet. Search the Marketplace (Avatar Shop) for Clothing, Shoes (layered), free: \"brown shoes\", the left of the pair; plain brown near #7a4a2a. Record the item's id, creator and page here (docs/ASSETS.md, \"Catalog items\")."
+      "placeholder": false,
+      "creator": "WhoseTrade",
+      "licence": "marketplace",
+      "origin": "\"brown mary janes - Left Shoe Accessory\" (LeftShoeAccessory), the left shoe in the Marketplace bundle \"brown mary janes\" (1026295737295) by WhoseTrade, 60 Robux the pair, on sale, https://www.roblox.com/bundles/1026295737295/brown-mary-janes; the owner's pick for Amy's brown shoes (ref:Amy), 2026-10-19. Worn, not bought."
     },
     {
       "name": "catalog:amy_right_shoe",
       "kind": "catalog",
-      "assetId": null,
-      "moderation": "pending",
+      "assetId": "101221549035066",
+      "moderation": "approved",
       "upload": false,
-      "placeholder": true,
-      "creator": "to be picked by the owner",
-      "licence": "creator-store-free",
-      "origin": "Amy's right shoe slot on Amy's Description (src/content/characters.luau, from ref:Amy), not picked yet. Search the Marketplace (Avatar Shop) for Clothing, Shoes (layered), free: \"brown shoes\", the right of the pair; plain brown near #7a4a2a. Record the item's id, creator and page here (docs/ASSETS.md, \"Catalog items\")."
+      "placeholder": false,
+      "creator": "WhoseTrade",
+      "licence": "marketplace",
+      "origin": "\"brown mary janes - Right Shoe Accessory\" (RightShoeAccessory), the right shoe in the Marketplace bundle \"brown mary janes\" (1026295737295) by WhoseTrade, 60 Robux the pair, on sale, https://www.roblox.com/bundles/1026295737295/brown-mary-janes; the owner's pick for Amy's brown shoes (ref:Amy), 2026-10-19. Worn, not bought."
     }
   ]
 }

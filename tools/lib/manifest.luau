@@ -45,12 +45,12 @@ Manifest.NAME_PREFIXES = table.freeze({
 	prop = true, -- a Prop's model
 	character = true, -- a Character model: a Character with its Humanoid and animations
 	font = true, -- a Creator Store font family, referenced by id
-	catalog = true, -- a free Catalog item a Description wears, referenced by id
+	catalog = true, -- a Catalog item a Description wears, referenced by id
 })
 
 -- The kinds referenced by their Creator Store id, never uploaded, so with
--- no file: a font family, a track from Roblox's audio library, and a free
--- avatar item from the Marketplace (a Catalog item).
+-- no file: a font family, a track from Roblox's audio library, and an
+-- avatar item from the Marketplace, free or paid (a Catalog item).
 Manifest.FONT = "font"
 Manifest.LIBRARY_AUDIO = "library-audio"
 Manifest.CATALOG = "catalog"
@@ -65,6 +65,7 @@ Manifest.KIND_PREFIXES = table.freeze({ [Manifest.FONT] = "font", [Manifest.CATA
 Manifest.LICENCES = table.freeze({
 	owner = true, -- made for this game by the owner's family (Clara's work), or generated here
 	["creator-store-free"] = true, -- free on the Creator Store (or the Marketplace, for a Catalog item)
+	marketplace = true, -- a paid Catalog item the game dresses Amy in; nothing is bought
 	cc0 = true,
 	["cc-by"] = true, -- needs `attribution`
 	synthesised = true, -- audio generated for this game
@@ -243,6 +244,8 @@ function Manifest.validate(manifest: any, readFile: (string) -> string?): { stri
 			bad(`licence must be one of {keys(Manifest.LICENCES)}`)
 		elseif entry.licence == "cc-by" and not nonEmpty(entry.attribution) then
 			bad("a cc-by licence needs an attribution")
+		elseif entry.licence == "marketplace" and entry.kind ~= Manifest.CATALOG then
+			bad("only a Catalog item has the marketplace licence")
 		end
 		for kind, kindPrefix in Manifest.KIND_PREFIXES do
 			if (prefix == kindPrefix) ~= (entry.kind == kind) then
