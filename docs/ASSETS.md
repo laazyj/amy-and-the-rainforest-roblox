@@ -154,6 +154,17 @@ What the Mac agent does for each animal:
    that step itself. CharacterHost loads these and plays `idle`, and
    `run` while the Character runs (`MoveCharacter` with `run`, as in
    `beat:sam_catches`).
+
+   Arranging may also take more than the animations; record each step in
+   `origin`. The model saved is the one holding the `Humanoid` and its
+   `HumanoidRootPart` as children (a Creator Store asset often wraps it in
+   another model); a model with a root and no `Humanoid` may be given one;
+   a root that does not face the model's front is turned, its joints taking
+   the inverse so nothing else moves; the model is scaled to its
+   Placeholder's length; `HipHeight` is set so it stands on the ground;
+   and every part but the root is unanchored and not colliding, held to
+   the root by its joints (or, where a rig's joints hold nothing, welded to
+   it), because a run unanchors the root.
 4. Check each animation plays in the game on Dev. Roblox plays an
    animation in an experience only if the experience's owner (or Roblox)
    owns it, so another creator's animation ids may load and not play;
@@ -170,6 +181,16 @@ What the Mac agent does for each animal:
    T-pose, the speaker facing Amy, and screenshots of each Character
    against `design/feel.md`. Then the Placeholder can stay in content as
    the fallback, or go with the owner's say-so.
+
+The first pass (2026-10-19) found no free animal model that ships
+animations that play: every free rig's `Animation` objects belong to
+their creators and fail to load in our game ("Failed to load animation
+with sanitized ID"), Roblox's own default animations do not fit the
+animals' joints, and a few ship only `KeyframeSequence`s (for the owner to
+upload, step 4). So Sam, the Fox and the Lion are Character models that
+stand still and slide when they run, and the Squirrel stays its
+Placeholder: no free model with a `Humanoid` reads as a squirrel rather
+than a costumed biped.
 
 ### Catalog items
 

@@ -583,6 +583,42 @@
       "creator": "WhoseTrade",
       "licence": "marketplace",
       "origin": "\"brown mary janes - Right Shoe Accessory\" (RightShoeAccessory), the right shoe in the Marketplace bundle \"brown mary janes\" (1026295737295) by WhoseTrade, 60 Robux the pair, on sale, https://www.roblox.com/bundles/1026295737295/brown-mary-janes; the owner's pick for Amy's brown shoes (ref:Amy), 2026-10-19. Worn, not bought."
+    },
+    {
+      "name": "character:Sam",
+      "kind": "model",
+      "path": "assets/meshes/characters/Sam.rbxm",
+      "assetId": null,
+      "moderation": "pending",
+      "upload": false,
+      "placeholder": false,
+      "creator": "skelewizz",
+      "licence": "creator-store-free",
+      "origin": "Creator Store asset 18912181105, \"Realistic Dog - White Pomeranian\" by skelewizz, inserted through Studio's MCP server and saved with SerializationService on 2026-10-19 (tools/studio-playtest/fetch-model.luau's checks: free, no scripts), then arranged in Studio before saving: the inner model \"White Pomeranian\" (a skinned mesh), scaled to 4.4 studs long, HipHeight set to stand on the ground, every part but the root unanchored and not colliding, its ClickDetector and the Animation Editor's InitialPoses removed. No animations: its IdleAnim (17789595035) and RunAnim (17798454248) belong to the group \"IT GIRL Magazine\" and fail to load in our game (\"Failed to load animation with sanitized ID\"), so they were removed; Sam stands still and slides when he runs. Meshes stay on Roblox under the creator's ids."
+    },
+    {
+      "name": "character:Fox",
+      "kind": "model",
+      "path": "assets/meshes/characters/Fox.rbxm",
+      "assetId": null,
+      "moderation": "pending",
+      "upload": false,
+      "placeholder": false,
+      "creator": "FOREST6653",
+      "licence": "creator-store-free",
+      "origin": "Creator Store asset 13779987258, \"fox\" (listed as \"Jumbo Stuffed Fox\") by FOREST6653, inserted through Studio's MCP server and saved with SerializationService on 2026-10-19 (tools/studio-playtest/fetch-model.luau's checks: free, no scripts), then arranged in Studio before saving: the asset is a plush fox riding an R15 avatar, and only the fox (its \"PetModel\") is kept, given a Humanoid (it had none), scaled to 3.8 studs long, HipHeight set to stand on the ground, every part but the root unanchored and not colliding; its joints held no parts (Part0 and Part1 empty), so they were removed and each part welded to the root where it stands. It ships no animations: the Fox stands still. Meshes stay on Roblox under the creator's ids."
+    },
+    {
+      "name": "character:Lion",
+      "kind": "model",
+      "path": "assets/meshes/characters/Lion.rbxm",
+      "assetId": null,
+      "moderation": "pending",
+      "upload": false,
+      "placeholder": false,
+      "creator": "mocrews1",
+      "licence": "creator-store-free",
+      "origin": "Creator Store asset 1081455293, \"Lion Rig\" by mocrews1, inserted through Studio's MCP server and saved with SerializationService on 2026-10-19 (tools/studio-playtest/fetch-model.luau's checks: free, no scripts), then arranged in Studio before saving: the inner model \"Lion Rig\", its root turned 90 degrees to face his head (the joints take the inverse, so nothing else moves), scaled to 7.5 studs long, HipHeight set to stand on the ground, every part but the root unanchored and not colliding, and its AnimSaves (an empty test Animation and a two-keyframe \"Automatic Save\") removed. No animations: the Lion stands still. Meshes stay on Roblox under the creator's ids."
     }
   ]
 }
