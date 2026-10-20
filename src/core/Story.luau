@@ -171,6 +171,18 @@ Story.CATALOG_SLOTS = table.freeze({
 
 Story.NARRATOR = "Narrator"
 
+-- A run (MoveCharacter with `run`): how fast a Character runs, in studs a
+-- second, and how much longer than that takes it is given to arrive, at
+-- most `limit` seconds in all.
+Story.RUN = table.freeze({ speed = 16, slack = 0.5, limit = 3 })
+
+-- How long a run of `distance` studs is given before the Character is
+-- stood at its Spot: a Beat's Wait after it is at least this long, so the
+-- whole run is seen.
+function Story.runSeconds(distance: number): number
+	return math.min(Story.RUN.limit, distance / Story.RUN.speed + Story.RUN.slack)
+end
+
 export type Placed = { quest: Quest, chapter: Chapter }
 
 -- Every Quest with its Chapter, in story order.

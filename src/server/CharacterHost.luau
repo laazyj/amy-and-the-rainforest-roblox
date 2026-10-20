@@ -19,6 +19,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local ServerStorage = game:GetService("ServerStorage")
 local Workspace = game:GetService("Workspace")
 
@@ -31,13 +32,18 @@ local HAIR = Color3.fromRGB(94, 64, 44)
 local TALK = "Talk"
 -- the animations a Character may have, by name in its Animations folder
 local ANIMATIONS = { "idle", "walk", "run" }
--- how fast a Character runs, in studs a second, and how much longer than
--- that takes it is given to arrive, at most RUN_LIMIT seconds in all
-local RUN_SPEED = 16
-local RUN_SLACK = 0.5
-local RUN_LIMIT = 3
 
 local CharacterHost = {}
+
+-- the states a Character never takes: it never dies, and a just-unanchored
+-- assembly that tips as it wakes would fall down and stand getting up
+-- before it ran
+CharacterHost.NEVER_STATES = table.freeze({
+	Enum.HumanoidStateType.Dead,
+	Enum.HumanoidStateType.FallingDown,
+	Enum.HumanoidStateType.Ragdoll,
+	Enum.HumanoidStateType.GettingUp,
+})
 
 local models: { [string]: Model } = {}
 local prompts: { [string]: ProximityPrompt } = {}
@@ -110,7 +116,9 @@ local function ready(model: Model, humanoid: Humanoid)
 	humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
 	humanoid.RequiresNeck = false
 	humanoid.BreakJointsOnDeath = false
-	humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+	for _, state in CharacterHost.NEVER_STATES do
+		humanoid:SetStateEnabled(state, false)
+	end
 	local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator")
 	animator.Parent = humanoid
 
@@ -588,11 +596,26 @@ local function swap(animations: { [string]: AnimationTrack }, from: string, to: 
 	end
 end
 
+-- Sets a Humanoid off running to `to`: its root unanchored and simulated
+-- by the server, its state Running (an anchored Humanoid's state machine
+-- has not run, so it would first settle), and, once physics has stepped the
+-- woken assembly (`stepped`, which yields), told to move, unless a later
+-- move has anchored it again.
+function CharacterHost.setOff(humanoid: Humanoid, root: BasePart, to: Vector3, stepped: () -> ())
+	humanoid.WalkSpeed = Story.RUN.speed
+	root.Anchored = false
+	pcall(root.SetNetworkOwner, root, nil)
+	humanoid:ChangeState(Enum.HumanoidStateType.Running)
+	stepped()
+	if not root.Anchored then
+		humanoid:MoveTo(to)
+	end
+end
+
 -- Sets a Character running toward `at` with its run animation, and returns.
--- The run ends when it arrives, when a later move comes, or after as long
--- as running there takes and RUN_SLACK more, at most RUN_LIMIT seconds
--- (physics may not step, as in a Luau Execution task); then it stands at
--- `at`. A Beat gives the run its time with a Wait.
+-- The run ends when it arrives, when a later move comes, or after
+-- Story.runSeconds (physics may not step, as in a Luau Execution task);
+-- then it stands at `at`. A Beat gives the run its time with a Wait.
 local function runTo(id: string, model: Model, at: CFrame)
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	local root = model.PrimaryPart
@@ -603,13 +626,13 @@ local function runTo(id: string, model: Model, at: CFrame)
 	local run = {}
 	runs[id] = run
 	local animations: { [string]: AnimationTrack } = tracks[id] or {}
-	humanoid.WalkSpeed = RUN_SPEED
-	root.Anchored = false
-	pcall(root.SetNetworkOwner, root, nil)
+	local seconds = Story.runSeconds((at.Position - root.Position).Magnitude)
 	swap(animations, "idle", "run")
-	humanoid:MoveTo(at.Position)
-	local seconds = math.min(RUN_LIMIT, (at.Position - root.Position).Magnitude / RUN_SPEED + RUN_SLACK)
+	-- set off before this returns; the step and the move follow in the run
 	task.spawn(function()
+		CharacterHost.setOff(humanoid, root, at.Position, function()
+			RunService.Heartbeat:Wait()
+		end)
 		local arrived = false
 		local connection = humanoid.MoveToFinished:Connect(function()
 			arrived = true

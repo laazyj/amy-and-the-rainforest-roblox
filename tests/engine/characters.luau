@@ -106,6 +106,42 @@ describe("the Player Character", function()
 end)
 
 describe("a run", function()
+	it("never lets a Character die, fall down, ragdoll or get up, so it sets off at once", function()
+		for _, character in story.characters do
+			local model = built:FindFirstChild(character.id)
+			if model then
+				local humanoid = model:FindFirstChildOfClass("Humanoid") :: Humanoid
+				for _, state in CharacterHost.NEVER_STATES do
+					expect(humanoid:GetStateEnabled(state)).toBe(false)
+				end
+			end
+		end
+	end)
+
+	it("sets a Humanoid off unanchored and Running, and tells it to move only once physics has stepped", function()
+		local calls: { string } = {}
+		local root = { Anchored = true, SetNetworkOwner = function() end }
+		local humanoid = {
+			WalkSpeed = 0,
+			ChangeState = function(_, state: Enum.HumanoidStateType)
+				table.insert(calls, `ChangeState {state.Name}, anchored {root.Anchored}`)
+			end,
+			MoveTo = function()
+				table.insert(calls, "MoveTo")
+			end,
+		}
+		local step: thread? = nil
+		task.spawn(CharacterHost.setOff, humanoid :: any, root :: any, Vector3.zero, function()
+			table.insert(calls, "stepped")
+			step = coroutine.running()
+			coroutine.yield()
+		end)
+		expect(humanoid.WalkSpeed).toBe(world.Story.RUN.speed)
+		expect(calls).toEqual({ "ChangeState Running, anchored false", "stepped" })
+		task.spawn(assert(step, "setOff never waited for the step"))
+		expect(calls).toEqual({ "ChangeState Running, anchored false", "stepped", "MoveTo" })
+	end)
+
 	it("sets Sam running and returns, so the Beat's Wait gives the run its time", function()
 		local started = os.clock()
 		CharacterHost.moveCharacter("Sam", "GateOutside", true)

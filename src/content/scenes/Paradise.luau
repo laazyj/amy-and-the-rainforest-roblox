@@ -2,6 +2,7 @@
 -- scene:Paradise: the parallel world beyond the wall, in the site's palette
 -- (moss, gold, bubblegum pink, grape purple), where the animals live.
 
+local HeartGlade = require("./HeartGlade")
 local Story = require("../../core/Story")
 local layout = require("../layout")
 local palette = require("../palette")
@@ -10,9 +11,13 @@ local spot, zone, at, rgb = layout.spot, layout.zone, layout.at, layout.rgb
 local HOME = layout.TOWARD_HOME
 local colours = palette.colours
 
+-- Amy meets the animals in turn, from the heart glade: each faces the way
+-- she walks up to it from
+local SQUIRREL_HOME = layout.spotToward(-30, 215, HeartGlade.centre)
+
 local spots: { [string]: Story.Spot } = {
-	SquirrelHome = spot(-30, 215, HOME),
-	FoxHome = spot(35, 248, HOME),
+	SquirrelHome = SQUIRREL_HOME,
+	FoxHome = layout.spotToward(35, 248, SQUIRREL_HOME.at),
 	LionHome = spot(0, 298, HOME),
 }
 
