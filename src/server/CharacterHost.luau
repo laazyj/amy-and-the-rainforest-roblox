@@ -36,6 +36,8 @@ local ANIMATIONS = { "idle", "walk", "run" }
 local RUN_SPEED = 16
 local RUN_SLACK = 0.5
 local RUN_LIMIT = 3
+-- how long, in seconds, a Player Character has to reach the Workspace to be dressed
+local DRESS_WAIT = 10
 
 local CharacterHost = {}
 
@@ -671,6 +673,15 @@ function CharacterHost.dress(character: Model)
 	local humanoid = character:WaitForChild("Humanoid", 10)
 	if not amy or not humanoid or not humanoid:IsA("Humanoid") then
 		return
+	end
+	-- CharacterAdded fires before the Character is in the Workspace, and
+	-- ApplyDescriptionAsync fails until it is ("DataModel was not available")
+	local deadline = os.clock() + DRESS_WAIT
+	while not character:IsDescendantOf(Workspace) do
+		if os.clock() > deadline then
+			return
+		end
+		task.wait()
 	end
 	-- the description is built inside the pcall, so its errors are caught too
 	local ok, problem = pcall(function()

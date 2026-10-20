@@ -91,16 +91,48 @@ describe("the Characters", function()
 end)
 
 describe("the Player Character", function()
-	it("is dressed as Amy: her Description on Roblox's body", function()
-		local amy = assert(world.Story.character(story, "Amy")).description :: any
+	local amy = assert(world.Story.character(story, "Amy")).description :: any
+
+	-- Roblox's R15 body with nothing applied, not yet in the Workspace.
+	local function blankBody(): (Model, Humanoid)
 		local body =
 			game:GetService("Players")
 				:CreateHumanoidModelFromDescriptionAsync(Instance.new("HumanoidDescription"), Enum.HumanoidRigType.R15)
 		body.Name = "FakeAmy"
-		body.Parent = Workspace
-		CharacterHost.dress(body)
+		return body, body:FindFirstChildOfClass("Humanoid") :: Humanoid
+	end
+
+	local function expectAmysColours(body: Model)
 		expect(part(body, "UpperTorso").Color:ToHex()).toBe(Convert.colour(amy.torso):ToHex())
 		expect(part(body, "LeftLowerLeg").Color:ToHex()).toBe(Convert.colour(amy.legs):ToHex())
+	end
+
+	it("is dressed as Amy, her Description on Roblox's body, once in the Workspace as on a spawn", function()
+		local body = blankBody()
+		-- parented after dressing starts, as CharacterAdded fires before it is
+		task.defer(function()
+			body.Parent = Workspace
+		end)
+		CharacterHost.dress(body)
+		expectAmysColours(body)
+		body:Destroy()
+	end)
+
+	-- Roblox skips a Catalog item that does not load (withdrawn, removed, or
+	-- never there) and applies the rest, so a lost item costs Amy only that
+	-- item; dress relies on it
+	it("still dresses Amy, less the one item, when one of her Catalog items does not load", function()
+		local body, humanoid = blankBody()
+		body.Parent = Workspace
+		local description = CharacterHost.humanoidDescription(amy)
+		local accessories = description:GetAccessories(true)
+		local worn = #accessories
+		-- an id no Catalog item has
+		table.insert(accessories, { AssetId = 1, AccessoryType = Enum.AccessoryType.Hat })
+		description:SetAccessories(accessories, true)
+		humanoid:ApplyDescriptionAsync(description)
+		expectAmysColours(body)
+		expect(#humanoid:GetAccessories()).toBe(worn)
 		body:Destroy()
 	end)
 end)
