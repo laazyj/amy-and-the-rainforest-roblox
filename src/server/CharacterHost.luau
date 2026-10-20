@@ -683,13 +683,29 @@ function CharacterHost.dress(character: Model)
 		end
 		task.wait()
 	end
-	-- the description is built inside the pcall, so its errors are caught too
-	local ok, problem = pcall(function()
-		humanoid:ApplyDescriptionAsync(CharacterHost.humanoidDescription(amy))
-	end)
+	local ok, description = pcall(CharacterHost.humanoidDescription, amy)
 	if not ok then
-		warn(`[CharacterHost] could not dress {character.Name} as Amy: {problem}`)
+		warn(`[CharacterHost] could not dress {character.Name} as Amy: {description}`)
+		return
 	end
+	CharacterHost.wear(character, humanoid, description)
+end
+
+-- Applies `description` to `character`'s Humanoid. A Catalog item that no
+-- longer loads (taken off sale, or removed by Roblox) fails the whole
+-- description, so then it is applied again without its Catalog items: the
+-- Character loses its clothes but keeps its colours, and a warning names
+-- the first failure.
+function CharacterHost.wear(character: Model, humanoid: Humanoid, description: HumanoidDescription)
+	local ok, problem = pcall(humanoid.ApplyDescriptionAsync, humanoid, description)
+	if ok then
+		return
+	end
+	local bare = description:Clone()
+	bare:SetAccessories({}, true)
+	local bareOk, bareProblem = pcall(humanoid.ApplyDescriptionAsync, humanoid, bare)
+	local outcome = if bareOk then "wearing its colours only" else `and its colours did not either: {bareProblem}`
+	warn(`[CharacterHost] {character.Name}'s Catalog items did not load ({problem}), {outcome}`)
 end
 
 -- Dresses `player`'s Character as Amy each time it spawns.

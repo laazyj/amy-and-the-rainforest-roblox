@@ -91,19 +91,42 @@ describe("the Characters", function()
 end)
 
 describe("the Player Character", function()
-	it("is dressed as Amy, her Description on Roblox's body, once in the Workspace as on a spawn", function()
-		local amy = assert(world.Story.character(story, "Amy")).description :: any
+	local amy = assert(world.Story.character(story, "Amy")).description :: any
+
+	-- Roblox's R15 body with nothing applied, not yet in the Workspace.
+	local function blankBody(): (Model, Humanoid)
 		local body =
 			game:GetService("Players")
 				:CreateHumanoidModelFromDescriptionAsync(Instance.new("HumanoidDescription"), Enum.HumanoidRigType.R15)
 		body.Name = "FakeAmy"
+		return body, body:FindFirstChildOfClass("Humanoid") :: Humanoid
+	end
+
+	local function expectAmysColours(body: Model)
+		expect(part(body, "UpperTorso").Color:ToHex()).toBe(Convert.colour(amy.torso):ToHex())
+		expect(part(body, "LeftLowerLeg").Color:ToHex()).toBe(Convert.colour(amy.legs):ToHex())
+	end
+
+	it("is dressed as Amy, her Description on Roblox's body, once in the Workspace as on a spawn", function()
+		local body = blankBody()
 		-- parented after dressing starts, as CharacterAdded fires before it is
 		task.defer(function()
 			body.Parent = Workspace
 		end)
 		CharacterHost.dress(body)
-		expect(part(body, "UpperTorso").Color:ToHex()).toBe(Convert.colour(amy.torso):ToHex())
-		expect(part(body, "LeftLowerLeg").Color:ToHex()).toBe(Convert.colour(amy.legs):ToHex())
+		expectAmysColours(body)
+		body:Destroy()
+	end)
+
+	it("keeps Amy's colours and wears nothing when a Catalog item no longer loads", function()
+		local body, humanoid = blankBody()
+		body.Parent = Workspace
+		local description = CharacterHost.humanoidDescription(amy)
+		-- an id no Catalog item has
+		description:SetAccessories({ { AssetId = 1, AccessoryType = Enum.AccessoryType.Hat } }, true)
+		CharacterHost.wear(body, humanoid, description)
+		expectAmysColours(body)
+		expect(body:FindFirstChildOfClass("Accessory")).toBeNil()
 		body:Destroy()
 	end)
 end)
