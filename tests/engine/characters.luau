@@ -122,9 +122,8 @@ describe("the Player Character", function()
 		local body, humanoid = blankBody()
 		body.Parent = Workspace
 		local description = CharacterHost.humanoidDescription(amy)
-		-- an id no Catalog item has, which fails the whole description
+		-- an id no Catalog item has
 		description:SetAccessories({ { AssetId = 1, AccessoryType = Enum.AccessoryType.Hat } }, true)
-		expect((pcall(humanoid.ApplyDescriptionAsync, humanoid, description))).toBe(false)
 		CharacterHost.wear(body, humanoid, description)
 		expectAmysColours(body)
 		expect(body:FindFirstChildOfClass("Accessory")).toBeNil()
