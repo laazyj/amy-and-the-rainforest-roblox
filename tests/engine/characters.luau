@@ -118,15 +118,21 @@ describe("the Player Character", function()
 		body:Destroy()
 	end)
 
-	it("keeps Amy's colours and wears nothing when a Catalog item no longer loads", function()
+	-- Roblox skips a Catalog item that does not load (withdrawn, removed, or
+	-- never there) and applies the rest, so a lost item costs Amy only that
+	-- item; dress relies on it
+	it("still dresses Amy, less the one item, when one of her Catalog items does not load", function()
 		local body, humanoid = blankBody()
 		body.Parent = Workspace
 		local description = CharacterHost.humanoidDescription(amy)
+		local accessories = description:GetAccessories(true)
+		local worn = #accessories
 		-- an id no Catalog item has
-		description:SetAccessories({ { AssetId = 1, AccessoryType = Enum.AccessoryType.Hat } }, true)
-		CharacterHost.wear(body, humanoid, description)
+		table.insert(accessories, { AssetId = 1, AccessoryType = Enum.AccessoryType.Hat })
+		description:SetAccessories(accessories, true)
+		humanoid:ApplyDescriptionAsync(description)
 		expectAmysColours(body)
-		expect(body:FindFirstChildOfClass("Accessory")).toBeNil()
+		expect(#humanoid:GetAccessories()).toBe(worn)
 		body:Destroy()
 	end)
 end)

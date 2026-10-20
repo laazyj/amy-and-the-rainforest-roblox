@@ -327,7 +327,7 @@ in the "Asset ids" PR the workflow opens.
 |---|---|---|
 | `owner` | Clara's illustrations (the owner's family's work, used with the owner's permission), and placeholders generated in this repository | Record in `origin` which original it came from. |
 | `creator-store-free` | Free models, sounds and fonts from the Creator Store, and free Catalog items from the Marketplace | Fetched as the plan's section 5.5 says. Record the Creator Store asset id and creator in `origin`. Only items marked free. |
-| `marketplace` | A paid Catalog item from the Marketplace | The game dresses Amy in it through a server HumanoidDescription; nothing is bought, and the player need not own it. Record the price in `origin`. The one risk: the creator can take it off sale, and then Amy wears none of her Catalog items, only her colours, until it is re-picked. Only kind `catalog` (tier 0). |
+| `marketplace` | A paid Catalog item from the Marketplace | The game dresses Amy in it through a server HumanoidDescription; nothing is bought, and the player need not own it. Record the price in `origin`. The one risk: the creator can take it off sale, and then Amy loses that item (Roblox skips it and applies the rest; tier 2 proves it). Only kind `catalog` (tier 0). |
 | `cc0` | Public-domain sounds or images | Record the source URL in `origin`. |
 | `cc-by` | Free-licence sounds or images that need credit | `attribution` is required and goes in the credits. |
 | `synthesised` | Audio generated for this game | Record the tool and settings in `origin`. |
