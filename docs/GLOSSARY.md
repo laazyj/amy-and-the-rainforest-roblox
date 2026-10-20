@@ -55,7 +55,7 @@ Scene (look + sound)                     Player
 | **Beat** | A named, staged moment: a fixed list of World commands, with optional waits, played at a Hook. Beats are how the story moves the world. See [enumeration](#beats). | `beat:sam_catches` |
 | **Hook** | A point in a Quest's life where Beats run. Declared in the Chapter's `hooks.luau`. See [enumeration](#hook-names). | `chapter1.sneak_out_1.onComplete → sam_catches` |
 | **Scene** | A part of the world with its own look and sound: terrain, Props, Spots, Zones, and the music and ambience Cues that play while Amy is inside its **bounds**, a box in the Scene's file. See [enumeration](#scenes). | `scene:ForestWall` |
-| **Spot** | A named position and facing inside a Scene. Content never holds raw coordinates; it names Spots. | `spot:GardenGateInside` |
+| **Spot** | A named position and facing inside a Scene. Content never holds raw coordinates; it names Spots. A Character's Spot faces Amy wherever it speaks: the Zone she has entered, or the way she walks up to talk to it (`tests/lune/content/Stand.spec.luau`). | `spot:GardenGateInside` |
 | **Zone** | A named invisible volume the player can enter. Entering one is the Player event `EnteredZone`. See [enumeration](#zones). | `zone:ForestGap` |
 | **Prop** | A placed object with named states. See [enumeration](#props). | `prop:Machine` |
 | **Character** | A named being in the world with a kind, a display name and a home Spot. A human is built from its Description; any other Character from its Character model, or as its Placeholder until it has one (`Story.build`). Every Character has a Humanoid and plays its `idle` animation, and its `run` one while it runs. See [enumeration](#characters-and-speakers). | `character:Sam` "Sam the Dog" |
@@ -268,7 +268,7 @@ its `hooks.luau`.
 
 | Beat | Hook | Does |
 |---|---|---|
-| `beat:sam_catches` | `chapter1.sneak_out_1.onComplete`, `chapter1.sneak_out_2.onComplete` | `PlayCue(cue:sam_bark)`; Sam runs after Amy to the gate (`MoveCharacter(Sam, spot:GateOutside, run)`, then `Wait` 1 s) and brings her back into the garden |
+| `beat:sam_catches` | `chapter1.sneak_out_1.onComplete`, `chapter1.sneak_out_2.onComplete` | `PlayCue(cue:sam_bark)`; Sam runs after Amy through the middle of the gate (`MoveCharacter(Sam, spot:GateOutside, run)`, then `Wait` 1.2 s, at least the run's `Story.runSeconds`) and brings her back into the garden |
 | `beat:sam_goes_to_farm` | `chapter2.walk_to_forest.onStart` | Sam leaves for the farm |
 | `beat:forest_wall_reveal` | `chapter2.walk_to_forest.onComplete` | `FrameShot(shot:ForestWallReveal)`: the wall of trees, the gap centred |
 | `beat:paradise_reveal` | `chapter2.enter_forest.onComplete` | `PlayCue(cue:paradise_shimmer)`, `SetLighting(lighting:paradise)` |
@@ -287,9 +287,9 @@ its `hooks.luau`.
 | `spot:DadHome` | `scene:Garden` | Dad's home Spot |
 | `spot:MumHome` | `scene:Garden` | Mum's home Spot |
 | `spot:SamHome` | `scene:Garden` | Sam's home Spot, by the gate |
-| `spot:GateOutside` | `scene:Garden` | `beat:sam_catches`: Sam runs to Amy, just outside the gate |
+| `spot:GateOutside` | `scene:Garden` | `beat:sam_catches`: Sam runs to Amy, just outside the middle of the gate, clear of its posts |
 | `spot:GardenInside` | `scene:Garden` | `beat:sam_catches`: Amy lands back in the garden |
-| `spot:SamGuardPost` | `scene:Garden` | `beat:sam_catches`: Sam settles beside her |
+| `spot:SamGuardPost` | `scene:Garden` | `beat:sam_catches`: Sam settles beside her, watching the gate |
 | `spot:Farm` | `scene:Village` | `beat:sam_goes_to_farm` |
 | `spot:MachineBay` | `scene:Field` | Where `prop:Machine` parks |
 | `spot:DadAtMachine` | `scene:Field` | `beat:machine_arrives` |

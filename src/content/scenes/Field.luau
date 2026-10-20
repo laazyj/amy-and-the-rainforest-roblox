@@ -11,9 +11,13 @@ local spot, zone, at, rgb, dressed = layout.spot, layout.zone, layout.at, layout
 local FOREST = layout.TOWARD_FOREST
 local colours = palette.colours
 
+-- the patch of grass between the machine and the forest
+local MACHINE_FRONT = zone(at(0, 5, 110), at(16, 10, 9))
+
 local spots: { [string]: Story.Spot } = {
 	MachineBay = spot(0, 95, FOREST),
-	DadAtMachine = spot(9, 108, FOREST),
+	-- Dad faces Amy, who stands in front of the machine to explain
+	DadAtMachine = layout.spotToward(9, 108, MACHINE_FRONT.centre),
 	MumAtMachine = spot(-9, 106, FOREST),
 	SamAtMachine = spot(13, 104, FOREST),
 	Villager1 = spot(-14, 84, FOREST),
@@ -25,8 +29,7 @@ local spots: { [string]: Story.Spot } = {
 local zones: { [string]: Story.Zone } = {
 	-- the grass in front of the looming tree wall
 	ForestEdge = zone(at(0, 5, 136), at(60, 10, 8)),
-	-- the patch of grass between the machine and the forest
-	MachineFront = zone(at(0, 5, 110), at(16, 10, 9)),
+	MachineFront = MACHINE_FRONT,
 }
 
 -- Each Prop's states, and how PropHost places it: prop:Machine parks at

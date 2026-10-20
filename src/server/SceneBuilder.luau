@@ -345,7 +345,7 @@ function SceneBuilder.build()
 			local p = a:Lerp(b, t)
 			makePart({
 				Name = "FencePost",
-				Size = Vector3.new(0.8, 3.4, 0.8),
+				Size = Vector3.new(fence.post, 3.4, fence.post),
 				CFrame = CFrame.new(p.X, groundY + 1.7, p.Z),
 				Color = Color3.fromRGB(150, 116, 78),
 				Material = Enum.Material.Wood,

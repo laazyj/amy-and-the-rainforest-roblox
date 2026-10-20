@@ -211,7 +211,7 @@ return function(t: any)
 			end
 		)
 
-		it("plays beat sam_catches after both sneak-outs, waiting 1 s (Sam's run) and 0.4 s each time", function()
+		it("plays beat sam_catches after both sneak-outs, waiting 1.2 s (Sam's run) and 0.4 s each time", function()
 			local waits = {}
 			for _, step in walk.steps do
 				for _, command in step.commands do
@@ -221,7 +221,7 @@ return function(t: any)
 				end
 			end
 			-- a Chapter card's 3.2 s for each Chapter, Sam's catch twice in Chapter One
-			expect(waits).toEqual({ 3.2, 1, 0.4, 1, 0.4, 3.2, 3.2, 3.2 })
+			expect(waits).toEqual({ 3.2, 1.2, 0.4, 1.2, 0.4, 3.2, 3.2, 3.2 })
 		end)
 
 		it("plays beat sam_goes_to_farm when chapter2.walk_to_forest starts, before its Objective", function()

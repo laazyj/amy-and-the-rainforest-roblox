@@ -29,6 +29,14 @@ function layout.spot(x: number, z: number, facing: Story.Vec3): Story.Spot
 	return { at = layout.at(x, 0, z), facing = facing }
 end
 
+-- A Spot on the ground at (x, z) facing `toward` across the ground: a
+-- Character's Spot faces where Amy talks with it from.
+function layout.spotToward(x: number, z: number, toward: Story.Vec3): Story.Spot
+	local dx, dz = toward.x - x, toward.z - z
+	local length = math.sqrt(dx * dx + dz * dz)
+	return layout.spot(x, z, { x = dx / length, y = 0, z = dz / length })
+end
+
 -- A Zone: its centre and size.
 function layout.zone(centre: Story.Vec3, size: Story.Vec3): Story.Zone
 	return { centre = centre, size = size }
