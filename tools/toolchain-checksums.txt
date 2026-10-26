@@ -11,8 +11,8 @@
 # tool    tag     platform       asset                           sha256
 rojo      v7.7.1  linux-x86_64   rojo-7.7.1-linux-x86_64.zip     00feb4fa0829a1dd72b49df2639da519a352bfe13cadcd83969e2ba2bb5693c4
 rojo      v7.7.1  macos-aarch64  rojo-7.7.1-macos-aarch64.zip    a702659940f6ca061a62df34aa0002ff024aa264efb859007ba890e9524753a4
-lune      v0.11.0 linux-x86_64   lune-0.11.0-linux-x86_64.zip    5a0ea32c3e13e5e3b1dc415c2056bcfe44258b3a811dcd473c50e3b437d10f72
-lune      v0.11.0 macos-aarch64  lune-0.11.0-macos-aarch64.zip   b609e986a81c46c168b571b8dca9ed7c350502a0b09b1de7401200f707283b57
+lune      v0.11.1 linux-x86_64   lune-0.11.1-linux-x86_64.zip    39859282ce677fce19e6eb45c37596a90a25c324c95b4e7e02d428b6cae294a1
+lune      v0.11.1 macos-aarch64  lune-0.11.1-macos-aarch64.zip   0592c9b37c06f208f7d90e5d750e76101b9ba6191cd693ef34667f4f1f1063d4
 wally     v0.3.2  linux-x86_64   wally-v0.3.2-linux.zip          21fdbb53dfee397fd21ca7fdd208db65cff0f87f0fd045cdb594b951981bd73f
 wally     v0.3.2  macos-aarch64  wally-v0.3.2-macos.zip          f743afd894bd41f285fd45f638f368af6f01f77078ae140f2991a3fb4612d2f0
 stylua    v2.6.0  linux-x86_64   stylua-linux-x86_64.zip         a485f72bbfa22e4642e77a84b5edc2611a5cab7477b34e2e709dd8f78e919895
